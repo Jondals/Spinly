@@ -1,13 +1,280 @@
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+* {
+    box-sizing: border-box;
+    font-family: var(--font-family);
+    color: var(--font-color);
+    margin: 0;
+    padding: 0;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+html,
+body,
+#root {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+html {
+    background-color: var(--bg-color);
+}
+
+:root {
+    --bg-color: #000000;
+    --bg-header-color: #13131b;
+    --bg-wheelmanager-color: #121214;
+    --bg-options-color: #1f1f27;
+    --bg-wheel-color: #0d0d10;
+    --font-color: #ffffff;
+    --font-color-light: #bab7c9;
+    --font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --color-border: #2a2a35;
+    --color-hover: #24242d;
+    --color-active: #2b2b35;
+}
+
+.App {
+    width: 100%;
+    height: 100%;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.Header {
+    background-color: var(--bg-header-color);
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 5rem;
+    min-height: 5rem;
+    gap: 1rem;
+    padding: 0 1.5rem;
+    border-bottom: 1px solid var(--color-border);
+
+    .spinly-logo {
+        height: 2.5rem;
+        width: 2.5rem;
+        object-fit: contain;
+    }
+
+    h1 {
+        font-size: 1.4rem;
+        font-weight: 600;
+    }
+
+    .spinly-theme {
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-left: auto;
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 0.5rem;
+
+        svg {
+            width: 1.4rem;
+            height: 1.4rem;
+        }
+
+        &:hover {
+            background-color: var(--color-hover);
+        }
+    }
+
+    .spinly-profile-picture {
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 50%;
+
+        svg {
+            width: 2.2rem;
+            height: 2.2rem;
+        }
+    }
+}
+
+.Main {
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 20rem 20rem minmax(0, 1fr);
+    overflow: hidden;
+}
+
+.Wheelmanager {
+    background-color: var(--bg-wheelmanager-color);
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    padding: 2rem 1rem 1rem;
+    border-right: 1px solid var(--color-border);
+
+    h1 {
+        font-size: 1.4rem;
+        font-weight: 600;
+    }
+
+    h3 {
+        color: var(--font-color-light);
+        font-size: 0.9rem;
+        font-weight: 400;
+        margin-top: 0.2rem;
+        margin-bottom: 2rem;
+    }
+
+    .button-menu {
+        background-color: transparent;
+        border: none;
+        color: var(--font-color-light);
+        font-size: 0.95rem;
+        text-align: left;
+        border-radius: 0.5rem;
+        padding: 0.7rem 0.8rem;
+        width: 100%;
+        min-height: 2.5rem;
+        cursor: pointer;
+
+        &:hover {
+            background-color: var(--color-hover);
+            color: var(--font-color);
+        }
+    }
+
+    .button-menu-option {
+        background-color: var(--bg-options-color);
+        border: 1px solid var(--color-border);
+        border-radius: 0.5rem;
+        margin-top: auto;
+        min-height: 3rem;
+        width: 100%;
+        cursor: pointer;
+
+        &:hover {
+            background-color: var(--color-hover);
+        }
+    }
+}
+
+.Options {
+    background-color: var(--bg-options-color);
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    padding: 2rem 1.5rem;
+    border-right: 1px solid var(--color-border);
+    overflow-y: auto;
+}
+
+.Wheel {
+    background-color: var(--bg-wheel-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+@media (max-width: 1000px) {
+    .Main {
+        grid-template-columns: 16rem 17rem minmax(0, 1fr);
+    }
+
+    .Wheelmanager {
+        padding: 1.5rem 0.75rem 0.75rem;
+    }
+
+    .Options {
+        padding: 1.5rem 1rem;
+    }
+}
+
+@media (max-width: 750px) {
+    html,
+    body,
+    #root {
+        overflow: auto;
+    }
+
+    .App {
+        min-height: 100vh;
+        height: auto;
+        overflow: visible;
+    }
+
+    .Header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        height: 4rem;
+        min-height: 4rem;
+        padding: 0 1rem;
+    }
+
+    .Header {
+        .spinly-logo {
+            width: 2rem;
+            height: 2rem;
+        }
+
+        h1 {
+            font-size: 1.2rem;
+        }
+    }
+
+    .Main {
+        display: flex;
+        flex-direction: column;
+        height: auto;
+        min-height: calc(100vh - 4rem);
+        overflow: visible;
+    }
+
+    .Wheelmanager {
+        width: 100%;
+        height: auto;
+        min-height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--color-border);
+
+        h3 {
+            margin-bottom: 1rem;
+        }
+
+        .button-menu-option {
+            margin-top: 1rem;
+        }
+    }
+
+    .Options {
+        width: 100%;
+        height: auto;
+        min-height: 12rem;
+        border-right: none;
+        border-bottom: 1px solid var(--color-border);
+        overflow: visible;
+    }
+
+    .Wheel {
+        width: 100%;
+        min-height: 60vh;
+        height: 60vh;
+    }
 }

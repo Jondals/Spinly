@@ -1,4 +1,5 @@
 import React from 'react';
+import '../css/Wheel.css';
 
 function Wheel() {
     return(

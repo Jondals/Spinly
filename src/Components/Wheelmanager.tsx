@@ -1,4 +1,5 @@
 import React from 'react';
+import '../css/WheelManager.css';
 
 function Wheelmanager() {
     return (
@@ -8,7 +9,7 @@ function Wheelmanager() {
             <button className='button-menu'>Wheel editor</button>
             <button className='button-menu'>Presets</button>
             <button className='button-menu'>Themes</button>
-            <button className='button-menu-option'>+ Add Option</button>
+           {/*<button className='button-menu-option'>+ Add Option</button>*/}
         </div>
     )
 }

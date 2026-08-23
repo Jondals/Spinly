@@ -1,5 +1,4 @@
 import React from 'react';
-import { Analytics } from "@vercel/analytics/react"
 import Header from './Components/Header'
 import Wheelmanager from './Components/Wheelmanager'
 import Options from './Components/Options'

@@ -83,7 +83,7 @@
     font-size: clamp(0.55rem, calc(1.05rem - var(--option-count) * 0.045rem), 0.95rem);
 
     /* ancho maximo */
-    max-width: calc(1.44 * min(30vmin, 13rem) * sin(calc(180deg / var(--option-count))) - 0.4rem);
+    max-width: 42%;
 }
 
 .wheel-hub {

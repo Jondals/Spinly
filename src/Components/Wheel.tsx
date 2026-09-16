@@ -29,6 +29,7 @@ function Wheel({ options }: WheelProps) {
 
     return (
         <div className="Wheel">
+            {winner && !spinning && (<p className="wheel-result"> ¡{winner}! </p>)}
             <div className="wheel-container">
                 <div className="wheel-pointer" />
                 <div className={`wheel-disc ${!hasOptions ? 'wheel-disc--empty' : ''}`}
@@ -48,7 +49,6 @@ function Wheel({ options }: WheelProps) {
             </div>
 
             <button className="wheel-spin-button" onClick={handleSpin} disabled={spinning || !hasOptions}> {spinning ? 'GIRANDO...' : 'GIRAR'} </button>
-            {winner && !spinning && (<p className="wheel-result"> ¡Toca {winner}! </p>)}
         </div>
     );
 }

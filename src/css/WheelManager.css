@@ -21,6 +21,16 @@
     margin-bottom: 1.75rem;
 }
 
+/* Boton que DESPLIEGA el menu en mobile (oculto en desktop) */
+.wheelmanager-toggle {
+    display: none;
+}
+
+.wheelmanager-body {
+    display: flex;
+    flex-direction: column;
+}
+
 .button-menu {
     width: 100%;
     text-align: left;
@@ -55,4 +65,62 @@
 
 .button-menu--active:hover {
     background-color: var(--bg-transparence);
+}
+
+/* ===== Mobile: se convierte en menu DESPLEGABLE ===== */
+@media (max-width: 750px) {
+    .Wheelmanager {
+        height: auto;
+        min-height: auto;
+        padding: 0;
+        border-right: none;
+        border-bottom: 1px solid var(--color-border);
+    }
+
+    .wheelmanager-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        padding: 1rem 1.25rem;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        font-weight: 600;
+        text-align: left;
+
+        .toggle-arrow {
+            display: inline-block;
+            transition: transform 0.2s ease;
+            color: var(--font-color-muted);
+        }
+    }
+
+    /* Cerrado por defecto; .Wheelmanager--open lo abre (lo controla React) */
+    .wheelmanager-body {
+        display: none;
+        padding: 0 1.25rem 1.25rem;
+    }
+
+    .Wheelmanager--open .wheelmanager-body {
+        display: flex;
+    }
+
+    .Wheelmanager--open .toggle-arrow {
+        transform: rotate(180deg);
+    }
+
+    .Wheelmanager h1 {
+        font-size: 1.15rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .Wheelmanager h3 {
+        margin-bottom: 1rem;
+    }
+
+    .button-menu-option {
+        margin-top: 1rem;
+    }
 }

@@ -1,5 +1,4 @@
 /* COLORES DE LAS OPCIONES */
-
 .option-color-indigo { background-color: var(--item-indigo); }
 .option-color-coral { background-color: var(--item-coral); }
 .option-color-amber { background-color: var(--item-amber); }
@@ -145,7 +144,8 @@
                 }
             }
 
-            &:hover .remove-option-button, &:focus-within .remove-option-button {
+            &:hover .remove-option-button,
+            &:focus-within .remove-option-button {
                 opacity: 1;
             }
         }
@@ -153,14 +153,13 @@
 
     .options-bottom {
         padding: 1.25rem 1.5rem;
-
         border-top: 1px solid var(--color-border);
 
         .add-option-button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
-        
+
         .add-option-button {
             width: 100%;
             height: 2.75rem;
@@ -175,7 +174,6 @@
             font: inherit;
             font-size: 0.8rem;
             cursor: pointer;
-
             transition:
                 background-color 0.15s,
                 border-color 0.15s,
@@ -191,6 +189,21 @@
                 color: var(--color-primary-light);
                 font-size: 1rem;
             }
+        }
+    }
+}
+
+/* ===== Mobile ===== */
+@media (max-width: 750px) {
+    .Options {
+        height: auto;
+        min-height: 12rem;
+        border-right: none;
+        border-bottom: none;
+        overflow: visible;
+
+        .container-options {
+            max-height: 40vh;
         }
     }
 }

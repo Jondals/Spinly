@@ -59,3 +59,23 @@
         }
     }
 }
+
+@media (max-width: 750px) {
+    .Header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        height: 4rem;
+        min-height: 4rem;
+        padding: 0 1rem;
+
+        .spinly-logo {
+            width: 2rem;
+            height: 2rem;
+        }
+
+        h1 {
+            font-size: 1.2rem;
+        }
+    }
+}

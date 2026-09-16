@@ -23,10 +23,10 @@ export function createOption(name, index) {
 
 export function createDefaultOptions() {
     return [
-        createOption('Pizza', 0),
-        createOption('Sushi', 1),
-        createOption('Tacos', 2),
-        createOption('Pasta', 3)
+        createOption('Option 0', 0),
+        createOption('Option 1', 1),
+        createOption('Option 2', 2),
+        createOption('Option 3', 3)
     ];
 }
 

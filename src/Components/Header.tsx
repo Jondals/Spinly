@@ -24,10 +24,6 @@ function Header() {
                     <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1.992a10 10 0 1 0 9.236 13.838c.341-.82-.476-1.644-1.298-1.31a6.5 6.5 0 0 1-6.864-10.787l.077-.08c.551-.63.113-1.653-.758-1.653h-.266l-.068-.006z"/></svg>
                 )}
             </button>
-
-            <button className='spinly-profile-picture'>
-                <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" fill="currentColor" stroke="currentColor" viewBox="-2.4 -2.4 28.8 28.8"><g id="SVGRepo_iconCarrier" fill="#000"><path d="M12 22.01c5.523 0 10-4.477 10-10s-4.477-10-10-10-10 4.477-10 10 4.477 10 10 10Z" opacity=".4"/><path d="M12 6.94c-2.07 0-3.75 1.68-3.75 3.75 0 2.03 1.59 3.68 3.7 3.74h.18a3.743 3.743 0 0 0 3.62-3.74c0-2.07-1.68-3.75-3.75-3.75Zm6.78 12.42A9.98 9.98 0 0 1 12 22.01c-2.62 0-5-1.01-6.78-2.65.24-.91.89-1.74 1.84-2.38 2.73-1.82 7.17-1.82 9.88 0 .96.64 1.6 1.47 1.84 2.38Z"/></g></svg>
-            </button>
         </div>
     );
 }

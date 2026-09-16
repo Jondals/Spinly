@@ -60,6 +60,8 @@
     }
 }
 
+
+
 @media (max-width: 750px) {
     .Header {
         position: sticky;
@@ -77,5 +79,41 @@
         h1 {
             font-size: 1.2rem;
         }
+
+        .spinly-menu-button {
+            display: none;
+            position: relative;
+            width: 2.5rem;
+            height: 2.5rem;
+            background: transparent;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.28rem;
+
+        }
+        .hamburger-line {
+            display: block;
+            width: 1.35rem;
+            height: 2px;
+            background-color: var(--font-color);
+            border-radius: 2px;
+            transition: transform 0.25s ease, opacity 0.2s ease;
+        }
+
+        &:hover {
+            background-color: var(--color-hover);
+        }
+        
+        &.spinly-menu-button--open {
+            .hamburger-line:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+            .hamburger-line:nth-child(2) { opacity: 0; }
+            .hamburger-line:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+        }
     }
 }
+
+

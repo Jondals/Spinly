@@ -21,7 +21,8 @@
     margin-bottom: 1.75rem;
 }
 
-/* Boton que DESPLIEGA el menu en mobile (oculto en desktop) */
+/* Este botón toggle interno ya no lo usamos en mobile.
+   Lo dejamos oculto siempre para no romper nada. */
 .wheelmanager-toggle {
     display: none;
 }
@@ -67,60 +68,81 @@
     background-color: var(--bg-transparence);
 }
 
-/* ===== Mobile: se convierte en menu DESPLEGABLE ===== */
+/* ===== Mobile: Wheelmanager como DRAWER lateral (entra desde la derecha) ===== */
 @media (max-width: 750px) {
     .Wheelmanager {
-        height: auto;
-        min-height: auto;
-        padding: 0;
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: auto;
+        width: min(18rem, 85vw);
+        height: 100vh;
+        padding: 5rem 1.25rem 1.5rem; /* espacio arriba para el header */
         border-right: none;
-        border-bottom: 1px solid var(--color-border);
+        border-left: 1px solid var(--color-border);
+        z-index: 30;
+
+        /* Cerrado: fuera de pantalla a la derecha */
+        transform: translateX(100%);
+        transition: transform 0.25s ease;
     }
 
-    .wheelmanager-toggle {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        width: 100%;
-        padding: 1rem 1.25rem;
-        background: transparent;
-        border: none;
-        cursor: pointer;
-        font-size: 1rem;
-        font-weight: 600;
-        text-align: left;
-
-        .toggle-arrow {
-            display: inline-block;
-            transition: transform 0.2s ease;
-            color: var(--font-color-muted);
-        }
+    .Wheelmanager--open {
+        transform: translateX(0);
     }
 
-    /* Cerrado por defecto; .Wheelmanager--open lo abre (lo controla React) */
-    .wheelmanager-body {
-        display: none;
-        padding: 0 1.25rem 1.25rem;
+    /* Overlay opcional para cerrar tocando fuera */
+    .Wheelmanager-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 20;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
     }
 
-    .Wheelmanager--open .wheelmanager-body {
-        display: flex;
+    .Wheelmanager-backdrop--visible {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
+
+@media (max-width: 750px) {
+    .Wheelmanager {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: auto;
+        width: min(18rem, 85vw);
+        height: 100vh;
+        padding: 5rem 1.25rem 1.5rem;
+        border-right: none;
+        border-left: 1px solid var(--color-border);
+        z-index: 60;
+        transform: translateX(100%);
+        transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+        overflow-y: auto;
     }
 
-    .Wheelmanager--open .toggle-arrow {
-        transform: rotate(180deg);
+    .Wheelmanager--open {
+        transform: translateX(0);
     }
 
-    .Wheelmanager h1 {
-        font-size: 1.15rem;
-        margin-bottom: 0.25rem;
+    .Wheelmanager-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 50;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
     }
 
-    .Wheelmanager h3 {
-        margin-bottom: 1rem;
-    }
-
-    .button-menu-option {
-        margin-top: 1rem;
+    .Wheelmanager-backdrop--visible {
+        opacity: 1;
+        pointer-events: auto;
     }
 }

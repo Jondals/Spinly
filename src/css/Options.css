@@ -1,3 +1,14 @@
+/* COLORES DE LAS OPCIONES */
+
+.option-color-indigo { background-color: var(--item-indigo); }
+.option-color-coral { background-color: var(--item-coral); }
+.option-color-amber { background-color: var(--item-amber); }
+.option-color-teal { background-color: var(--item-teal); }
+.option-color-pink { background-color: var(--item-pink); }
+.option-color-violet { background-color: var(--item-violet); }
+.option-color-sky { background-color: var(--item-sky); }
+.option-color-mint { background-color: var(--item-mint); }
+
 .Options {
     background-color: var(--bg-options-color);
     display: flex;
@@ -48,6 +59,8 @@
         .option-item {
             display: flex;
             align-items: center;
+            cursor: default;
+            transition: opacity 0.15s ease, border-color 0.15s ease;
             gap: 0.85rem;
             height: 3.25rem;
             min-height: 3.25rem;
@@ -67,6 +80,14 @@
                 height: 0.75rem;
                 min-width: 0.75rem;
                 border-radius: 50%;
+            }
+
+            .option-item--dragging {
+                opacity: 0.4;
+            }
+
+            .option-item--over {
+                border-top: 2px solid var(--color-focus);
             }
 
             .option-color-blue {
@@ -135,6 +156,11 @@
 
         border-top: 1px solid var(--color-border);
 
+        .add-option-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
         .add-option-button {
             width: 100%;
             height: 2.75rem;

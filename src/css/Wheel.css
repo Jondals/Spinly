@@ -1,11 +1,143 @@
 .Wheel {
     background-color: var(--bg-wheel-color);
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 2rem;
     width: 100%;
     height: 100%;
     min-width: 0;
     min-height: 0;
     overflow: hidden;
+}
+
+.wheel-container {
+    position: relative;
+    width: min(60vmin, 26rem);
+    height: min(60vmin, 26rem);
+}
+
+.wheel-pointer {
+    position: absolute;
+    top: -0.25rem;
+    left: 50%;
+    width: 1.1rem;
+    height: 1.1rem;
+    background: var(--wheel-pointer-color);
+    border-radius: 0.2rem;
+    transform: translateX(-50%) rotate(45deg);
+    z-index: 3;
+}
+
+.wheel-disc {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 0.35rem solid var(--color-border-dark);
+    transition-property: transform;
+    transition-timing-function: cubic-bezier(0.16, 0.84, 0.2, 1);
+    --option-count: 4;
+}
+
+.wheel-disc--empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--wheel-color-dark);
+    transition: none;
+}
+
+.wheel-empty-text {
+    max-width: 60%;
+    text-align: center;
+    color: var(--font-color-muted);
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.wheel-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 14%;
+    transform-origin: 50% 50%;
+    pointer-events: none;
+}
+
+.wheel-label-text {
+    color: var(--font-color-wheel); 
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: center;
+    font-weight: 700;
+    letter-spacing: 0.1rem;
+    text-transform: uppercase;
+
+    /* tamaño de fuente segun numero de opciones */
+    font-size: clamp(0.55rem, calc(1.05rem - var(--option-count) * 0.045rem), 0.95rem);
+
+    /* ancho maximo */
+    max-width: calc(1.44 * min(30vmin, 13rem) * sin(calc(180deg / var(--option-count))) - 0.4rem);
+}
+
+.wheel-hub {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 3.5rem;
+    height: 3.5rem;
+    background: var(--wheel-center-color);
+    border: 0.35rem solid var(--color-border);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+}
+
+.wheel-spin-button {
+    position: relative;
+    padding: 1.1rem 3.5rem;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.12rem;
+    color: #ffffff;
+    background: linear-gradient(135deg, var(--color-focus-light), var(--color-focus));
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: 0 8px 24px -6px rgba(99, 102, 241, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.wheel-spin-button:hover:not(:disabled) {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 28px -6px rgba(99, 102, 241, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+    filter: brightness(1.08);
+}
+
+.wheel-spin-button:active:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+.wheel-spin-button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.wheel-result {
+    color: var(--font-color-light);
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .wheel-disc {
+        transition-duration: 0.01ms !important;
+    }
 }

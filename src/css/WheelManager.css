@@ -21,9 +21,8 @@
     margin-bottom: 1.75rem;
 }
 
-/* Este botón toggle interno ya no lo usamos en mobile.
-   Lo dejamos oculto siempre para no romper nada. */
-.wheelmanager-toggle {
+/* Overlay del drawer: en desktop el panel ya está visible, así que nunca se muestra */
+.Wheelmanager-backdrop {
     display: none;
 }
 
@@ -77,61 +76,35 @@
         bottom: 0;
         left: auto;
         width: min(18rem, 85vw);
-        height: 100vh;
-        padding: 5rem 1.25rem 1.5rem; /* espacio arriba para el header */
+        /* height auto (no 100vh) para que iOS no corte el final del panel */
+        height: auto;
+        padding: 4.75rem 1.25rem 1.5rem; /* hueco arriba para el header */
         border-right: none;
         border-left: 1px solid var(--color-border);
-        z-index: 30;
-
-        /* Cerrado: fuera de pantalla a la derecha */
-        transform: translateX(100%);
-        transition: transform 0.25s ease;
-    }
-
-    .Wheelmanager--open {
-        transform: translateX(0);
-    }
-
-    /* Overlay opcional para cerrar tocando fuera */
-    .Wheelmanager-backdrop {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 20;
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.25s ease;
-    }
-
-    .Wheelmanager-backdrop--visible {
-        opacity: 1;
-        pointer-events: auto;
-    }
-}
-
-@media (max-width: 750px) {
-    .Wheelmanager {
-        position: fixed;
-        top: 0;
-        right: 0;
-        bottom: 0;
-        left: auto;
-        width: min(18rem, 85vw);
-        height: 100vh;
-        padding: 5rem 1.25rem 1.5rem;
-        border-right: none;
-        border-left: 1px solid var(--color-border);
-        z-index: 60;
-        transform: translateX(100%);
-        transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
         overflow-y: auto;
+        /* el scroll del panel no arrastra el de la página de detrás */
+        overscroll-behavior: contain;
+        z-index: 60;
+
+        /* Cerrado: fuera de pantalla a la derecha y no interactivo
+           (sin transición: así nunca se anima en la carga inicial) */
+        transform: translateX(100%);
+        visibility: hidden;
+    }
+
+    /* La transición solo se activa cuando el usuario ya ha interactuado */
+    .Wheelmanager--animated {
+        transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.28s ease;
     }
 
     .Wheelmanager--open {
         transform: translateX(0);
+        visibility: visible;
     }
 
+    /* Overlay: cierra el drawer al tocar fuera */
     .Wheelmanager-backdrop {
+        display: block;
         position: fixed;
         inset: 0;
         background: rgba(0, 0, 0, 0.5);

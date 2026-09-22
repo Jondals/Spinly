@@ -42,8 +42,6 @@ html {
     --color-active: #e4e4ee;
     --color-focus: #6366f1;
     --color-focus-light: #818cf8;
-    --color-primary: #6366f1;
-    --color-primary-light: #818cf8;
 
     --wheel-color-dark: #e6e6ee;
     --wheel-center-color: #ffffff;
@@ -83,10 +81,8 @@ html {
 
     --color-hover: #24242d;
     --color-active: #2b2b35;
-        --color-focus: #6366f1;
+    --color-focus: #6366f1;
     --color-focus-light: #818cf8;
-    --color-primary: #6366f1;
-    --color-primary-light: #818cf8;
     --color-remove: #ef4444;
 
     /* WHEEL */
@@ -124,13 +120,13 @@ html {
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: minmax(0, 20rem) minmax(0, 20rem) minmax(0, 1fr);
+    grid-template-columns: minmax(9rem, 13rem) minmax(11rem, 17rem) minmax(0, 1fr);
     overflow: hidden;
 }
 
 @media (max-width: 1000px) {
     .Main {
-        grid-template-columns: minmax(0, 16rem) minmax(0, 17rem) minmax(0, 1fr);
+        grid-template-columns: minmax(8rem, 11rem) minmax(10rem, 14rem) minmax(0, 1fr);
     }
 
     .Options {

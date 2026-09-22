@@ -1,10 +1,174 @@
-.Presets {
+.presets-presets {
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
     color: var(--font-color-light);
+    overflow-y: auto;
+}
+
+.presets-presets-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1rem;
+}
+
+.presets-presets-header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.presets-presets-icon { font-size: 1.2rem; }
+.presets-presets-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--color-focus);
+    margin: 0;
+}
+
+.presets-presets-badge {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    background: var(--bg-transparence);
+    color: var(--font-color-muted);
+}
+
+.presets-presets-badge--accent { color: var(--color-focus); }
+
+.presets-presets-subtitle {
+    font-size: 0.8rem;
+    color: var(--font-color-muted);
+    margin: 0 1rem 0.5rem;
+}
+
+.presets-presets-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 1rem;
+}
+
+.presets-presets-search {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.presets-presets-search svg {
+    position: absolute;
+    left: 0.5rem;
+    width: 14px;
+    height: 14px;
+    opacity: 0.5;
+}
+
+.presets-presets-search input {
+    width: 100%;
+    padding: 0.45rem 0.75rem 0.45rem 2rem;
+    font-size: 0.85rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    background: var(--bg-input-color);
+    color: var(--font-color);
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.presets-presets-search input:focus {
+    border-color: var(--color-focus);
+}
+
+.presets-presets-new-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    background: transparent;
+    color: var(--font-color-light);
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.45rem 0.9rem;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.presets-presets-new-btn:hover {
+    border-color: var(--color-focus);
+    color: var(--color-focus);
+}
+
+.presets-presets-create-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0 1rem;
+}
+
+.presets-presets-create-input {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    background: var(--bg-input-color);
+    color: var(--font-color);
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.presets-presets-create-input:focus {
+    border-color: var(--color-focus);
+}
+
+.presets-presets-create-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+}
+
+.presets-presets-create-btn {
+    border: 1px solid var(--color-focus);
+    border-radius: 0.5rem;
+    background: var(--color-focus);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.presets-presets-create-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.presets-presets-cancel-btn {
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    background: transparent;
+    color: var(--font-color-light);
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+}
+
+.presets-presets-cancel-btn:hover {
+    border-color: var(--color-focus);
+    color: var(--color-focus);
+}
+
+.presets-presets-empty {
+    text-align: center;
+    color: var(--font-color-muted);
+    padding: 1rem;
 }

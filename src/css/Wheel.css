@@ -16,8 +16,15 @@
 .wheel-container {
     --wheel-radius: min(30vmin, 13rem);
     position: relative;
+    /* width: min(100%, 34rem) con aspect-ratio: 1/1 y fallback */
+    width: min(100%, 34rem);
     width: calc(var(--wheel-radius) * 2);
-    height: calc(var(--wheel-radius) * 2);
+    max-width: 100%;
+    aspect-ratio: 1 / 1;
+    height: auto;
+    /* Fallback para aspect-ratio: padding-top trick (solo si no soporta aspect-ratio) */
+    padding-top: 100%;
+    padding-top: unset;
 }
 
 .wheel-pointer {
@@ -41,6 +48,20 @@
     transition-property: transform;
     transition-timing-function: cubic-bezier(0.16, 0.84, 0.2, 1);
     --option-count: 4;
+    overflow: hidden;
+}
+
+.wheel-img-layer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    z-index: 0;
+}
+
+.wheel-disc--with-img {
+    background: var(--wheel-color-dark);
 }
 
 .wheel-disc--empty {
@@ -68,6 +89,7 @@
     padding-top: 14%;
     transform-origin: 50% 50%;
     pointer-events: none;
+    z-index: 1;
 }
 
 .wheel-label-text {
@@ -88,6 +110,17 @@
     /* ancho maximo: lo calcula JS como --label-max-width
        (cuerda del segmento = 2R * sin(PI / n) * 0.72 - 0.4rem) */
     max-width: var(--label-max-width, 7rem);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+.wheel-label--dark .wheel-label-text {
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.35);
+}
+
+.wheel-label--over-img .wheel-label-text {
+    background: rgba(0, 0, 0, 0.45);
+    border-radius: 0.35rem;
+    padding: 0.1rem 0.4rem;
 }
 
 .wheel-hub {
@@ -103,8 +136,10 @@
     z-index: 2;
 }
 
+/* Botón GIRAR: mismo ancho fijo en ambos estados para evitar saltos */
 .wheel-spin-button {
     position: relative;
+    min-width: 12rem;
     padding: 1.1rem 3.5rem;
     font-size: 1rem;
     font-weight: 700;
@@ -116,6 +151,7 @@
     cursor: pointer;
     box-shadow: 0 8px 24px -6px rgba(99, 102, 241, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
     transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+    white-space: nowrap;
 }
 
 .wheel-spin-button:hover:not(:disabled) {
@@ -134,26 +170,74 @@
     box-shadow: none;
 }
 
+/* Zona de resultado: siempre presente, fuera de la ruleta */
+.wheel-result-container {
+    min-height: 3rem;
+    min-height: clamp(2.5rem, 5vh, 3.5rem);
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 1rem;
+}
+
 .wheel-result {
     color: var(--font-color-light);
-    font-size: 1.1rem;
-    font-weight: 600;
+    font-size: clamp(1.1rem, 2.5vw + 0.5rem, 1.75rem);
+    font-weight: 700;
+    line-height: 1.3;
+    text-align: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s ease;
+    overflow-wrap: anywhere;
+    max-width: 100%;
+}
+
+.wheel-result--visible {
+    opacity: 1;
+    visibility: visible;
 }
 
 /* ===== Mobile: la rueda manda y respeta el ancho real del viewport ===== */
 @media (max-width: 750px) {
     .Wheel {
         gap: 1.25rem;
+        width: 100%;
         height: auto;
         min-height: 60vh;
+        min-height: 60dvh;
         padding: 2rem 0;
+        position: relative;
     }
 
     .wheel-container {
+        /* el radio ya está limitado por vw/vh, así que la rueda nunca se corta */
         --wheel-radius: min(34vw, 30vh, 13rem);
+        width: calc(var(--wheel-radius) * 2);
+        max-width: 100%;
+        aspect-ratio: 1 / 1;
+        height: auto;
+    }
+
+    /* En móvil el resultado se muestra en una zona propia entre la ruleta y el botón */
+    .wheel-result-container {
+        min-height: 3.5rem;
+        width: 100%;
+        max-width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 1rem;
+    }
+
+    .wheel-result {
+        font-size: clamp(1rem, 4vw + 0.5rem, 1.5rem);
+        text-align: center;
     }
 
     .wheel-spin-button {
+        min-width: 10rem;
         padding: 0.95rem 2.75rem;
         font-size: 0.95rem;
     }

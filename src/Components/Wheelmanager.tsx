@@ -1,49 +1,61 @@
-import React, { useState } from 'react';
+import React, { useEffect } from 'react';
 import '../css/WheelManager.css';
 
+export type WheelSectionId = 'options' | 'presets' | 'themes';
+
 interface WheelmanagerProps {
-    activeSection: string;
-    onSectionChange: (section: string) => void;
+    activeSection: WheelSectionId;
+    onSectionChange: (section: WheelSectionId) => void;
+    isOpen: boolean;
+    isAnimated: boolean;
+    onClose: () => void;
 }
 
-const SECTIONS = [
-    { id: 'editor', label: 'Wheel editor' },
+const SECTIONS: Array<{ id: WheelSectionId; label: string }> = [
+    { id: 'options', label: 'Options' },
     { id: 'presets', label: 'Presets' },
-    { id: 'themes', label: 'Themes' }
+    { id: 'themes', label: 'Themes' },
 ];
 
-function Wheelmanager({ activeSection, onSectionChange }: WheelmanagerProps) {
-    const [isOpen, setIsOpen] = useState(false);
+function Wheelmanager({ activeSection, onSectionChange, isOpen, isAnimated, onClose }: WheelmanagerProps) {
+    // En mobile el drawer se cierra con Escape
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') onClose();
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, onClose]);
 
     return (
-        <div className={`Wheelmanager ${isOpen ? 'Wheelmanager--open' : ''}`}>
-            {/* Botón desplegable: visible SOLO en mobile (display:none en desktop) */}
-            <button
-                type="button"
-                className="wheelmanager-toggle"
-                onClick={() => setIsOpen(prev => !prev)}
-                aria-expanded={isOpen}
-                aria-controls="wheelmanager-body"
-            >
-                <span>Wheel Manager</span>
-                <span className="toggle-arrow" aria-hidden="true">▾</span>
-            </button>
+        <>
+            {/* Overlay: solo visible en mobile y cierra el drawer al tocar fuera */}
+            <div
+                className={`Wheelmanager-backdrop ${isOpen ? 'Wheelmanager-backdrop--visible' : ''}`}
+                onClick={onClose}
+                aria-hidden="true"
+            />
 
-            {/* Contenido: en desktop siempre visible, en mobile depende de --open */}
-            <div className="wheelmanager-body" id="wheelmanager-body">
-                <h1>Wheel Manager</h1>
-                <h3>Configura tu giro</h3>
-                {SECTIONS.map(section => (
-                    <button
-                        key={section.id}
-                        className={`button-menu ${activeSection === section.id ? 'button-menu--active' : ''}`}
-                        onClick={() => onSectionChange(section.id)}
-                    >
-                        {section.label}
-                    </button>
-                ))}
+            <div className={`Wheelmanager ${isOpen ? 'Wheelmanager--open' : ''} ${isAnimated ? 'Wheelmanager--animated' : ''}`}>
+                {/* Contenido: en desktop siempre visible, en mobile depende de --open */}
+                <div className="wheelmanager-body" id="wheelmanager-body">
+                    <h1>Wheel Manager</h1>
+                    <h3>Configura tu giro</h3>
+                    {SECTIONS.map(section => (
+                        <button
+                            key={section.id}
+                            className={`button-menu ${activeSection === section.id ? 'button-menu--active' : ''}`}
+                            onClick={() => onSectionChange(section.id)}
+                        >
+                            {section.label}
+                        </button>
+                    ))}
+                </div>
             </div>
-        </div>
+        </>
     );
 }
 

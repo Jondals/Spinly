@@ -2,7 +2,25 @@
 <html lang="es">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Spinly</title>
+    <style>
+      /* Estado CERRADO del drawer del Wheel Manager, aplicado desde el primer pintado:
+         evita que el menu aparezca desplegado mientras carga el CSS del bundle */
+      @media (max-width: 750px) {
+        .Wheelmanager:not(.Wheelmanager--open) {
+          position: fixed;
+          top: 0;
+          right: 0;
+          bottom: 0;
+          left: auto;
+          width: min(18rem, 85vw);
+          height: auto;
+          transform: translateX(100%);
+          visibility: hidden;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

@@ -14,6 +14,7 @@ import {
     PRESETS_STORAGE_KEY,
     THEMES_STORAGE_KEY,
     WHEEL_LIMIT_STORAGE_KEY,
+    clonePreset,
     cloneTheme,
     ensureSegments,
     sanitizePreset,
@@ -29,6 +30,8 @@ function App() {
     const [activeSection, setActiveSection] = useState<WheelSectionId>('options');
     // En mobile el Wheelmanager es un drawer: el botón vive en el Header
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    // Aviso fijo si localStorage se queda sin espacio (nunca fallar en silencio)
+    const [storageWarning, setStorageWarning] = useState<string | null>(null);
     // La transición se activa con la primera interacción (nunca en la carga inicial)
     const [isMenuAnimated, setIsMenuAnimated] = useState(false);
 
@@ -128,12 +131,28 @@ function App() {
     });
 
     // Persistencias separadas (temas de usuario / tema activo / límite)
+    // Si localStorage está lleno (~5MB, típico con presets con texturas en base64),
+    // avisamos con un banner fijo: los datos previos quedan intactos porque
+    // setItem falla ANTES de escribir nada (no puede corromperse lo que ya había).
+    const reportStorageError = (error: unknown, what: string): void => {
+        const name = (error as { name?: string } | null)?.name;
+        const code = (error as { code?: number } | null)?.code;
+        const message = String((error as { message?: string } | null)?.message ?? error);
+        const isQuota = name === 'QuotaExceededError' || code === 22 || /quota|exceed/i.test(message);
+        if (isQuota) {
+            setStorageWarning(
+                `Sin espacio en el navegador (localStorage ~5MB): no se han podido guardar ${what}. `
+                + 'Borra guardados que no necesites o usa imágenes más ligeras.'
+            );
+        }
+    };
+
     useEffect(() => {
         if (typeof window === 'undefined') return;
         try {
             localStorage.setItem(THEMES_STORAGE_KEY, JSON.stringify(userThemes));
-        } catch {
-            // ignore storage errors
+        } catch (error) {
+            reportStorageError(error, 'los temas');
         }
     }, [userThemes]);
 
@@ -141,8 +160,8 @@ function App() {
         if (typeof window === 'undefined') return;
         try {
             if (activeTheme) localStorage.setItem(ACTIVE_THEME_STORAGE_KEY, JSON.stringify(activeTheme));
-        } catch {
-            // ignore storage errors (p. ej. imágenes base64 muy pesadas)
+        } catch (error) {
+            reportStorageError(error, 'el tema activo (sus texturas pesan)');
         }
     }, [activeTheme]);
 
@@ -150,8 +169,8 @@ function App() {
         if (typeof window === 'undefined') return;
         try {
             localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(userPresets));
-        } catch {
-            // ignore storage errors
+        } catch (error) {
+            reportStorageError(error, 'los presets');
         }
     }, [userPresets]);
 
@@ -220,16 +239,41 @@ function App() {
     // Cargar un preset: sobreescribe opciones + tema visual de golpe.
     const handleLoadPreset = (preset: WheelPreset) => {
         setOptions(preset.options.map((o) => ({ ...o })));
-        setActiveTheme(cloneTheme({
-            ...preset.theme,
-            segments: ensureSegments(preset.theme.segments, Math.max(preset.options.length, 1)),
-        }));
+        setActiveTheme(
+            preset.theme.id.startsWith('default-theme-')
+                ? cloneTheme(preset.theme)
+                : cloneTheme({
+                      ...preset.theme,
+                      segments: ensureSegments(preset.theme.segments, Math.max(preset.options.length, 1)),
+                  })
+        );
         setActivePresetId(preset.id);
     };
 
     const handleDeletePreset = (id: string) => {
         if (id === activePresetId) setActivePresetId(null);
         setUserPresets((prev) => prev.filter((p) => p.id !== id));
+    };
+
+    // Renombrar un preset (botón "editar" de la tarjeta activa).
+    const handleRenamePreset = (id: string, name: string) => {
+        setUserPresets((prev) => prev.map((p) => (p.id === id ? { ...p, name, updatedAt: Date.now() } : p)));
+    };
+
+    // Importar un preset de la comunidad: guarda copia local + la carga de golpe.
+    const handleImportPreset = (preset: WheelPreset) => {
+        const copy: WheelPreset = {
+            ...clonePreset(preset),
+            id: crypto.randomUUID(),
+            updatedAt: Date.now(),
+        };
+        setUserPresets((prev) => [copy, ...prev]);
+        setOptions(copy.options.map((o) => ({ ...o })));
+        setActiveTheme(cloneTheme({
+            ...copy.theme,
+            segments: ensureSegments(copy.theme.segments, Math.max(copy.options.length, 1)),
+        }));
+        setActivePresetId(copy.id);
     };
 
     const toggleMenu = () => {
@@ -253,6 +297,8 @@ function App() {
                         onSavePreset={handleSavePreset}
                         onLoadPreset={handleLoadPreset}
                         onDeletePreset={handleDeletePreset}
+                        onRenamePreset={handleRenamePreset}
+                        onImportPreset={handleImportPreset}
                     />
                 );
             case 'themes':
@@ -297,6 +343,18 @@ function App() {
                 {/* La ruleta siempre está montada: no se mueve ni se recarga al cambiar de sección */}
                 <Wheel options={options} activeTheme={activeTheme} />
             </div>
+
+            {/* Aviso fijo (position:fixed: NO desplaza el layout) de cuota localStorage */}
+            {storageWarning && (
+                <div className="spinly-storage-warning" role="alert">
+                    <span>{storageWarning}</span>
+                    <button
+                        type="button"
+                        onClick={() => setStorageWarning(null)}
+                        aria-label="Descartar aviso de almacenamiento"
+                    >✕</button>
+                </div>
+            )}
         </div>
     );
 }

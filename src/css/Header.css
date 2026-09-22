@@ -106,6 +106,139 @@
             height: 2.2rem;
         }
     }
+
+    /* ===== Perfil (solo nombre de usuario, sin email/contraseña) ===== */
+    .spinly-profile {
+        position: relative;
+        flex-shrink: 0;
+    }
+
+    .spinly-profile-button {
+        width: 2.5rem;
+        height: 2.5rem;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: 1px solid var(--color-border);
+        border-radius: 50%;
+        cursor: pointer;
+        transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+
+    .spinly-profile-button:hover {
+        border-color: var(--color-focus);
+        background-color: var(--color-hover);
+    }
+
+    .spinly-profile-button .spinly-avatar {
+        width: 2.2rem;
+        height: 2.2rem;
+        border: none;
+    }
+
+    .spinly-profile-menu {
+        position: absolute;
+        top: calc(100% + 0.5rem);
+        right: 0;
+        width: min(17rem, calc(100vw - 2rem));
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+        padding: 0.9rem var(--spinly-panel-pad-x);
+        background-color: var(--bg-header-color);
+        border: 1px solid var(--color-border);
+        border-radius: var(--spinly-card-radius);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+        z-index: 120;
+    }
+
+    /* Dentro del menú los mensajes ya llevan su propio padding del menú */
+    .spinly-profile-menu .spinly-status {
+        margin: 0;
+    }
+
+    .spinly-profile-head {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        text-align: center;
+    }
+
+    .spinly-profile-username {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--font-color);
+        overflow-wrap: anywhere;
+    }
+
+    .spinly-profile-title {
+        margin: 0;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-family: var(--font-family-alternative);
+        color: var(--color-focus);
+    }
+
+    .spinly-profile-form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+    }
+
+    .spinly-profile-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+        font-size: 0.75rem;
+        color: var(--font-color-muted);
+    }
+
+    .spinly-profile-field input[type="text"] {
+        padding: 0.5rem 0.7rem;
+        font-size: 0.9rem;
+        border: 1px solid var(--color-border);
+        border-radius: var(--spinly-card-radius);
+        background-color: var(--bg-input-color);
+        color: var(--font-color);
+        outline: none;
+        transition: border-color 0.15s ease;
+    }
+
+    .spinly-profile-field input[type="text"]:focus {
+        border-color: var(--color-focus);
+    }
+
+    .spinly-profile-field input[type="file"] {
+        font-size: 0.75rem;
+        color: var(--font-color-muted);
+        max-width: 100%;
+    }
+
+    .spinly-profile-field input[type="file"]::file-selector-button {
+        margin: 0 0.5rem 0 0;
+        padding: 0.35rem 0.6rem;
+        border: 1px solid var(--color-border);
+        border-radius: var(--spinly-card-radius);
+        background: var(--bg-transparence);
+        color: var(--font-color-light);
+        font: inherit;
+        cursor: pointer;
+    }
+
+    .spinly-profile-preview {
+        align-self: center;
+    }
+
+    .spinly-profile-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+    }
 }
 
 

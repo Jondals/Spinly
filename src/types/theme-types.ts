@@ -129,58 +129,10 @@ export const DEFAULT_THEMES: WheelTheme[] = [
         centerColor: '#0b0f19',
         pointerColor: '#ffffff',
     },
-    {
-        id: 'theme-sunset',
-        name: 'Sunset Horizon',
-        description: 'Degradados crepusculares ámbar, ciruela & cobre vivo.',
-        styleTag: 'WARM GRADIENTS',
-        category: 'ATMOSFÉRICO',
-        segments: [
-            seg('#7c2d12'),
-            seg('#c2410c'),
-            seg('#f59e0b'),
-            seg('#fb7185'),
-            seg('#881337'),
-        ],
-        borderColor: '#1c0a00',
-        centerColor: '#1c0a00',
-        pointerColor: '#ffffff',
-    },
-    {
-        id: 'theme-emerald',
-        name: 'Emerald Glow',
-        description: 'Verde esmeralda, jade bio-digital & menta sobre ónix.',
-        styleTag: 'RADIANTE ORGÁNICO',
-        category: 'LUMINISCENTE',
-        segments: [
-            seg('#064e3b'),
-            seg('#059669'),
-            seg('#34d399'),
-            seg('#065f46'),
-            seg('#a7f3d0'),
-        ],
-        borderColor: '#022c22',
-        centerColor: '#022c22',
-        pointerColor: '#ffffff',
-    },
-    {
-        id: 'theme-light',
-        name: 'Spinly Light',
-        description: 'Minimalismo puro, platino de estudio & grafito suave.',
-        styleTag: 'STUDIO ARCHITECTURE',
-        category: 'MONOCROMO',
-        segments: [
-            seg('#f8fafc'),
-            seg('#e2e8f0'),
-            seg('#cbd5e1'),
-            seg('#94a3b8'),
-            seg('#64748b'),
-        ],
-        borderColor: '#334155',
-        centerColor: '#ffffff',
-        pointerColor: '#6366f1',
-    },
 ];
+
+// Sunset Horizon, Emerald Glow y Spinly Light se retiraron temporalmente
+// (fase de iteración). Viven en el historial de git por si se recuperan.
 
 // Limpia un preset leído de storage: valida opciones y tema.
 export function sanitizePreset(raw: unknown): WheelPreset | null {
@@ -217,6 +169,11 @@ export function clonePreset(p: WheelPreset): WheelPreset {
         tags: p.tags ? [...p.tags] : [],
     };
 }
+// Sanitización de datos que pueden venir de localStorage o de Supabase (defensa en profundidad):
+// colores solo hex saneado y imágenes solo data:image raster segura (sin svg con scripts ni URLs externas).
+const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+const SAFE_DATA_IMAGE = /^data:image\/(?:png|jpeg|webp|gif|avif);base64,/i;
+
 export function sanitizeTheme(raw: unknown): WheelTheme | null {
     if (!raw || typeof raw !== 'object') return null;
     const t = raw as Partial<WheelTheme> & { segments?: Array<Record<string, unknown>> };
@@ -224,10 +181,18 @@ export function sanitizeTheme(raw: unknown): WheelTheme | null {
     if (!Array.isArray(t.segments) || t.segments.length === 0) return null;
     const segments: WheelSegmentStyle[] = t.segments
         .filter((s) => s && typeof s === 'object')
-        .map((s) => ({
-            color: typeof s['color'] === 'string' ? (s['color'] as string) : DEFAULT_SEGMENT_COLOR,
-            ...(typeof s['backgroundImage'] === 'string' ? { backgroundImage: s['backgroundImage'] as string } : {}),
-        }))
+        .map((s) => {
+            const rawColor = s['color'];
+            const rawImage = s['backgroundImage'];
+            // Color inválido → fallback al color por defecto (nunca se pierde el tema entero)
+            const color = typeof rawColor === 'string' && HEX_COLOR.test(rawColor)
+                ? rawColor
+                : DEFAULT_SEGMENT_COLOR;
+            const backgroundImage = typeof rawImage === 'string' && SAFE_DATA_IMAGE.test(rawImage)
+                ? rawImage
+                : undefined;
+            return backgroundImage ? { color, backgroundImage } : { color };
+        })
         .filter((s) => typeof s.color === 'string' && s.color.length > 0);
     if (segments.length === 0) return null;
     return {
@@ -255,12 +220,18 @@ function mkPresetOptions(names: string[], prefix: string): WheelOption[] {
     }));
 }
 
+// Referencia por ID (no por índice) para no romper si cambia el orden de DEFAULT_THEMES.
+function defaultThemeById(id: string): WheelTheme {
+    return DEFAULT_THEMES.find((theme) => theme.id === id) ?? DEFAULT_THEMES[0];
+}
+
+// Solo 2 presets de ejemplo de momento (fase de iteración).
 export const DEFAULT_PRESETS: WheelPreset[] = [
     {
         id: 'default-preset-cena',
         name: 'Cena de Viernes',
         options: mkPresetOptions(['Pizza Night', 'Sushi', 'Burgers', 'Tacos'], 'cena'),
-        theme: cloneTheme(DEFAULT_THEMES[1] as WheelTheme),
+        theme: cloneTheme(defaultThemeById('theme-neon')),
         updatedAt: Date.now() - 2 * 24 * 60 * 60 * 1000,
         tags: ['Equipo'],
     },
@@ -268,26 +239,13 @@ export const DEFAULT_PRESETS: WheelPreset[] = [
         id: 'default-preset-juegos',
         name: 'Juegos de Mesa',
         options: mkPresetOptions(['Catan', 'Carcassonne', 'Dixit', 'Azul', 'Ticket to Ride', 'Pandemic', 'Splendor', 'Codenames'], 'juegos'),
-        theme: cloneTheme(DEFAULT_THEMES[0] as WheelTheme),
+        theme: cloneTheme(defaultThemeById('theme-obsidian')),
         updatedAt: Date.now() - 2 * 24 * 60 * 60 * 1000,
         tags: [],
     },
-    {
-        id: 'default-preset-decisiones',
-        name: 'Decisiones Rápidas',
-        options: mkPresetOptions(['Sí', 'No', 'Quizás', 'Vuelve a tirar'], 'decisiones'),
-        theme: cloneTheme(DEFAULT_THEMES[2] as WheelTheme),
-        updatedAt: Date.now() - 5 * 24 * 60 * 60 * 1000,
-        tags: ['Frecuente'],
-    },
-    {
-        id: 'default-preset-turnos',
-        name: 'Asignación de Turnos',
-        options: mkPresetOptions(['Ana', 'Bruno', 'Carla', 'Diego', 'Elena', 'Fede'], 'turnos'),
-        theme: cloneTheme(DEFAULT_THEMES[3] as WheelTheme),
-        updatedAt: Date.now() - 9 * 24 * 60 * 60 * 1000,
-        tags: ['Equipo', 'Scrum'],
-    },
 ];
+
+// "Decisiones Rápidas" y "Asignación de Turnos" se retiraron temporalmente
+// (fase de iteración). Viven en el historial de git por si se recuperan.
 
 

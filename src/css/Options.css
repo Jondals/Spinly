@@ -18,38 +18,8 @@
     border-right: 1px solid var(--color-border);
     overflow: hidden;
 
+    /* Estructura/título/badge: .spinly-panel-header + .spinly-panel-title + .spinly-badge (shared.css) */
     .options-title {
-        height: 4rem;
-        min-height: 4rem;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
-        padding: 0 1.25rem;
-        border-bottom: 1px solid var(--color-border);
-
-        p {
-            margin: 0;
-            color: var(--font-color);
-            font-family: var(--font-family-alternative);
-            font-size: 0.75rem;
-            font-weight: 600;
-            letter-spacing: 0.15em;
-        }
-
-        .number-items {
-            background-color: var(--bg-transparence);
-            padding: 0.3rem 0.6rem;
-            border-radius: 0.25rem;
-            color: var(--color-focus);
-            font-family: var(--font-family-alternative);
-            font-size: 0.75rem;
-            white-space: nowrap;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.25rem;
-        }
-
         .options-limit-value {
             padding: 0;
             margin: 0;
@@ -101,12 +71,13 @@
     .container-options {
         display: flex;
         flex-direction: column;
-        gap: 0.6rem;
+        gap: var(--spinly-list-gap);
         flex: 1;
         min-height: 0;
-        padding: 0.9rem 1.1rem;
+        padding: var(--spinly-panel-pad-y) var(--spinly-panel-pad-x);
         overflow-y: auto;
 
+        /* Fondo, borde y radio vienen de .spinly-panel-card (clase compartida) */
         .option-item {
             display: flex;
             align-items: center;
@@ -116,8 +87,6 @@
             height: 3.25rem;
             min-height: 3.25rem;
             padding: 0 1rem;
-            background-color: var(--bg-card-color);
-            border-radius: 0.55rem;
 
             .drag {
                 color: var(--font-color-muted);
@@ -137,22 +106,15 @@
                 overflow: hidden;
                 padding: 0;
                 flex-shrink: 0;
-                transition: transform 0.15s ease;
+                transition: transform 0.15s ease, box-shadow 0.15s ease;
             }
 
-            .option-item:hover .option-swatch {
-                transform: scale(1.08);
-            }
-
-            .option-color-input {
-                position: absolute;
-                inset: 0;
-                width: 100%;
-                height: 100%;
-                opacity: 0;
-                cursor: pointer;
-                padding: 0;
-                border: none;
+            /* Hover/focus del swatch: escala sutil + anillo del mismo color focus
+               (mismo lenguaje que los anillos de tarjeta activa de Themes/Presets) */
+            .option-swatch:hover,
+            .option-swatch:focus-visible {
+                transform: scale(1.1);
+                box-shadow: 0 0 0 2px var(--color-focus);
             }
 
             .option-img-btn {
@@ -196,15 +158,15 @@
                 color: var(--color-remove, #f87171);
             }
 
-            .option-item--dragging {
+            &.option-item--dragging {
                 opacity: 0.4;
             }
 
-            .option-item--over {
+            &.option-item--over {
                 border-top: 2px solid var(--color-focus);
             }
 
-            .option-item--has-img {
+            &.option-item--has-img {
                 border-color: var(--color-border);
             }
 
@@ -220,16 +182,8 @@
                 flex-shrink: 0;
             }
 
-            .option-color-input {
-                position: absolute;
-                inset: 0;
-                width: 100%;
-                height: 100%;
-                opacity: 0;
-                cursor: pointer;
-                padding: 0;
-                border: none;
-                flex: none;
+            .option-item:hover .option-swatch {
+                transform: scale(1.08);
             }
 
             .option-name-input {
@@ -269,6 +223,12 @@
                 opacity: 1;
                 color: var(--font-color);
                 border-color: var(--color-focus);
+            }
+
+            .option-img-btn svg {
+                width: 1rem;
+                height: 1rem;
+                display: block;
             }
 
             .option-img-remove {
@@ -349,14 +309,10 @@
     }
 
     .options-bottom {
-        padding: 1.25rem 1.5rem;
+        padding: var(--spinly-panel-pad-y) var(--spinly-panel-pad-x);
         border-top: 1px solid var(--color-border);
 
-        .add-option-button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
+        /* "Añadir opción": acción a ancho completo con tono propio (no es un item de la lista) */
         .add-option-button {
             width: 100%;
             height: 2.75rem;
@@ -364,27 +320,43 @@
             align-items: center;
             justify-content: center;
             gap: 0.5rem;
-            border: 1px dashed var(--color-border);
-            border-radius: 0.5rem;
-            background: transparent;
+            border: 1px solid var(--color-border);
+            border-radius: var(--spinly-card-radius);
+            background-color: var(--bg-transparence);
             color: var(--font-color-light);
             font: inherit;
-            font-size: 0.8rem;
+            font-size: 0.85rem;
+            font-weight: 600;
             cursor: pointer;
             transition:
                 background-color 0.15s,
                 border-color 0.15s,
-                color 0.15s;
+                color 0.15s,
+                opacity 0.15s;
 
-            &:hover {
-                background-color: var(--color-hover);
-                border-color: var(--color-primary);
-                color: var(--font-color);
+            svg {
+                width: 1rem;
+                height: 1rem;
+                color: var(--color-focus-light);
+                transition: color 0.15s;
             }
 
-            span {
-                color: var(--color-primary-light);
-                font-size: 1rem;
+            &:hover:not(:disabled) {
+                background-color: var(--color-focus);
+                border-color: var(--color-focus);
+                color: #ffffff;
+            }
+
+            &:hover:not(:disabled) svg {
+                color: #ffffff;
+            }
+
+            /* Límite de opciones alcanzado: estado claramente apagado */
+            &:disabled {
+                opacity: 0.4;
+                cursor: not-allowed;
+                background-color: var(--bg-transparence);
+                border-style: dashed;
             }
         }
     }

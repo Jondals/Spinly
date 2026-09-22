@@ -136,38 +136,105 @@
     z-index: 2;
 }
 
-/* Botón GIRAR: mismo ancho fijo en ambos estados para evitar saltos */
+/* ===== Botón GIRAR (Imagen 2): zona a ancho completo + pista de teclado ===== */
+.wheel-spin-zone {
+    width: 100%;
+    max-width: 30rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0 1rem;
+}
+
 .wheel-spin-button {
     position: relative;
-    min-width: 12rem;
-    padding: 1.1rem 3.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+    width: 100%;
+    padding: 1.05rem 2rem;
     font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: 0.12rem;
+    font-weight: 800;
+    letter-spacing: 0.14rem;
     color: #ffffff;
     background: linear-gradient(135deg, var(--color-focus-light), var(--color-focus));
     border: none;
-    border-radius: 999px;
+    border-radius: 1.35rem;
     cursor: pointer;
-    box-shadow: 0 8px 24px -6px rgba(99, 102, 241, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+    box-shadow:
+        0 10px 30px -8px rgba(99, 102, 241, 0.65),
+        0 0 26px rgba(99, 102, 241, 0.35),
+        0 0 0 1px rgba(255, 255, 255, 0.06) inset;
     transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
     white-space: nowrap;
 }
 
+.wheel-spin-icon {
+    width: 1.3rem;
+    height: 1.3rem;
+    flex-shrink: 0;
+}
+
+.wheel-spin-button--spinning .wheel-spin-icon {
+    animation: wheel-spin-icon-rotate 1s linear infinite;
+}
+
+@keyframes wheel-spin-icon-rotate {
+    to { transform: rotate(360deg); }
+}
+
 .wheel-spin-button:hover:not(:disabled) {
-    transform: translateY(-3px);
-    box-shadow: 0 12px 28px -6px rgba(99, 102, 241, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+    transform: translateY(-2px);
+    box-shadow:
+        0 14px 34px -8px rgba(99, 102, 241, 0.75),
+        0 0 34px rgba(99, 102, 241, 0.45),
+        0 0 0 1px rgba(255, 255, 255, 0.08) inset;
     filter: brightness(1.08);
 }
 
 .wheel-spin-button:active:not(:disabled) {
-    transform: translateY(-1px);
+    transform: translateY(0);
 }
 
 .wheel-spin-button:disabled {
     opacity: 0.55;
     cursor: not-allowed;
     box-shadow: none;
+}
+
+.wheel-spin-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--font-color-muted);
+    font-size: 0.75rem;
+}
+
+.wheel-spin-key {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.18rem 0.55rem;
+    border: 1px solid var(--color-border);
+    border-bottom-width: 2px;
+    border-radius: 0.35rem;
+    background: var(--bg-transparence);
+    color: var(--font-color);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    line-height: 1.4;
+}
+
+.wheel-spin-hint-sep {
+    opacity: 0.5;
+}
+
+.wheel-spin-hint-icon {
+    width: 0.85rem;
+    height: 0.85rem;
+    flex-shrink: 0;
 }
 
 /* Zona de resultado: siempre presente, fuera de la ruleta */
@@ -236,15 +303,24 @@
         text-align: center;
     }
 
+    .wheel-spin-zone {
+        max-width: 100%;
+    }
+
     .wheel-spin-button {
-        min-width: 10rem;
-        padding: 0.95rem 2.75rem;
+        padding: 0.95rem 1.25rem;
         font-size: 0.95rem;
+        letter-spacing: 0.1rem;
+        border-radius: 1.15rem;
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .wheel-disc {
         transition-duration: 0.01ms !important;
+    }
+
+    .wheel-spin-button--spinning .wheel-spin-icon {
+        animation: none !important;
     }
 }

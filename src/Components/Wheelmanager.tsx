@@ -12,7 +12,7 @@ interface WheelmanagerProps {
 }
 
 const SECTIONS: Array<{ id: WheelSectionId; label: string }> = [
-    { id: 'options', label: 'Options' },
+    { id: 'options', label: 'Wheel editor' },
     { id: 'presets', label: 'Presets' },
     { id: 'themes', label: 'Themes' },
 ];

@@ -1,7 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { timeAgo, type WheelPreset } from '../types/theme-types';
 import type { WheelOption } from '../scripts/option-wheel';
 import type { WheelTheme } from '../types/theme-types';
+import Avatar from './Avatar';
+import SearchIcon from './SearchIcon';
+import { fetchCommunityPresets, sharePreset, type CommunityPreset } from '../lib/community';
+import { useShareCooldown } from '../lib/useShareCooldown';
 import '../css/Presets.css';
 
 interface PresetsProps {
@@ -12,13 +16,11 @@ interface PresetsProps {
     onSavePreset: (name: string, tags?: string[]) => void;
     onLoadPreset: (preset: WheelPreset) => void;
     onDeletePreset: (id: string) => void;
+    onRenamePreset: (id: string, name: string) => void;
+    onImportPreset: (preset: WheelPreset) => void;
 }
 
-const SearchIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-);
+type PanelNotice = { tone: 'ok' | 'error'; text: string };
 
 const PlusIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
@@ -26,17 +28,78 @@ const PlusIcon = () => (
     </svg>
 );
 
-function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, onSavePreset, onLoadPreset, onDeletePreset }: PresetsProps) {
+function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, onSavePreset, onLoadPreset, onDeletePreset, onRenamePreset, onImportPreset }: PresetsProps) {
     const [search, setSearch] = useState('');
     const [creating, setCreating] = useState(false);
     const [draftName, setDraftName] = useState('');
     const [draftTags, setDraftTags] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
+    const editInputRef = useRef<HTMLInputElement>(null);
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editDraft, setEditDraft] = useState('');
     const isDefault = (id: string) => id.startsWith('default-preset-');
     const filtered = savedPresets.filter((p) =>
         p.name.toLowerCase().includes(search.toLowerCase()) ||
         (p.tags ?? []).some((t) => t.toLowerCase().includes(search.toLowerCase()))
     );
+    const [view, setView] = useState<'mine' | 'community'>('mine');
+    const [community, setCommunity] = useState<CommunityPreset[]>([]);
+    const [communitySearch, setCommunitySearch] = useState('');
+    const [loadingCommunity, setLoadingCommunity] = useState(false);
+    const [communityError, setCommunityError] = useState<string | null>(null);
+    const [notice, setNotice] = useState<PanelNotice | null>(null);
+    const [refreshToken, setRefreshToken] = useState(0);
+    const share = useShareCooldown();
+
+    // Se carga SIEMPRE (montaje + cada entrada en Comunidad): así el badge
+    // muestra el contador REAL de Supabase, nunca un 0 hardcodeado.
+    useEffect(() => {
+        let alive = true;
+        setLoadingCommunity(true);
+        setCommunityError(null);
+        fetchCommunityPresets().then((result) => {
+            if (!alive) return;
+            setLoadingCommunity(false);
+            if (result.ok) {
+                setCommunity(result.data);
+            } else {
+                setCommunity([]);
+                setCommunityError(result.error);
+            }
+        });
+        return () => {
+            alive = false;
+        };
+    }, [view, refreshToken]);
+
+    // Compartir: el servicio asocia SIEMPRE author_id a la fila subida.
+    // useShareCooldown evita el doble clic y un bucle de peticiones (4s de cooldown).
+    const handleShare = async (preset: WheelPreset) => {
+        if (!share.begin(preset.id)) return;
+        setNotice(null);
+        const result = await sharePreset(preset);
+        share.finish();
+        if (result.ok) {
+            setNotice({ tone: 'ok', text: `"${preset.name}" compartido en la comunidad.` });
+            setRefreshToken((token) => token + 1);
+        } else {
+            setNotice({ tone: 'error', text: result.error });
+        }
+    };
+
+    // "Usar" de la comunidad: lo guarda como preset propio y lo carga en la ruleta.
+    const handleUseCommunity = (preset: WheelPreset) => {
+        setNotice(null);
+        onImportPreset(preset);
+        setNotice({ tone: 'ok', text: `"${preset.name}" cargado y guardado en Mis presets.` });
+    };
+
+    const communityFiltered = community.filter((entry) => {
+        const query = communitySearch.trim().toLowerCase();
+        if (!query) return true;
+        return entry.preset.name.toLowerCase().includes(query)
+            || entry.author.username.toLowerCase().includes(query);
+    });
 
     const handleCreate = () => {
         setCreating(true);
@@ -66,28 +129,81 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
         onSavePreset(`${preset.name} (copia)`, preset.tags);
     };
 
+    const startRename = (preset: WheelPreset) => {
+        setEditingId(preset.id);
+        setEditDraft(preset.name);
+        setTimeout(() => editInputRef.current?.focus(), 10);
+    };
+
+    const commitRename = () => {
+        if (editingId) {
+            const name = editDraft.trim();
+            if (name) onRenamePreset(editingId, name);
+        }
+        setEditingId(null);
+        setEditDraft('');
+    };
+
+    const cancelRename = () => {
+        setEditingId(null);
+        setEditDraft('');
+    };
+
     const handleDelete = (preset: WheelPreset, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (window.confirm(`¿Estás seguro de borrar "${preset.name}"?`)) {
-            onDeletePreset(preset.id);
-        }
+        onDeletePreset(preset.id);
     };
 
     return (
         <div className="Presets presets-presets">
-            <header className="presets-presets-header">
+            <header className="presets-presets-header spinly-panel-header">
                 <div className="presets-presets-header-left">
-                    <span className="presets-presets-icon" aria-hidden="true">💾</span>
-                    <h2 className="presets-presets-title">Presets Guardados</h2>
+                    <span className="presets-presets-icon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                            <polyline points="17 21 17 13 7 13 7 21" />
+                            <polyline points="7 3 7 8 15 8" />
+                        </svg>
+                    </span>
+                    <h2 className="presets-presets-title spinly-panel-title">Presets Guardados</h2>
                 </div>
-                <span className="presets-presets-badge presets-presets-badge--accent">{savedPresets.length} Listas</span>
+                <span className="presets-presets-badge spinly-badge">
+                    {view === 'mine' ? `${savedPresets.length} Listas` : `${community.length} en Comunidad`}
+                </span>
             </header>
             <p className="presets-presets-subtitle">
                 Alterna instantáneamente o crea configuraciones predefinidas para tus sorteos.
             </p>
 
+            {/* Toggle Mis presets / Comunidad (mismo patrón en Themes) */}
+            <div className="spinly-segmented" role="tablist" aria-label="Vista de presets">
+                <button
+                    type="button"
+                    role="tab"
+                    aria-selected={view === 'mine'}
+                    className={`spinly-segmented-btn${view === 'mine' ? ' spinly-segmented-btn--active' : ''}`}
+                    onClick={() => setView('mine')}
+                >Mis presets</button>
+                <button
+                    type="button"
+                    role="tab"
+                    aria-selected={view === 'community'}
+                    className={`spinly-segmented-btn${view === 'community' ? ' spinly-segmented-btn--active' : ''}`}
+                    onClick={() => setView('community')}
+                >Comunidad</button>
+            </div>
+
+            {notice && (
+                <p
+                    className={`spinly-status ${notice.tone === 'error' ? 'spinly-status--error' : 'spinly-status--ok'}`}
+                    role="status"
+                >{notice.text}</p>
+            )}
+
+            {view === 'mine' && (
+            <>
             <div className="presets-presets-toolbar">
-                <label className="presets-presets-search">
+                <label className="spinly-search">
                     <SearchIcon />
                     <input
                         type="text"
@@ -99,13 +215,13 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
                 {!creating && (
                     <button
                         type="button"
-                        className="presets-presets-new-btn"
+                        className="presets-presets-new-btn spinly-btn-primary"
                         onClick={handleCreate}
                         aria-label="Crear nuevo preset"
                     >
                         <PlusIcon /> Nuevo
                     </button>
-                                )}
+                )}
             </div>
 
             {creating && (
@@ -160,18 +276,36 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
                         return (
                             <li
                                 key={preset.id}
-                                className={`presets-presets-card ${isActive ? 'presets-presets-card--active' : ''}`}
+                                className={`presets-presets-card spinly-panel-card ${isActive ? 'presets-presets-card--active' : ''}${isDefaultPreset ? '' : ' presets-presets-card--own'}`}
                             >
                                 <div className="presets-presets-card-inner">
                                     <div className="presets-presets-card-top">
                                         <span className="presets-presets-card-badge">{preset.options.length} opciones</span>
                                         <span className="presets-presets-meta">
-                                            {preset.tags && preset.tags.length > 0
-                                                ? preset.tags.map((t) => `· ${t}`).join(' ')
-                                                : `· ${timeAgo(preset.updatedAt)}`}
+                                            {[
+                                                `· ${timeAgo(preset.updatedAt)}`,
+                                                ...(preset.tags ?? []).map((t) => `· ${t}`),
+                                            ].join(' ')}
                                         </span>
                                     </div>
-                                    <span className="presets-presets-card-name">{preset.name}</span>
+                                    {editingId === preset.id ? (
+                                        <input
+                                            ref={editInputRef}
+                                            type="text"
+                                            className="presets-presets-rename-input"
+                                            value={editDraft}
+                                            maxLength={40}
+                                            onChange={(e) => setEditDraft(e.target.value)}
+                                            onBlur={commitRename}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') commitRename();
+                                                if (e.key === 'Escape') cancelRename();
+                                            }}
+                                            aria-label={`Renombrar preset ${preset.name}`}
+                                        />
+                                    ) : (
+                                        <span className="presets-presets-card-name">{preset.name}</span>
+                                    )}
                                     <div className="presets-presets-chips">
                                         {optionChips.map((opt) => (
                                             <span key={opt.id} className="presets-presets-chip">
@@ -192,22 +326,47 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
                                                 onClick={() => onLoadPreset(preset)}
                                                 aria-label={`Cargar preset ${preset.name}`}
                                             >
-                                                ▶ Cargar en Ruleta
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <polygon points="6 3 20 12 6 21 6 3" />
+                                                </svg>
+                                                Cargar en Ruleta
                                             </button>
                                         )}
-                                        {!isDefaultPreset && isActive && (
-                                            <div className="presets-presets-active-icons">
+                                    </div>
+                                </div>
+                                {!isDefaultPreset && (
+                                    <div className="presets-presets-active-icons">
+                                        <button
+                                            type="button"
+                                            className="presets-presets-action-icon"
+                                            onClick={() => handleShare(preset)}
+                                            aria-label={`Compartir ${preset.name}`}
+                                            title="Compartir en la comunidad"
+                                            disabled={share.blocked}
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                                                <path d="M7 17 17 7" />
+                                                <path d="M8 7h9v9" />
+                                            </svg>
+                                        </button>
+                                        {isActive && (
+                                            <>
                                                 <button
                                                     type="button"
                                                     className="presets-presets-action-icon"
                                                     onClick={() => handleDuplicate(preset)}
                                                     aria-label={`Duplicar ${preset.name}`}
                                                     title="Duplicar"
-                                                >📋</button>
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                                                    </svg>
+                                                </button>
                                                 <button
                                                     type="button"
                                                     className="presets-presets-action-icon"
-                                                    onClick={() => { /* TODO: editar */ }}
+                                                    onClick={() => startRename(preset)}
                                                     aria-label={`Editar ${preset.name}`}
                                                     title="Editar"
                                                 >✎</button>
@@ -218,14 +377,90 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
                                                     aria-label={`Borrar ${preset.name}`}
                                                     title="Borrar"
                                                 >✕</button>
-                                            </div>
+                                            </>
                                         )}
                                     </div>
-                                </div>
+                                )}
                             </li>
                         );
                     })}
                 </ul>
+            )}
+            </>
+            )}
+
+            {view === 'community' && (
+                <>
+                    <div className="spinly-toolbar">
+                        <label className="spinly-search">
+                            <SearchIcon />
+                            <input
+                                type="text"
+                                value={communitySearch}
+                                onChange={(e) => setCommunitySearch(e.target.value)}
+                                placeholder="Buscar por nombre o autor..."
+                                aria-label="Buscar presets en la comunidad"
+                            />
+                        </label>
+                    </div>
+
+                    {loadingCommunity && (
+                        <p className="spinly-status" role="status">Cargando comunidad…</p>
+                    )}
+                    {!loadingCommunity && communityError && (
+                        <p className="spinly-status spinly-status--error" role="alert">{communityError}</p>
+                    )}
+                    {!loadingCommunity && !communityError && communityFiltered.length === 0 && (
+                        <p className="presets-presets-empty">No hay presets en la comunidad todavía.</p>
+                    )}
+
+                    {!loadingCommunity && !communityError && communityFiltered.length > 0 && (
+                        <ul className="presets-presets-grid">
+                            {communityFiltered.map(({ preset, author }) => (
+                                <li
+                                    key={preset.id}
+                                    className="presets-presets-card presets-presets-card--community spinly-panel-card"
+                                >
+                                    <div className="presets-presets-card-inner">
+                                        <div className="presets-presets-card-top">
+                                            <span className="presets-presets-card-badge">
+                                                {preset.options.length} opciones
+                                            </span>
+                                        </div>
+                                        <span className="presets-presets-card-name">{preset.name}</span>
+                                        <div className="presets-presets-chips">
+                                            {preset.options.slice(0, 4).map((opt) => (
+                                                <span key={opt.id} className="presets-presets-chip">{opt.name}</span>
+                                            ))}
+                                            {preset.options.length > 4 && (
+                                                <span className="presets-presets-chip presets-presets-chip--more">
+                                                    +{preset.options.length - 4} más
+                                                </span>
+                                            )}
+                                        </div>
+                                        <span className="spinly-author" title={author.username}>
+                                            <Avatar src={author.avatar_url} size="sm" alt={`Foto de ${author.username}`} />
+                                            <span className="spinly-author-name">{author.username}</span>
+                                        </span>
+                                        <div className="presets-presets-card-actions">
+                                            <button
+                                                type="button"
+                                                className="spinly-action-btn"
+                                                onClick={() => handleUseCommunity(preset)}
+                                                aria-label={`Usar preset ${preset.name}`}
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <polygon points="6 3 20 12 6 21 6 3" />
+                                                </svg>
+                                                Usar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </>
             )}
         </div>
     );

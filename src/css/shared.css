@@ -1,0 +1,340 @@
+/* ===================================================================== */
+/* Base visual COMPARTIDA (Wheel editor / Themes / Presets / UI común)    */
+/* Se importa primero (ver src/index.tsx): los componentes sobreescriben. */
+/* ===================================================================== */
+
+:root {
+    /* Geometría compartida de los tres paneles */
+    --spinly-panel-pad-x: 1.1rem;
+    --spinly-panel-pad-y: 0.9rem;
+    /* Tarjetas de Themes/Presets: más aire entre ellas (misma var en ambos paneles) */
+    --spinly-card-gap: 1.1rem;
+    /* Filas densas del Wheel editor: se quedan como estaban, sin desalinearse */
+    --spinly-list-gap: 0.6rem;
+    --spinly-card-radius: 0.55rem;
+    --spinly-badge-radius: 0.25rem;
+
+    /* Tokens usados por varios componentes que antes estaban SIN definir
+       (ColorPicker, badges/botones de Presets): ahora con valor real. */
+    --radius-sm: 0.4rem;
+    --radius-lg: 0.75rem;
+    --bg-panel-color: var(--bg-card-color);
+}
+
+/* Los tres paneles: mismo fondo y mismo borde contenedor */
+.Options,
+.Presets,
+.Themes {
+    background-color: var(--bg-options-color);
+    border-right: 1px solid var(--color-border);
+}
+
+/* Tarjeta/fila base: mismo fondo, mismo grosor/color de borde y mismo radio
+   en Wheel editor (filas), Themes (tarjetas) y Presets (tarjetas). */
+.spinly-panel-card {
+    background-color: var(--bg-card-color);
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-card-radius);
+}
+
+/* ===== Toggle segmentado "Mis X / Comunidad" (Themes y Presets) ===== */
+.spinly-segmented {
+    display: inline-flex;
+    align-self: flex-start;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    margin: 0 var(--spinly-panel-pad-x);
+    background: var(--bg-transparence);
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-badge-radius);
+}
+
+.spinly-segmented-btn {
+    border: none;
+    background: transparent;
+    color: var(--font-color-muted);
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.4rem 0.9rem;
+    border-radius: calc(var(--spinly-badge-radius) - 0.1rem);
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.spinly-segmented-btn:hover {
+    color: var(--font-color);
+}
+
+.spinly-segmented-btn--active {
+    background: var(--bg-card-color);
+    color: var(--font-color);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+/* ===== Fila toolbar + buscador (Themes y Presets) ===== */
+.spinly-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 var(--spinly-panel-pad-x);
+}
+
+.spinly-search {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+.spinly-search svg {
+    position: absolute;
+    left: 0.55rem;
+    width: 14px;
+    height: 14px;
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.spinly-search input {
+    width: 100%;
+    padding: 0.45rem 0.75rem 0.45rem 2rem;
+    font-size: 0.85rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-card-radius);
+    background: var(--bg-input-color);
+    color: var(--font-color);
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.spinly-search input:focus {
+    border-color: var(--color-focus);
+}
+
+/* ===== Autor de la comunidad (nombre + foto con placeholder) ===== */
+.spinly-author {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.spinly-author-name {
+    font-size: 0.72rem;
+    color: var(--font-color-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ===== Avatar compartido (foto real o placeholder neutro) ===== */
+.spinly-avatar {
+    display: block;
+    flex-shrink: 0;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--bg-transparence);
+    border: 1px solid var(--color-border);
+    color: var(--font-color-muted);
+}
+
+.spinly-avatar--sm {
+    width: 1.35rem;
+    height: 1.35rem;
+}
+
+.spinly-avatar--md {
+    width: 2.2rem;
+    height: 2.2rem;
+}
+
+.spinly-avatar--lg {
+    width: 3rem;
+    height: 3rem;
+}
+
+.spinly-avatar--placeholder {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.spinly-avatar--placeholder svg {
+    width: 65%;
+    height: 65%;
+    fill: currentColor;
+}
+
+/* ===== Mensajes de estado (carga / error / éxito) ===== */
+.spinly-status {
+    margin: 0 var(--spinly-panel-pad-x);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-card-radius);
+    background: var(--bg-transparence);
+    color: var(--font-color-muted);
+}
+
+.spinly-status--error {
+    border-color: var(--color-remove, #f87171);
+    color: var(--color-remove, #f87171);
+}
+
+.spinly-status--ok {
+    border-color: var(--color-focus);
+    color: var(--color-focus);
+}
+
+/* ===== Acción secundaria de ancho completo (Descargar / Usar) ===== */
+.spinly-action-btn {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.55rem 0.8rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-card-radius);
+    background: var(--bg-transparence);
+    color: var(--font-color-light);
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+
+.spinly-action-btn:hover {
+    border-color: var(--color-focus);
+    background: var(--color-hover);
+    color: var(--font-color);
+}
+
+/* Variante primaria (acciones de confirmación, p. ej. Entrar/Guardar) */
+.spinly-action-btn--primary {
+    background: var(--color-focus);
+    border-color: var(--color-focus);
+    color: #ffffff;
+}
+
+.spinly-action-btn--primary:hover:not(:disabled) {
+    background: var(--color-focus-light);
+    border-color: var(--color-focus-light);
+    color: #ffffff;
+}
+
+.spinly-action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ===== Cabecera compartida de los tres paneles =====
+   Fila única de 4rem, sin wrap: título a la izquierda + badge a la derecha. */
+.spinly-panel-header {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    height: 4rem;
+    min-height: 4rem;
+    padding: 0 var(--spinly-panel-pad-x);
+    border-bottom: 1px solid var(--color-border);
+}
+
+/* ===== Título de cabecera: mismo estilo compacto que "WHEEL EDITOR" =====
+   Monoespaciada 0.75rem/600/0.15em y UNA sola línea (ellipsis si aprieta). */
+.spinly-panel-title {
+    margin: 0;
+    min-width: 0;
+    font-family: var(--font-family-alternative);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    color: var(--font-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ===== Badge base compartido =====
+   "4 / 10" (Wheel editor), "N Listas", "N Disponibles", "N en Comunidad":
+   mismo radio, padding, tamaño y color en toda la app. */
+.spinly-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
+    padding: 0.3rem 0.6rem;
+    border-radius: var(--spinly-badge-radius);
+    background-color: var(--bg-transparence);
+    color: var(--color-focus);
+    font-family: var(--font-family-alternative);
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* ===== Aviso de cuota de localStorage (fijo: sin desplazar el layout) ===== */
+.spinly-storage-warning {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 200;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    max-width: min(24rem, calc(100vw - 2rem));
+    padding: 0.75rem 0.9rem;
+    background-color: var(--bg-header-color);
+    border: 1px solid var(--color-remove, #f87171);
+    border-radius: var(--spinly-card-radius);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    color: var(--font-color);
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+.spinly-storage-warning span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.spinly-storage-warning button {
+    flex-shrink: 0;
+    border: 0;
+    background: transparent;
+    color: var(--font-color-muted);
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0;
+    cursor: pointer;
+}
+
+.spinly-storage-warning button:hover {
+    color: var(--color-remove, #f87171);
+}
+
+/* ===== Botón primario compartido (estilo "GIRAR RULETA" / "+ Nuevo") =====
+   Selector con elemento para ganar especificidad: shared.css se importa primero
+   y sin esto las reglas propias de cada componente lo sobreescribirían. */
+button.spinly-btn-primary {
+    background: var(--color-focus);
+    border-color: var(--color-focus);
+    color: #ffffff;
+}
+
+button.spinly-btn-primary:hover:not(:disabled) {
+    background: var(--color-focus-light);
+    border-color: var(--color-focus-light);
+    color: #ffffff;
+}
+
+button.spinly-btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

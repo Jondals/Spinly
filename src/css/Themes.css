@@ -3,69 +3,50 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    padding: 0.5rem 0;
+    gap: var(--spinly-card-gap);
+    padding: 0;
     color: var(--font-color-light);
     overflow-y: auto;
 }
 
-.presets-themes-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 1rem;
-}
-
+/* Cabecera/título/badge: .spinly-panel-header + .spinly-panel-title + .spinly-badge (shared.css) */
 .presets-themes-header-left {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    min-width: 0;
 }
 
 .presets-themes-icon {
-    font-size: 1.2rem;
-}
-
-.presets-themes-title {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: var(--color-focus);
-    margin: 0;
-}
-
-.presets-themes-badge {
-    font-size: 0.72rem;
-    font-weight: 700;
-    padding: 0.2rem 0.6rem;
-    border-radius: 999px;
-    background: var(--bg-transparence);
+    display: inline-flex;
+    flex-shrink: 0;
     color: var(--font-color-muted);
 }
 
-.presets-themes-badge--accent {
-    color: var(--color-focus);
+.presets-themes-icon svg {
+    width: 1.1rem;
+    height: 1.1rem;
+    display: block;
 }
 
 .presets-themes-subtitle {
     font-size: 0.8rem;
     color: var(--font-color-muted);
-    margin: 0 1rem 0.5rem;
+    margin: 0 var(--spinly-panel-pad-x);
 }
 
 .presets-themes-grid {
     list-style: none;
     margin: 0;
-    padding: 0 1rem;
+    padding: 0 var(--spinly-panel-pad-x) var(--spinly-panel-pad-y);
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
-    gap: 0.75rem;
+    gap: var(--spinly-card-gap);
 }
 
+/* Fondo, borde y radio: .spinly-panel-card (clase compartida con Options/Presets) */
 .presets-themes-card {
     position: relative;
-    border: 1px solid var(--color-border);
-    border-radius: 0.75rem;
-    background: var(--bg-card-color);
     overflow: hidden;
     transition: border-color 0.15s ease, transform 0.15s ease;
     margin: 0;
@@ -155,10 +136,21 @@
     color: var(--color-focus);
 }
 
-.presets-themes-delete {
+/* Acciones de la tarjeta (Compartir + Borrar), ancladas arriba a la derecha */
+.presets-themes-tools {
     position: absolute;
     top: 0.35rem;
     right: 0.35rem;
+    display: flex;
+    gap: 0.3rem;
+    z-index: 1;
+}
+
+.presets-themes-delete,
+.presets-themes-share {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border: 1px solid var(--color-border);
     border-radius: 0.4rem;
     background: rgba(0, 0, 0, 0.65);
@@ -168,11 +160,16 @@
     padding: 0.2rem 0.5rem;
     cursor: pointer;
     opacity: 0;
-    transition: opacity 0.15s ease;
+    transition: opacity 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.presets-themes-card:hover .presets-themes-delete {
+.presets-themes-card:hover .presets-themes-delete,
+.presets-themes-card:hover .presets-themes-share {
     opacity: 1;
+}
+
+.presets-themes-share svg {
+    display: block;
 }
 
 .presets-themes-delete:hover {
@@ -180,15 +177,42 @@
     color: var(--color-remove, #f87171);
 }
 
+.presets-themes-share:hover {
+    border-color: var(--color-focus);
+    color: var(--color-focus-light);
+}
+
+/* Cooldown/petición en curso: estado disabled claro */
+.presets-themes-share:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    border-color: var(--color-border);
+}
+
+/* Tarjeta de la comunidad: contenedor estático (la acción es "Descargar") */
+.presets-themes-card--community .presets-themes-card-inner {
+    cursor: default;
+    text-align: left;
+}
+
+.presets-themes-empty {
+    text-align: center;
+    color: var(--font-color-muted);
+    padding: 1rem;
+}
+
+/* Bloque inferior: input de nombre arriba + botón primario abajo, ambos a ancho completo */
 .presets-themes-save {
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+    margin-top: auto;
+    padding: 0 var(--spinly-panel-pad-x) var(--spinly-panel-pad-y);
 }
 
 .presets-themes-input {
-    flex: 1;
+    width: 100%;
     padding: 0.5rem 0.75rem;
     font-size: 0.85rem;
     border: 1px solid var(--color-border);
@@ -203,20 +227,31 @@
     border-color: var(--color-focus);
 }
 
+/* Botón a ancho completo, texto SIEMPRE en una línea; colores → .spinly-btn-primary */
 .presets-themes-save-btn {
+    width: 100%;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
     border: 1px solid var(--color-border);
-    border-radius: 0.5rem;
+    border-radius: var(--spinly-card-radius);
     background: transparent;
     color: var(--font-color-light);
-    font-size: 0.8rem;
-    padding: 0.5rem 1rem;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.65rem 1rem;
     cursor: pointer;
-    transition: border-color 0.15s ease, color 0.15s ease;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.presets-themes-save-btn:hover:not(:disabled) {
-    border-color: var(--color-primary);
-    color: var(--font-color);
+.presets-themes-save-btn svg {
+    width: 0.95rem;
+    height: 0.95rem;
+    display: block;
+    flex-shrink: 0;
 }
 
 .presets-themes-save-btn:disabled {
@@ -225,12 +260,8 @@
 }
 
 @media (max-width: 750px) {
-    .presets-themes {
-        padding: 0;
-    }
-
     .presets-themes-grid {
         grid-template-columns: 1fr;
-        padding: 0 1rem;
+        padding: 0 var(--spinly-panel-pad-x) var(--spinly-panel-pad-y);
     }
 }

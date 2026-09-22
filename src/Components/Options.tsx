@@ -1,7 +1,9 @@
 import React, { useState, useRef } from 'react';
 import '../css/Options.css';
+import ColorPicker from './ColorPicker';
 import { addOption, removeOption, updateOption, reorderOptions, MAX_OPTION_LENGTH, MAX_WHEEL_OPTIONS, type WheelOption } from '../scripts/option-wheel';
 import { DEFAULT_SEGMENT_COLOR, WHEEL_LIMIT_STORAGE_KEY, ensureSegments, type WheelSegmentStyle, type WheelTheme } from '../types/theme-types';
+import { isAllowedImageMime, MAX_UPLOAD_BYTES } from '../lib/supabaseClient';
 
 interface OptionsProps {
     options: WheelOption[];
@@ -65,6 +67,12 @@ function Options({ options, setOptions, activeTheme, setActiveTheme, wheelLimit,
         syncSeg(index, { color });
     };
 
+    // Selector de color personalizado: anclado al swatch pulsado
+    const [colorPicker, setColorPicker] = useState<{ index: number; anchorEl: HTMLElement } | null>(null);
+    const openColorPicker = (index: number, anchorEl: HTMLElement) => {
+        setColorPicker((prev) => (prev && prev.index === index ? null : { index, anchorEl }));
+    };
+
     const openFilePicker = (id: string) => {
         fileInputs.current[id]?.click();
     };
@@ -75,20 +83,22 @@ function Options({ options, setOptions, activeTheme, setActiveTheme, wheelLimit,
 
     const handleImageFile = (index: number, file: File | undefined) => {
         if (!file) return;
-        if (!file.type.startsWith('image/')) {
-            setImageWarning('El archivo debe ser una imagen.');
+        // MIME real del archivo (no la extensión) + whitelist estricta + límite duro de 2MB
+        if (!isAllowedImageMime(file.type)) {
+            setImageWarning('Formato no permitido: usa PNG, JPEG o WEBP.');
             return;
         }
-        if (file.size > 2 * 1024 * 1024) {
-            setImageWarning('Imagen mayor de ~2MB: puede agotar localStorage (~5MB total). Se guarda igualmente, pero considera usar una imagen más pequeña.');
-        } else {
-            setImageWarning(null);
+        if (file.size > MAX_UPLOAD_BYTES) {
+            setImageWarning('Imagen mayor de 2MB: excede el límite de localStorage (~5MB). Elige una más ligera.');
+            return;
         }
+        setImageWarning(null);
         const reader = new FileReader();
         reader.onload = () => {
             const dataUrl = String(reader.result ?? '');
             if (dataUrl.length > 2800000) {
-                setImageWarning('Esta imagen en base64 es muy pesada y puede romper el guardado en localStorage. Prueba con una más pequeña.');
+                setImageWarning('Esta imagen en base64 es muy pesada para localStorage. No se ha guardado.');
+                return;
             }
             syncSeg(index, { backgroundImage: dataUrl });
         };
@@ -175,9 +185,9 @@ function Options({ options, setOptions, activeTheme, setActiveTheme, wheelLimit,
 
     return (
         <div className='Options'>
-            <div className="options-title">
-                <p>WHEEL EDITOR</p>
-                <span className="number-items" title={`Límite ${lim} de ${MAX_WHEEL_OPTIONS}: clic para editar`}>
+            <div className="options-title spinly-panel-header">
+                <p className="spinly-panel-title">WHEEL EDITOR</p>
+                <span className="number-items spinly-badge" title={`Límite ${lim} de ${MAX_WHEEL_OPTIONS}: clic para editar`}>
                     {options.length} / {isEditingLimit ? (
                         <input
                             className="options-limit-inline"
@@ -210,23 +220,28 @@ function Options({ options, setOptions, activeTheme, setActiveTheme, wheelLimit,
                     const hasImg = Boolean(seg?.backgroundImage);
                     return (
                         <div
-                            className={`option-item${dragIndex === index ? ' option-item--dragging' : ''}${overIndex === index ? ' option-item--over' : ''}${hasImg ? ' option-item--has-img' : ''}`}
+                            className={`option-item spinly-panel-card${dragIndex === index ? ' option-item--dragging' : ''}${overIndex === index ? ' option-item--over' : ''}${hasImg ? ' option-item--has-img' : ''}`}
                             key={option.id}
                             onDragOver={handleDragOver(index)}
                             onDrop={handleDrop(index)}
                         >
                             <span className='drag' draggable onDragStart={handleDragStart(index)} onDragEnd={handleDragEnd}>⠿</span>
-                            <label className="option-swatch" style={{ backgroundColor: swatch }} title={`Color sector ${index + 1}`}>
-                                <input
-                                    className="option-color-input"
-                                    type="color"
-                                    value={swatch}
-                                    onChange={(event) => handleColorChange(index, event.target.value)}
-                                    aria-label={`Color de ${option.name}`}
-                                />
-                            </label>
+                            <button
+                                type="button"
+                                className="option-swatch"
+                                style={{ backgroundColor: swatch }}
+                                title={`Cambiar color del sector ${index + 1}`}
+                                onClick={(event) => openColorPicker(index, event.currentTarget)}
+                                aria-label={`Color de ${option.name}`}
+                            />
                             <input value={option.name} maxLength={MAX_OPTION_LENGTH} onChange={(event) => renameOpt(option.id, index, event.target.value)} aria-label={`Nombre opción ${index + 1}`} />
-                            <button type="button" className={`option-img-btn${hasImg ? ' option-img-btn--active' : ''}`} onClick={() => openFilePicker(option.id)} title={hasImg ? 'Cambiar imagen de fondo' : 'Añadir imagen de fondo'} aria-label={`Imagen de fondo opción ${index + 1}`}>🖼</button>
+                            <button type="button" className={`option-img-btn${hasImg ? ' option-img-btn--active' : ''}`} onClick={() => openFilePicker(option.id)} title={hasImg ? 'Cambiar imagen de fondo' : 'Añadir imagen de fondo'} aria-label={`Imagen de fondo opción ${index + 1}`}>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                    <circle cx="8.5" cy="8.5" r="1.5" />
+                                    <polyline points="21 15 16 10 5 21" />
+                                </svg>
+                            </button>
                             <input
                                 ref={(el) => { fileInputs.current[option.id] = el; }}
                                 type="file"
@@ -246,10 +261,23 @@ function Options({ options, setOptions, activeTheme, setActiveTheme, wheelLimit,
 
             <div className='options-bottom'>
                 <button className='add-option-button' onClick={handleAdd} disabled={reachedLimit} title={reachedLimit ? `Máximo ${lim} opciones` : undefined}>
-                    <span>⊕</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24" aria-hidden="true">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
                     Añadir opción
                 </button>
             </div>
+
+            {colorPicker && colorPicker.index < options.length && (
+                <ColorPicker
+                    key={colorPicker.index}
+                    color={segments[colorPicker.index]?.color ?? DEFAULT_SEGMENT_COLOR}
+                    onChange={(hex) => handleColorChange(colorPicker.index, hex)}
+                    onClose={() => setColorPicker(null)}
+                    anchorEl={colorPicker.anchorEl}
+                />
+            )}
         </div>
     );
 }

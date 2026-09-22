@@ -44,6 +44,7 @@ html {
     --color-focus-light: #818cf8;
     --color-primary: #6366f1;
     --color-primary-light: #818cf8;
+    --color-remove: #ef4444;
 
     --wheel-color-dark: #e6e6ee;
     --wheel-center-color: #ffffff;
@@ -133,7 +134,10 @@ html {
         grid-template-columns: minmax(0, 16rem) minmax(0, 17rem) minmax(0, 1fr);
     }
 
-    .Options {
+    /* Mismo padding exterior en los tres paneles (tablet) */
+    .Options,
+    .Presets,
+    .Themes {
         padding: 1.5rem 1rem;
     }
 }

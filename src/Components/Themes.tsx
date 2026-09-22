@@ -113,8 +113,23 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
     const handleSaveCurrent = () => {
         if (!activeTheme) return;
         const name = nameInput.trim() || `Tema ${savedThemes.filter((t) => !DEFAULT_THEME_IDS.has(t.id)).length + 1}`;
-        onSaveTheme({ ...activeTheme, id: crypto.randomUUID(), name });
+        const description = descriptionInput.trim();
+        const styleTag = styleTagInput.trim().toUpperCase();
+        const category = categoryInput.trim().toUpperCase();
+
+        onSaveTheme({
+            ...activeTheme,
+            id: crypto.randomUUID(),
+            name,
+            description: description || activeTheme.description,
+            styleTag: styleTag || activeTheme.styleTag,
+            category: category || activeTheme.category,
+        });
+
         setNameInput('');
+        setDescriptionInput('');
+        setStyleTagInput('');
+        setCategoryInput('');
     };
 
     return (
@@ -229,6 +244,17 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
                 <input type="text" className="presets-themes-input" value={nameInput}
                     onChange={(e) => setNameInput(e.target.value)}
                     placeholder="Nombre del tema (opcional)" maxLength={32} />
+                <textarea className="presets-themes-input presets-themes-textarea" value={descriptionInput}
+                    onChange={(e) => setDescriptionInput(e.target.value)}
+                    placeholder="Descripción (opcional)" maxLength={120} rows={2} />
+                <div className="presets-themes-tag-inputs">
+                    <input type="text" className="presets-themes-input presets-themes-tag-input" value={styleTagInput}
+                        onChange={(e) => setStyleTagInput(e.target.value)}
+                        placeholder="Etiqueta de estilo" maxLength={24} />
+                    <input type="text" className="presets-themes-input presets-themes-tag-input" value={categoryInput}
+                        onChange={(e) => setCategoryInput(e.target.value)}
+                        placeholder="Categoría" maxLength={24} />
+                </div>
                 <button type="button" className="presets-themes-save-btn spinly-btn-primary"
                     onClick={handleSaveCurrent} disabled={!activeTheme}
                     aria-label="Guardar tema visual actual en local"
@@ -293,6 +319,10 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
                                                 />
                                             ))}
                                         </span>
+                                        <div className="presets-themes-card-footer">
+                                            <span className="presets-themes-tag presets-themes-tag--style">{theme.styleTag ?? 'ESTILO'}</span>
+                                            <span className="presets-themes-tag presets-themes-tag--category">{theme.category ?? 'CATEGORÍA'}</span>
+                                        </div>
                                         <span className="spinly-author" title={author.username}>
                                             <Avatar src={author.avatar_url} size="sm" alt={`Foto de ${author.username}`} />
                                             <span className="spinly-author-name">{author.username}</span>

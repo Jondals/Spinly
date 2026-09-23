@@ -3,7 +3,7 @@ import '../../css/Options.css';
 import Icon from '../common/Icon';
 import { useSortable } from '../../hooks/useSortable';
 import PanelHeader from '../common/PanelHeader';
-import { addOption, removeOption, updateOption, reorderOptions, MAX_OPTION_LENGTH, MAX_WHEEL_OPTIONS, type WheelOption } from '../../scripts/option-wheel';
+import { addOption, removeOption, updateOption, reorderOptions, MAX_OPTION_LENGTH, MAX_WHEEL_OPTIONS, MIN_OPTIONS, type WheelOption } from '../../scripts/option-wheel';
 import { DEFAULT_IMAGE_FIT, DEFAULT_SEGMENT_COLOR, WHEEL_LIMIT_STORAGE_KEY, ensureSegments, type ImageFit, type WheelSegmentStyle, type WheelTheme } from '../../types/theme-types';
 import { isAllowedImageMime, MAX_UPLOAD_BYTES } from '../../scripts/supabaseClient';
 import { fitImageToSector, randomSegmentColor } from '../../scripts/wheel';
@@ -36,6 +36,7 @@ function WheelEditor({ options, setOptions, activeTheme, setActiveTheme, wheelLi
     const [limitDraft, setLimitDraft] = useState<string>('');
     const lim = Number.isFinite(wheelLimit) ? Math.min(Math.max(wheelLimit, 2), MAX_WHEEL_OPTIONS) : MAX_WHEEL_OPTIONS;
     const reachedLimit = options.length >= lim;
+    const atMinimum = options.length <= MIN_OPTIONS;
     const segments = ensureSegments(activeTheme?.segments ?? [], Math.max(options.length, 1));
 
     const handleLimit = (value: number) => {
@@ -148,8 +149,10 @@ function WheelEditor({ options, setOptions, activeTheme, setActiveTheme, wheelLi
         });
     };
 
+    // En el mínimo no se toca nada: quitar solo el sector desajustaría colores y opciones.
     const handleRemove = (id: string, index: number) => {
         const curLen = options.length;
+        if (curLen <= MIN_OPTIONS) return;
         setOptions((prev) => removeOption(prev, id));
         setActiveTheme((themePrev) => {
             if (!themePrev) return themePrev;
@@ -274,7 +277,14 @@ function WheelEditor({ options, setOptions, activeTheme, setActiveTheme, wheelLi
                             {hasImg && (
                                 <button type="button" className="option-img-remove" onClick={() => removeSegImage(index)} title={t('options', 'removeImg')} aria-label={t('options', 'removeImgAria', { n: index + 1 })}>✕</button>
                             )}
-                            <button className='remove-option-button' onClick={() => handleRemove(option.id, index)} aria-label={t('options', 'removeOpt', { n: index + 1 })}>×</button>
+                            <button
+                                type="button"
+                                className='remove-option-button'
+                                onClick={() => handleRemove(option.id, index)}
+                                disabled={atMinimum}
+                                aria-label={t('options', 'removeOpt', { n: index + 1 })}
+                                title={atMinimum ? t('options', 'minReached', { min: MIN_OPTIONS }) : undefined}
+                            >×</button>
                         </div>
                     );
                 })}

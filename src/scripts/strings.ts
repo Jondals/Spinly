@@ -45,6 +45,7 @@ export const STRINGS = {
         limitBlocked: { en: 'Cannot lower the limit to {next}: you already have {count} options.', es: 'No se puede bajar el límite a {next}: ya tienes {count} opciones.' },
         add: { en: 'Add option', es: 'Añadir opción' },
         maxReached: { en: 'Max {lim} options', es: 'Máximo {lim} opciones' },
+        minReached: { en: 'A wheel needs at least {min} options', es: 'La ruleta necesita al menos {min} opciones' },
         changeColor: { en: 'Change color of sector {n}', es: 'Cambiar color del sector {n}' },
         colorOf: { en: 'Color of {name}', es: 'Color de {name}' },
         optName: { en: 'Option name {n}', es: 'Nombre opción {n}' },

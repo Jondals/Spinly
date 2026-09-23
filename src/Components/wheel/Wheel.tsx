@@ -250,6 +250,7 @@ function Wheel({ options, activeTheme, onColorChange }: WheelProps) {
                         onChange={(color) => onColorChange(picker.field, color)}
                         onClose={() => setPicker(null)}
                         anchorEl={picker.anchor}
+                        placement={picker.field === 'lightColor' ? 'around' : 'below'}
                     />
                 </Suspense>
             )}

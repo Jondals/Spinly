@@ -9,9 +9,14 @@ interface ColorPickerProps {
     onChange: (hex: string) => void;
     onClose: () => void;
     anchorEl: HTMLElement;
+    /**
+     * below: bajo el ancla, o encima si no cabe. around: para anclas grandes como la ruleta;
+     * debajo, o si no a un lado, para que el ancla siga a la vista mientras se elige el color.
+     */
+    placement?: 'below' | 'around';
 }
 
-function ColorPicker({ color, onChange, onClose, anchorEl }: ColorPickerProps) {
+function ColorPicker({ color, onChange, onClose, anchorEl, placement = 'below' }: ColorPickerProps) {
     const { t } = useTranslation();
     // Solo al montar: el picker se re-monta por key en cada apertura.
     const [hsv, setHsv] = useState<Hsv>(() => rgbToHsv(hexToRgb(color)));
@@ -20,6 +25,10 @@ function ColorPicker({ color, onChange, onClose, anchorEl }: ColorPickerProps) {
     const [rgbDrafts, setRgbDrafts] = useState<{ r: string | null; g: string | null; b: string | null }>({ r: null, g: null, b: null });
     const panelRef = useRef<HTMLDivElement>(null);
     const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+    // Arrastrado con el ratón por la cabecera: deja de seguir al ancla y se queda donde se soltó.
+    const movedRef = useRef(false);
+    const grabRef = useRef<{ dx: number; dy: number } | null>(null);
+    const [grabbing, setGrabbing] = useState(false);
 
     const rgb = hsvToRgb(hsv);
     const hex = rgbToHex(rgb);
@@ -39,16 +48,34 @@ function ColorPicker({ color, onChange, onClose, anchorEl }: ColorPickerProps) {
     anchorRef.current = anchorEl;
     useDismiss(true, onClose, [panelRef, anchorRef]);
 
-    // Anclado al swatch, sigue scroll y resize sin salirse del viewport.
+    // Anclado, sigue scroll y resize sin salirse del viewport.
     useLayoutEffect(() => {
         const update = () => {
             const rect = anchorEl.getBoundingClientRect();
             const pw = panelRef.current?.offsetWidth ?? 264;
             const ph = panelRef.current?.offsetHeight ?? 340;
-            let left = clamp(rect.left, 8, Math.max(8, window.innerWidth - pw - 8));
+            const maxLeft = Math.max(8, window.innerWidth - pw - 8);
+            const maxTop = Math.max(8, window.innerHeight - ph - 8);
+            if (movedRef.current) {
+                setPos((prev) => (prev ? { top: clamp(prev.top, 8, maxTop), left: clamp(prev.left, 8, maxLeft) } : prev));
+                return;
+            }
+            if (placement === 'around') {
+                const besideTop = clamp(rect.top + (rect.height - ph) / 2, 8, maxTop);
+                if (rect.bottom + 8 + ph <= window.innerHeight - 8) {
+                    setPos({ top: rect.bottom + 8, left: clamp(rect.left + (rect.width - pw) / 2, 8, maxLeft) });
+                } else if (rect.right + 8 + pw <= window.innerWidth - 8) {
+                    setPos({ top: besideTop, left: rect.right + 8 });
+                } else if (rect.left - 8 - pw >= 8) {
+                    setPos({ top: besideTop, left: rect.left - 8 - pw });
+                } else {
+                    setPos({ top: maxTop, left: clamp(rect.left + (rect.width - pw) / 2, 8, maxLeft) });
+                }
+                return;
+            }
             let top = rect.bottom + 8;
             if (top + ph > window.innerHeight - 8) top = Math.max(8, rect.top - ph - 8);
-            setPos({ top, left });
+            setPos({ top, left: clamp(rect.left, 8, maxLeft) });
         };
         update();
         window.addEventListener('resize', update);
@@ -57,7 +84,7 @@ function ColorPicker({ color, onChange, onClose, anchorEl }: ColorPickerProps) {
             window.removeEventListener('resize', update);
             window.removeEventListener('scroll', update, true);
         };
-    }, [anchorEl]);
+    }, [anchorEl, placement]);
 
     const applySv = (clientX: number, clientY: number, el: HTMLElement) => {
         const rect = el.getBoundingClientRect();
@@ -111,6 +138,31 @@ function ColorPicker({ color, onChange, onClose, anchorEl }: ColorPickerProps) {
         setDrag(null);
     };
 
+    const onHeadPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+        if (event.pointerType !== 'mouse' || event.button !== 0 || !pos) return;
+        if ((event.target as HTMLElement).closest('button')) return;
+        event.preventDefault();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        grabRef.current = { dx: event.clientX - pos.left, dy: event.clientY - pos.top };
+        setGrabbing(true);
+    };
+
+    const onHeadPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+        const grab = grabRef.current;
+        const panel = panelRef.current;
+        if (!grab || !panel) return;
+        movedRef.current = true;
+        setPos({
+            left: clamp(event.clientX - grab.dx, 8, Math.max(8, window.innerWidth - panel.offsetWidth - 8)),
+            top: clamp(event.clientY - grab.dy, 8, Math.max(8, window.innerHeight - panel.offsetHeight - 8)),
+        });
+    };
+
+    const endHeadDrag = () => {
+        grabRef.current = null;
+        setGrabbing(false);
+    };
+
     const commitHex = () => {
         if (hexDraft !== null) {
             const clean = hexDraft.trim().replace(/^#/, '');
@@ -135,13 +187,19 @@ function ColorPicker({ color, onChange, onClose, anchorEl }: ColorPickerProps) {
 
     return (
         <div
-            className="cpicker"
+            className={`cpicker${grabbing ? ' cpicker--grabbing' : ''}`}
             ref={panelRef}
             style={pos ? { top: pos.top, left: pos.left } : { visibility: 'hidden' }}
             role="dialog"
             aria-label={t('colorPicker', 'dialog')}
         >
-            <div className="cpicker-head">
+            <div
+                className="cpicker-head"
+                onPointerDown={onHeadPointerDown}
+                onPointerMove={onHeadPointerMove}
+                onPointerUp={endHeadDrag}
+                onPointerCancel={endHeadDrag}
+            >
                 <span className="cpicker-title">{t('colorPicker', 'title')}</span>
                 <button type="button" className="cpicker-close" onClick={onClose} aria-label={t('colorPicker', 'close')}>✕</button>
             </div>

@@ -318,8 +318,13 @@
                     opacity 0.15s,
                     color 0.15s;
 
-                &:hover {
+                &:hover:not(:disabled) {
                     color: var(--color-remove);
+                }
+
+                &:disabled {
+                    color: var(--font-color-disabled);
+                    cursor: not-allowed;
                 }
             }
 

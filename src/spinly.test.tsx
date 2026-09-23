@@ -164,6 +164,23 @@ describe('ruleta y editor', () => {
         expect(swatches[before].style.backgroundColor).not.toBe('');
     });
 
+    test('en el mínimo de 2 opciones no se puede eliminar y cada sector conserva su color', () => {
+        const { container } = renderApp();
+        fireEvent.click(screen.getByRole('button', { name: 'Add option' }));
+        const colors = () => Array.from(container.querySelectorAll<HTMLElement>('.option-swatch')).map((el) => el.style.backgroundColor);
+        while (container.querySelectorAll('.option-swatch').length > 2) {
+            fireEvent.click(screen.getByRole('button', { name: 'Remove option 1' }));
+        }
+        const kept = colors();
+        expect(new Set(kept).size).toBe(2);
+
+        const remove = screen.getByRole('button', { name: 'Remove option 1' });
+        expect(remove).toBeDisabled();
+        fireEvent.click(remove);
+        expect(colors()).toEqual(kept);
+        expect(storedActiveTheme().segments.map((segment) => segment.color)).toHaveLength(2);
+    });
+
     test('el resultado se muestra en un diálogo fuera de la ruleta y se cierra con Escape', async () => {
         jest.useFakeTimers();
         try {

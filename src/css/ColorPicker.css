@@ -129,6 +129,46 @@
     gap: 0.5rem;
 }
 
+.cpicker-eyedropper {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 2.1rem;
+    height: 2.1rem;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input-color);
+    color: var(--font-color-muted);
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.cpicker-eyedropper:hover:not(:disabled),
+.cpicker-eyedropper:focus-visible {
+    color: var(--font-color);
+    border-color: var(--color-focus);
+}
+
+.cpicker-eyedropper svg {
+    display: block;
+}
+
+/* Solo lo abre la pipeta en modo imagen (móvil o sin captura de pantalla). */
+.cpicker-file {
+    display: none;
+}
+
+/* Pipeta abierta: el botón queda marcado hasta que se elige o se cancela */
+.cpicker-eyedropper--active,
+.cpicker-eyedropper--active:disabled {
+    color: #ffffff;
+    border-color: var(--color-focus);
+    background: var(--color-focus);
+    cursor: progress;
+}
+
 .cpicker-swatch {
     flex: 1;
     height: 2.1rem;

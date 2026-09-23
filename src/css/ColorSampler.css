@@ -1,0 +1,150 @@
+/* ColorSampler.tsx: pipeta sobre una captura o imagen, a pantalla completa. */
+.csampler {
+    position: fixed;
+    inset: 0;
+    /* Sobre el header (100) y el selector de color (60) */
+    z-index: 160;
+    display: flex;
+    background: rgba(0, 0, 0, 0.88);
+    animation: csampler-in 0.18s ease-out;
+}
+
+.csampler-dialog {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+}
+
+.csampler-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-header-color);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.csampler-text {
+    min-width: 0;
+}
+
+.csampler-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--font-color);
+}
+
+.csampler-hint {
+    margin-top: 0.15rem;
+    font-size: 0.8rem;
+    color: var(--font-color-muted);
+}
+
+.csampler-actions {
+    display: flex;
+    flex-shrink: 0;
+    gap: 0.5rem;
+}
+
+.csampler-actions .spinly-action-btn {
+    width: auto;
+    white-space: nowrap;
+}
+
+.csampler-stage {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+/* Canvas a resolución real, reducido para caber sin deformarse */
+.csampler-canvas {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    cursor: crosshair;
+    touch-action: none;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+    outline: none;
+}
+
+.csampler-canvas:focus-visible {
+    box-shadow: 0 0 0 3px var(--color-focus), 0 12px 40px rgba(0, 0, 0, 0.6);
+}
+
+.csampler-loupe {
+    position: fixed;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 2px solid #ffffff;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 12px 32px rgba(0, 0, 0, 0.5);
+    background: var(--bg-card-color);
+    pointer-events: none;
+}
+
+.csampler-loupe canvas {
+    display: block;
+    image-rendering: pixelated;
+}
+
+.csampler-loupe-value {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    height: 28px;
+    padding: 0 0.5rem;
+    font-family: var(--font-family-alternative);
+    font-size: 0.8rem;
+    color: var(--font-color);
+}
+
+.csampler-loupe-swatch {
+    width: 0.85rem;
+    height: 0.85rem;
+    border-radius: 0.2rem;
+    border: 1px solid var(--color-border-dark);
+}
+
+.csampler-live {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+@keyframes csampler-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@media (max-width: 750px) {
+    .csampler-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.6rem;
+    }
+
+    .csampler-actions .spinly-action-btn {
+        flex: 1;
+    }
+
+    .csampler-stage {
+        padding: 0.5rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .csampler {
+        animation: none;
+    }
+}

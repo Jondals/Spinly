@@ -3,7 +3,7 @@ import '../../css/Options.css';
 import Icon from '../common/Icon';
 import { useSortable } from '../../hooks/useSortable';
 import PanelHeader from '../common/PanelHeader';
-import { addOption, removeOption, updateOption, reorderOptions, MAX_OPTION_LENGTH, MAX_WHEEL_OPTIONS, MIN_OPTIONS, type WheelOption } from '../../scripts/option-wheel';
+import { addOption, removeOption, updateOption, reorderOptions, DEFAULT_WHEEL_LIMIT, MAX_OPTION_LENGTH, MAX_WHEEL_OPTIONS, MIN_OPTIONS, type WheelOption } from '../../scripts/option-wheel';
 import { DEFAULT_IMAGE_FIT, DEFAULT_SEGMENT_COLOR, WHEEL_LIMIT_STORAGE_KEY, ensureSegments, type ImageFit, type WheelSegmentStyle, type WheelTheme } from '../../types/theme-types';
 import { isAllowedImageMime, MAX_UPLOAD_BYTES } from '../../scripts/supabaseClient';
 import { fitImageToSector, randomSegmentColor } from '../../scripts/wheel';
@@ -34,14 +34,14 @@ function WheelEditor({ options, setOptions, activeTheme, setActiveTheme, wheelLi
     const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
     const [isEditingLimit, setIsEditingLimit] = useState<boolean>(false);
     const [limitDraft, setLimitDraft] = useState<string>('');
-    const lim = Number.isFinite(wheelLimit) ? Math.min(Math.max(wheelLimit, 2), MAX_WHEEL_OPTIONS) : MAX_WHEEL_OPTIONS;
+    const lim = Number.isFinite(wheelLimit) ? Math.min(Math.max(wheelLimit, MIN_OPTIONS), MAX_WHEEL_OPTIONS) : DEFAULT_WHEEL_LIMIT;
     const reachedLimit = options.length >= lim;
     const atMinimum = options.length <= MIN_OPTIONS;
     const segments = ensureSegments(activeTheme?.segments ?? [], Math.max(options.length, 1));
 
     const handleLimit = (value: number) => {
         if (!Number.isFinite(value)) return;
-        const next = Math.min(Math.max(Math.round(value), 2), MAX_WHEEL_OPTIONS);
+        const next = Math.min(Math.max(Math.round(value), MIN_OPTIONS), MAX_WHEEL_OPTIONS);
         // Bajar el límite nunca borra opciones: se bloquea por debajo de las que ya hay.
         if (next < options.length) {
             setImageWarning(dictMessage('options', 'limitBlocked', { next, count: options.length }));

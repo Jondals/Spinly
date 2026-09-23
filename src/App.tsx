@@ -5,18 +5,20 @@ import WheelEditor from './Components/editor/WheelEditor';
 import Wheel, { type WheelColorField } from './Components/wheel/Wheel';
 import { useTranslation } from './Components/i18n/LanguageProvider';
 import { useButtonSounds } from './hooks/useButtonSounds';
-import { createDefaultOptions, relabelDefaultOptions, MAX_WHEEL_OPTIONS } from './scripts/option-wheel';
+import { createDefaultOptions, relabelDefaultOptions, DEFAULT_WHEEL_LIMIT, MAX_WHEEL_OPTIONS, MIN_OPTIONS, type WheelOption } from './scripts/option-wheel';
 import {
     ACTIVE_PRESET_STORAGE_KEY,
     ACTIVE_THEME_STORAGE_KEY,
     DEFAULT_PRESETS,
     DEFAULT_THEMES,
+    OPTIONS_STORAGE_KEY,
     PRESETS_STORAGE_KEY,
     THEMES_STORAGE_KEY,
     WHEEL_LIMIT_STORAGE_KEY,
     clonePreset,
     cloneTheme,
     ensureSegments,
+    sanitizeOptions,
     sanitizePreset,
     sanitizeTheme,
     type WheelPreset,
@@ -85,7 +87,17 @@ const DEFAULT_OPTION_LABELS = Object.values(STRINGS.options.defaultName);
 
 function App() {
     const { lang, t } = useTranslation();
-    const [options, setOptions] = useState(() => createDefaultOptions(t('options', 'defaultName')));
+    // La ruleta vuelve tal como se dejó; las 4 opciones por defecto solo aparecen la primera vez.
+    const [options, setOptions] = useState<WheelOption[]>(() => {
+        try {
+            const stored = localStorage.getItem(OPTIONS_STORAGE_KEY);
+            const clean = stored ? sanitizeOptions(JSON.parse(stored), 'stored').slice(0, MAX_WHEEL_OPTIONS) : [];
+            if (clean.length >= MIN_OPTIONS) return clean;
+        } catch {
+            // Storage corrupto o inaccesible: se empieza con las opciones por defecto.
+        }
+        return createDefaultOptions(t('options', 'defaultName'));
+    });
     const [activeSection, setActiveSection] = useState<WheelSectionId>('options');
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -180,17 +192,23 @@ function App() {
         return null;
     });
 
+    // Nunca por debajo de las opciones que ya hay: una ruleta guardada con más de 14 sigue editable.
     const [wheelLimit, setWheelLimit] = useState<number>(() => {
-        if (typeof window === 'undefined') return MAX_WHEEL_OPTIONS;
+        let limit = DEFAULT_WHEEL_LIMIT;
         try {
             const stored = localStorage.getItem(WHEEL_LIMIT_STORAGE_KEY);
             const n = stored ? Number(stored) : NaN;
-            if (Number.isFinite(n)) return Math.min(Math.max(Math.round(n), 2), MAX_WHEEL_OPTIONS);
+            if (Number.isFinite(n)) limit = Math.min(Math.max(Math.round(n), MIN_OPTIONS), MAX_WHEEL_OPTIONS);
         } catch {
             // Sin acceso a storage (modo privado): el estado sigue en memoria.
         }
-        return MAX_WHEEL_OPTIONS;
+        return Math.max(limit, options.length);
     });
+
+    // Un preset con más opciones que el límite lo sube lo justo, sin persistirlo.
+    useEffect(() => {
+        setWheelLimit((prev) => Math.max(prev, options.length));
+    }, [options.length]);
 
     // setItem falla antes de escribir: con la cuota llena lo ya guardado sigue intacto y solo se avisa.
     const reportStorageError = (error: unknown, what: StorageWhat): void => {
@@ -200,6 +218,14 @@ function App() {
         const isQuota = name === 'QuotaExceededError' || code === 22 || /quota|exceed/i.test(message);
         if (isQuota) setStorageWarning(what);
     };
+
+    useEffect(() => {
+        try {
+            localStorage.setItem(OPTIONS_STORAGE_KEY, JSON.stringify(options));
+        } catch {
+            // Sin acceso a storage (modo privado): la ruleta sigue en memoria.
+        }
+    }, [options]);
 
     useEffect(() => {
         if (typeof window === 'undefined') return;

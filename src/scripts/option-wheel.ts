@@ -17,7 +17,10 @@ const OPTION_COLORS: string[] = [
 ];
 
 export const MAX_OPTION_LENGTH = 20;
+/** Tope absoluto de opciones; el límite de cada usuario se elige entre MIN_OPTIONS y este. */
 export const MAX_WHEEL_OPTIONS = 25;
+/** Límite inicial hasta que el usuario lo cambie en el editor. */
+export const DEFAULT_WHEEL_LIMIT = 14;
 export const MIN_OPTIONS = 2;
 
 export function createOption(name: string, index: number): WheelOption {

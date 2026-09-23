@@ -1,8 +1,14 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import '../../css/ColorPicker.css';
 import { useTranslation } from '../i18n/LanguageProvider';
 import { useDismiss } from '../../hooks/useDismiss';
+import { useEyeDropper } from '../../hooks/useEyeDropper';
+import Icon from '../common/Icon';
 import { clamp, hexToRgb, hsvToRgb, rgbToHex, rgbToHsv, type Hsv } from '../../scripts/color';
+import { captureScreenFrame, loadImageFile } from '../../scripts/screen-capture';
+
+// Solo en navegadores sin EyeDropper y solo al usar la pipeta.
+const ColorSampler = lazy(() => import('./ColorSampler'));
 
 interface ColorPickerProps {
     color: string;
@@ -46,7 +52,44 @@ function ColorPicker({ color, onChange, onClose, anchorEl, placement = 'below' }
     // El swatch queda "dentro": su propio click ya alterna el selector.
     const anchorRef = useRef<HTMLElement>(anchorEl);
     anchorRef.current = anchorEl;
-    useDismiss(true, onClose, [panelRef, anchorRef]);
+    const eyeDropper = useEyeDropper();
+    const fileRef = useRef<HTMLInputElement>(null);
+    // Captura o imagen sobre la que se elige el color (modos screen e image).
+    const [sample, setSample] = useState<{ canvas: HTMLCanvasElement; fromFile: boolean } | null>(null);
+    const [capturing, setCapturing] = useState(false);
+    const eyedropperBusy = eyeDropper.picking || capturing || sample !== null;
+    // Con la pipeta abierta, el clic y el Escape son suyos: no deben cerrar el selector.
+    useDismiss(!eyedropperBusy, onClose, [panelRef, anchorRef]);
+
+    const applyPicked = (picked: string) => {
+        setHexDraft(null);
+        setHsv(rgbToHsv(hexToRgb(picked)));
+    };
+
+    const startEyedropper = async () => {
+        if (eyeDropper.mode === 'native') {
+            const picked = await eyeDropper.pickNative();
+            if (picked) applyPicked(picked);
+            return;
+        }
+        if (eyeDropper.mode === 'screen') {
+            setCapturing(true);
+            const canvas = await captureScreenFrame();
+            setCapturing(false);
+            // null: el usuario canceló el diálogo de compartir pantalla; no hay nada que avisar.
+            if (canvas) setSample({ canvas, fromFile: false });
+            return;
+        }
+        fileRef.current?.click();
+    };
+
+    const onImageChosen = async (file: File | undefined) => {
+        if (!file) return;
+        const canvas = await loadImageFile(file);
+        if (canvas) setSample({ canvas, fromFile: true });
+    };
+
+    const eyedropperLabel = t('colorPicker', eyeDropper.mode === 'native' ? 'eyedropper' : eyeDropper.mode === 'screen' ? 'eyedropperScreen' : 'eyedropperImage');
 
     // Anclado, sigue scroll y resize sin salirse del viewport.
     useLayoutEffect(() => {
@@ -225,6 +268,30 @@ function ColorPicker({ color, onChange, onClose, anchorEl, placement = 'below' }
                 </div>
             </div>
             <div className="cpicker-result">
+                <button
+                    type="button"
+                    className={`cpicker-eyedropper${eyedropperBusy ? ' cpicker-eyedropper--active' : ''}`}
+                    onClick={() => { void startEyedropper(); }}
+                    disabled={eyedropperBusy}
+                    aria-label={eyedropperLabel}
+                    title={eyeDropper.picking ? t('colorPicker', 'eyedropperActive') : eyedropperLabel}
+                >
+                    <Icon name="eyedropper" size={16} />
+                </button>
+                {eyeDropper.mode !== 'native' && (
+                    <input
+                        ref={fileRef}
+                        type="file"
+                        accept="image/*"
+                        className="cpicker-file"
+                        tabIndex={-1}
+                        aria-hidden="true"
+                        onChange={(event) => {
+                            void onImageChosen(event.target.files?.[0]);
+                            event.target.value = '';
+                        }}
+                    />
+                )}
                 <span className="cpicker-swatch" style={{ background: hex }} />
                 <label className="cpicker-field cpicker-field--hex">
                     <span>HEX</span>
@@ -260,6 +327,19 @@ function ColorPicker({ color, onChange, onClose, anchorEl, placement = 'below' }
                     </label>
                 ))}
             </div>
+            {sample && (
+                <Suspense fallback={null}>
+                    <ColorSampler
+                        source={sample.canvas}
+                        onPick={(picked) => {
+                            applyPicked(picked);
+                            setSample(null);
+                        }}
+                        onCancel={() => setSample(null)}
+                        onReplace={sample.fromFile ? () => fileRef.current?.click() : undefined}
+                    />
+                </Suspense>
+            )}
         </div>
     );
 }

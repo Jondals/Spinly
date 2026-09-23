@@ -233,6 +233,100 @@ describe('ruleta y editor', () => {
         expect(storedActiveTheme().pointerColor).toBe('#22c55e');
     });
 
+    test('la pipeta toma un color de la pantalla; cancelarla no cambia nada ni cierra el selector', async () => {
+        const results: Array<() => Promise<{ sRGBHex: string }>> = [
+            async () => ({ sRGBHex: 'rgb(255, 0, 0)' }),
+            async () => { throw new DOMException('The user canceled the selection.', 'AbortError'); },
+        ];
+        class FakeEyeDropper {
+            open = () => (results.shift() as () => Promise<{ sRGBHex: string }>)();
+        }
+        const win = window as unknown as { EyeDropper?: unknown };
+        win.EyeDropper = FakeEyeDropper;
+        try {
+            renderApp();
+            fireEvent.click(screen.getByRole('button', { name: 'Change the pointer color' }));
+            const dropper = await screen.findByRole('button', { name: 'Pick a color from anywhere on the screen' });
+
+            await act(async () => { fireEvent.click(dropper); });
+            expect(rootVar('--wheel-pointer-color')).toBe('#ff0000');
+            expect(screen.getByLabelText('Color in hex')).toHaveValue('#ff0000');
+
+            await act(async () => { fireEvent.click(dropper); });
+            expect(rootVar('--wheel-pointer-color')).toBe('#ff0000');
+            expect(screen.getByRole('dialog', { name: 'Custom color picker' })).toBeInTheDocument();
+        } finally {
+            delete win.EyeDropper;
+        }
+    });
+
+    test('sin EyeDropper ni captura de pantalla (móvil) la pipeta toma el color de una imagen', async () => {
+        renderApp();
+        fireEvent.click(screen.getByRole('button', { name: 'Change the pointer color' }));
+        const dropper = await screen.findByRole('button', { name: 'Pick a color from an image or screenshot' });
+        expect(dropper).toBeEnabled();
+        const input = document.querySelector<HTMLInputElement>('.cpicker-file');
+        expect(input).toHaveAttribute('accept', 'image/*');
+        const opened: string[] = [];
+        input?.addEventListener('click', () => opened.push('file'));
+        fireEvent.click(dropper);
+        expect(opened).toEqual(['file']);
+    });
+
+    test('sin EyeDropper pero con captura de pantalla (Firefox, Safari) pide qué capturar; cancelar no cierra nada', async () => {
+        let requests = 0;
+        const nav = navigator as unknown as { mediaDevices?: unknown };
+        const win = window as unknown as { isSecureContext?: boolean };
+        const originalSecure = win.isSecureContext;
+        nav.mediaDevices = {
+            getDisplayMedia: async () => {
+                requests += 1;
+                throw new DOMException('Permission denied', 'NotAllowedError');
+            },
+        };
+        Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true });
+        try {
+            renderApp();
+            fireEvent.click(screen.getByRole('button', { name: 'Change the pointer color' }));
+            const dropper = await screen.findByRole('button', { name: 'Pick a color from the screen: choose the screen, window or tab to capture' });
+            await act(async () => { fireEvent.click(dropper); });
+            expect(requests).toBe(1);
+            expect(dropper).toBeEnabled();
+            expect(screen.getByRole('dialog', { name: 'Custom color picker' })).toBeInTheDocument();
+        } finally {
+            delete nav.mediaDevices;
+            Object.defineProperty(window, 'isSecureContext', { value: originalSecure, configurable: true });
+        }
+    });
+
+    test('la ruleta recuerda sus opciones; las 4 por defecto solo salen la primera vez', () => {
+        const first = renderApp();
+        expect(first.container.querySelectorAll('.option-swatch')).toHaveLength(4);
+        fireEvent.click(screen.getByRole('button', { name: 'Remove option 1' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Remove option 1' }));
+        const names = screen.getAllByLabelText(/^Option name/).map((input) => (input as HTMLInputElement).value);
+        first.unmount();
+
+        const second = renderApp();
+        expect(second.container.querySelectorAll('.option-swatch')).toHaveLength(2);
+        expect(screen.getAllByLabelText(/^Option name/).map((input) => (input as HTMLInputElement).value)).toEqual(names);
+    });
+
+    test('el límite por defecto es 14 y se puede subir hasta 25', () => {
+        renderApp();
+        const limitButton = () => screen.getByTitle('Click to edit the limit');
+        expect(limitButton()).toHaveTextContent('14');
+        for (let i = 0; i < 12; i++) fireEvent.click(screen.getByRole('button', { name: 'Add option' }));
+        expect(screen.getByRole('button', { name: 'Add option' })).toBeDisabled();
+
+        fireEvent.click(limitButton());
+        const input = screen.getByLabelText('Option limit (max 25)');
+        fireEvent.change(input, { target: { value: '99' } });
+        fireEvent.keyDown(input, { key: 'Enter' });
+        expect(limitButton()).toHaveTextContent('25');
+        expect(screen.getByRole('button', { name: 'Add option' })).toBeEnabled();
+    });
+
     test('los colores de flecha y luces se guardan en temas y presets', async () => {
         renderApp();
         await pickColor('Change the pointer color', '#22c55e');

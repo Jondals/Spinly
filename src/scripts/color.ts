@@ -14,6 +14,20 @@ export function hexToRgb(hex: string): Rgb {
     return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
 }
 
+/**
+ * Color devuelto por la pipeta: normalmente "#rrggbb", pero según el perfil de color algunas
+ * versiones de Chrome devuelven "#rrggbbaa" o "rgb(r, g, b)". Se descarta la transparencia.
+ */
+export function parseScreenColor(value: string): Rgb | null {
+    const clean = value.trim();
+    const hex = /^#([0-9a-f]{6})(?:[0-9a-f]{2})?$/i.exec(clean);
+    if (hex) return hexToRgb(hex[1]);
+    const rgb = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/i.exec(clean);
+    if (!rgb) return null;
+    const [r, g, b] = rgb.slice(1, 4).map((channel) => clamp(Number(channel), 0, 255));
+    return { r, g, b };
+}
+
 export function rgbToHex({ r, g, b }: Rgb): string {
     return `#${byte(r)}${byte(g)}${byte(b)}`;
 }

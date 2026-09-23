@@ -7,8 +7,12 @@ A customizable prize wheel for giveaways, raffles and everyday decisions. Add yo
 ## Features
 
 ### The wheel
-- Up to 25 options, with a configurable limit.
+- The limit starts at 14 options and can be raised to 25. The wheel remembers its options between visits; the four default options only appear the first time.
 - Each sector has its own color, picked with a built-in HSV / hex / RGB color picker, and an optional image.
+- The color picker can be dragged around with the mouse, and has an eyedropper that works in every browser:
+  - Chrome, Edge and Opera on desktop use the native eyedropper: any point on the screen, including other tabs, windows and apps.
+  - Firefox and Safari on desktop capture a frame of the screen, window or tab you choose, and you pick the color on it with a magnifier.
+  - On mobile you pick the color from an image or a screenshot, by dragging your finger.
 - The image editor previews the sector exactly as it will look when it wins. Move, zoom and rotate the image by dragging, pinching, scrolling or with the keyboard.
 - Reorder options by dragging with a mouse or a finger, or with the arrow keys.
 - Tap the pointer to recolor it. Tap the wheel to recolor the fairground lights around the rim and the hub.

@@ -95,6 +95,8 @@ export const ACTIVE_PRESET_STORAGE_KEY = 'spinly-active-preset';
 
 export const WHEEL_LIMIT_STORAGE_KEY = 'spinly-wheel-limit';
 
+export const OPTIONS_STORAGE_KEY = 'spinly-options';
+
 export const DEFAULT_SEGMENT_COLOR = '#6366f1';
 
 const seg = (color: string, backgroundImage?: string): WheelSegmentStyle => (
@@ -181,14 +183,7 @@ export function sanitizePreset(raw: unknown): WheelPreset | null {
     if (!Array.isArray(p.options) || p.options.length === 0) return null;
     const theme = sanitizeTheme(p.theme);
     if (!theme) return null;
-    const options: WheelOption[] = (p.options as Array<Record<string, unknown>>)
-        .filter((o) => o && typeof o === 'object' && typeof o['name'] === 'string')
-        .map((o, i) => ({
-            id: typeof o['id'] === 'string' ? (o['id'] as string) : `${p.id}-opt-${i}`,
-            name: String(o['name']).slice(0, MAX_OPTION_LENGTH),
-            color: typeof o['color'] === 'string' ? (o['color'] as string) : 'indigo',
-        }))
-        .filter((o) => o.name.length > 0);
+    const options = sanitizeOptions(p.options, p.id);
     if (options.length === 0) return null;
     return {
         id: p.id,
@@ -198,6 +193,19 @@ export function sanitizePreset(raw: unknown): WheelPreset | null {
         updatedAt: typeof p.updatedAt === 'number' ? p.updatedAt : Date.now(),
         tags: Array.isArray(p.tags) ? (p.tags as unknown[]).filter((t): t is string => typeof t === 'string') : [],
     };
+}
+
+/** Opciones leídas de storage o de la nube: solo nombre (acotado), id y color; se descartan las vacías. */
+export function sanitizeOptions(raw: unknown, idPrefix: string): WheelOption[] {
+    if (!Array.isArray(raw)) return [];
+    return (raw as Array<Record<string, unknown>>)
+        .filter((o) => o && typeof o === 'object' && typeof o['name'] === 'string')
+        .map((o, i) => ({
+            id: typeof o['id'] === 'string' ? (o['id'] as string) : `${idPrefix}-opt-${i}`,
+            name: String(o['name']).slice(0, MAX_OPTION_LENGTH),
+            color: typeof o['color'] === 'string' ? (o['color'] as string) : 'indigo',
+        }))
+        .filter((o) => o.name.length > 0);
 }
 
 export function clonePreset(p: WheelPreset): WheelPreset {

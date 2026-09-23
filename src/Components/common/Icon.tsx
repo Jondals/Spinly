@@ -70,6 +70,15 @@ const ICONS = defineIcons({
         ),
     },
     play: { body: <path d="M6 3l14 9-14 9Z" /> },
+    eyedropper: {
+        body: (
+            <>
+                <path d="m14.5 5.5 4 4" />
+                <path d="M16.2 3.8a2.5 2.5 0 0 1 3.5 3.5l-2.2 2.2-3.5-3.5Z" />
+                <path d="M13.3 6.7 5 15v4h4l8.3-8.3" />
+            </>
+        ),
+    },
     download: { body: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /> },
     save: {
         body: (

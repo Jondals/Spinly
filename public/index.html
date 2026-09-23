@@ -2,11 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Spinly: customizable spinning wheel for draws and decisions. Edit options, themes and presets, and share them with the community." />
+    <meta name="theme-color" content="#000000" />
+    <link rel="icon" type="image/webp" href="/Images/spinly-logo-128.webp" />
+    <link rel="preload" as="image" type="image/webp" href="/Images/spinly-logo-64.webp" imagesrcset="/Images/spinly-logo-64.webp 64w, /Images/spinly-logo-128.webp 128w" imagesizes="(max-width: 750px) 2rem, 2.5rem" />
     <title>Spinly</title>
-    <style>
-      /* Estado CERRADO del drawer del Wheel Manager, aplicado desde el primer pintado:
-         evita que el menu aparezca desplegado mientras carga el CSS del bundle */
+    <style> /* evita que el menu aparezca desplegado mientras carga el CSS del bundle */
       @media (max-width: 750px) {
         .Wheelmanager:not(.Wheelmanager--open) {
           position: fixed;

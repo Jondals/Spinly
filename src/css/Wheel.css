@@ -12,31 +12,145 @@
     overflow: hidden;
 }
 
-/* Radio centralizado en una variable: JS y CSS usan la MISMA formula */
+/* Todo el tamaño de la ruleta se deriva de este radio */
 .wheel-container {
     --wheel-radius: min(30vmin, 13rem);
     position: relative;
-    /* width: min(100%, 34rem) con aspect-ratio: 1/1 y fallback */
     width: min(100%, 34rem);
     width: calc(var(--wheel-radius) * 2);
     max-width: 100%;
     aspect-ratio: 1 / 1;
     height: auto;
-    /* Fallback para aspect-ratio: padding-top trick (solo si no soporta aspect-ratio) */
     padding-top: 100%;
     padding-top: unset;
+    border-radius: 50%;
+    box-shadow: 0 18px 40px -14px rgba(0, 0, 0, 0.55);
 }
 
+/* Botón invisible sobre la flecha: tocarla abre el selector de color */
+.wheel-pointer-btn {
+    position: absolute;
+    top: -1.5rem;
+    left: 50%;
+    z-index: 4;
+    width: 2.75rem;
+    height: 3rem;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    transform: translateX(-50%);
+    cursor: pointer;
+}
+
+.wheel-pointer-btn:focus-visible {
+    outline: 2px solid var(--color-focus-light);
+    outline-offset: 2px;
+}
+
+.wheel-pointer-btn .wheel-pointer {
+    top: 0.15rem;
+    transition: transform 0.15s ease;
+}
+
+.wheel-pointer-btn:hover .wheel-pointer {
+    transform: translateX(-50%) translateY(-2px);
+}
+
+/* Aro fijo sobre el borde del disco: no gira, como el marco de una ruleta real */
+.wheel-rim {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+}
+
+.wheel-rim-stop-top {
+    stop-color: var(--wheel-rim-top);
+}
+
+.wheel-rim-stop-bottom {
+    stop-color: var(--wheel-rim-bottom);
+}
+
+.wheel-rim-ring {
+    fill: none;
+    stroke: url(#wheel-rim-gradient);
+    stroke-width: 3;
+}
+
+.wheel-rim-inner {
+    fill: none;
+    stroke: var(--wheel-rim-line);
+    stroke-width: 0.35;
+}
+
+/* Capa transparente sobre el disco: tocar la ruleta abre el color de las luces */
+.wheel-lights-btn {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+}
+
+.wheel-lights-btn:focus-visible {
+    outline: 2px solid var(--color-focus-light);
+    outline-offset: 4px;
+}
+
+.wheel-hub {
+    fill: var(--wheel-center-color);
+    stroke: var(--wheel-rim-bottom);
+    stroke-width: 1.8;
+}
+
+/* Luces del aro y del centro: una onda de brillo recorre el círculo (retardo por luz en Wheel.tsx) */
+.wheel-light {
+    fill: var(--wheel-light-color);
+    animation: wheel-light 2.4s ease-in-out infinite;
+}
+
+.wheel-container--spinning .wheel-light {
+    animation-duration: 0.6s;
+}
+
+@keyframes wheel-light {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+}
+
+/* Lengüeta en ámbar: contrasta con cualquier paleta de sectores; la punta marca el ganador */
 .wheel-pointer {
     position: absolute;
-    top: -0.25rem;
+    top: -1.35rem;
     left: 50%;
-    width: 1.1rem;
-    height: 1.1rem;
-    background: var(--wheel-pointer-color);
-    border-radius: 0.2rem;
-    transform: translateX(-50%) rotate(45deg);
+    width: 2.25rem;
+    height: 2.5rem;
+    transform: translateX(-50%);
     z-index: 3;
+    overflow: visible;
+    filter:
+        drop-shadow(0 3px 4px rgba(0, 0, 0, 0.5))
+        drop-shadow(0 0 8px color-mix(in srgb, var(--wheel-pointer-color) 60%, transparent));
+}
+
+.wheel-pointer-body {
+    fill: var(--wheel-pointer-color);
+    stroke: var(--wheel-pointer-edge);
+    stroke-width: 2.5;
+    stroke-linejoin: round;
+}
+
+.wheel-pointer-shine {
+    fill: #ffffff;
+    opacity: 0.3;
 }
 
 .wheel-disc {
@@ -44,7 +158,6 @@
     width: 100%;
     height: 100%;
     border-radius: 50%;
-    border: 0.35rem solid var(--color-border-dark);
     transition-property: transform;
     transition-timing-function: cubic-bezier(0.16, 0.84, 0.2, 1);
     --option-count: 4;
@@ -93,7 +206,8 @@
 }
 
 .wheel-label-text {
-    color: var(--font-color-wheel);
+    /* Depende del sector y no del modo claro/oscuro: blanco salvo sobre colores claros */
+    color: #ffffff;
     display: inline-block;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -103,54 +217,38 @@
     letter-spacing: 0.1rem;
     text-transform: uppercase;
 
-    /* tamaño de fuente segun numero de opciones (sin() NO va aqui:
-       postcss-calc de Vercel no lo soporta y rompe el build) */
+    /* Sin sin(): el postcss-calc del build de Vercel no lo soporta */
     font-size: clamp(0.55rem, calc(1.05rem - var(--option-count) * 0.045rem), 0.95rem);
 
-    /* ancho maximo: lo calcula JS como --label-max-width
-       (cuerda del segmento = 2R * sin(PI / n) * 0.72 - 0.4rem) */
+    /* --label-max-width = cuerda del sector: 2R · sin(π / n) · 0.72 - 0.4rem (JS) */
     max-width: var(--label-max-width, 7rem);
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 
 .wheel-label--dark .wheel-label-text {
+    color: #14141a;
     text-shadow: 0 1px 2px rgba(255, 255, 255, 0.35);
 }
 
 .wheel-label--over-img .wheel-label-text {
+    color: #ffffff;
     background: rgba(0, 0, 0, 0.45);
     border-radius: 0.35rem;
     padding: 0.1rem 0.4rem;
 }
 
-.wheel-hub {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 3.5rem;
-    height: 3.5rem;
-    background: var(--wheel-center-color);
-    border: 0.35rem solid var(--color-border);
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 2;
-}
 
-/* ===== Botón GIRAR (Imagen 2): zona a ancho completo + pista de teclado ===== */
 .wheel-spin-zone {
     width: 100%;
     max-width: 30rem;
     display: flex;
     flex-direction: column;
     align-items: center;
-    /* Separación botón ↔ fila "ESPACIO para girar · Aleatoriedad certificada":
-       mismo hueco que entre tarjetas del resto de la app */
     gap: var(--spinly-card-gap);
     padding: 0 1rem;
 }
 
-/* Gradiente, estados y transición: .spinly-btn-primary (shared.css).
-   Aquí solo lo propio del botón "héroe": tamaño, tipografía, forma de píldora y glow amplio. */
+/* Solo lo propio del botón principal; la base está en .spinly-btn-primary */
 .wheel-spin-button {
     display: flex;
     align-items: center;
@@ -162,7 +260,7 @@
     white-space: nowrap;
 }
 
-/* Misma especificidad que la base (button.spinly-btn-primary) o más: si no, la base gana */
+/* Especificidad igual o mayor que button.spinly-btn-primary, o gana la base */
 .wheel-spin-button.spinly-btn-primary {
     font-weight: 800;
     letter-spacing: 0.14rem;
@@ -202,8 +300,6 @@
         inset 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
-/* Girando / sin opciones: estado disabled de la base (.spinly-btn-primary) */
-
 .wheel-spin-hint {
     display: flex;
     align-items: center;
@@ -237,7 +333,6 @@
     flex-shrink: 0;
 }
 
-/* "Aleatoriedad certificada": disparador del tooltip de probabilidades */
 .wheel-spin-odds {
     color: var(--font-color-muted);
     transition: color 0.15s ease;
@@ -254,13 +349,29 @@
     color: var(--font-color-light);
 }
 
-/* ===== Resultado del giro: overlay flotante (WinnerOverlay.tsx) =====
-   Portal a <body> + position: fixed → fuera del flujo: aparecer/desaparecer
-   nunca desplaza el layout. Fondo desenfocado y oscurecido para centrar la atención. */
+.wheel-sound-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--font-color-muted);
+    cursor: pointer;
+}
+
+.wheel-sound-btn:hover {
+    color: var(--font-color-light);
+}
+
+.wheel-sound-btn:focus-visible {
+    outline: 2px solid var(--color-focus-light);
+}
+
 .wheel-overlay {
     position: fixed;
     inset: 0;
-    /* por encima del Header (100) y del drawer (60); por debajo del aviso de cuota (200) */
+    /* Sobre el header (100) y el drawer (60), bajo el aviso de cuota (200) */
     z-index: 150;
     display: flex;
     align-items: center;
@@ -272,7 +383,7 @@
     animation: wheel-overlay-in 0.22s ease-out;
 }
 
-/* Sin backdrop-filter: fondo casi opaco para que el resultado siga siendo legible */
+/* Sin backdrop-filter: fondo casi opaco para que siga siendo legible */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     .wheel-overlay {
         background: color-mix(in srgb, var(--bg-color) 90%, transparent);
@@ -310,9 +421,9 @@
 .wheel-overlay-name {
     max-width: 100%;
     color: var(--font-color);
-    font-size: clamp(2.25rem, 5vw + 1rem, 4.5rem);
+    font-size: 2.25rem;
     font-weight: 800;
-    line-height: 1.08;
+    line-height: 1.12;
     overflow-wrap: anywhere;
     text-shadow: 0 0 36px var(--spinly-primary-glow-soft);
 }
@@ -362,6 +473,24 @@ button.wheel-overlay-spin.spinly-btn-primary {
     display: block;
 }
 
+/* Escritorio: nombre contenido y más aire entre insignia, nombre y botón */
+@media (min-width: 751px) {
+    .wheel-overlay-card {
+        width: min(30rem, 100%);
+        padding: 2.75rem 2.5rem 2.5rem;
+        gap: 1.4rem;
+    }
+
+    .wheel-overlay-name {
+        font-size: clamp(2.25rem, 1.2vw + 1.6rem, 3rem);
+        letter-spacing: -0.01em;
+    }
+
+    .wheel-overlay-spin {
+        margin-top: 0.75rem;
+    }
+}
+
 @keyframes wheel-overlay-in {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -372,7 +501,6 @@ button.wheel-overlay-spin.spinly-btn-primary {
     to { opacity: 1; transform: none; }
 }
 
-/* ===== Mobile: la rueda manda y respeta el ancho real del viewport ===== */
 @media (max-width: 750px) {
     .Wheel {
         gap: 1.25rem;
@@ -385,7 +513,7 @@ button.wheel-overlay-spin.spinly-btn-primary {
     }
 
     .wheel-container {
-        /* el radio ya está limitado por vw/vh, así que la rueda nunca se corta */
+        /* El radio ya está acotado por vw/vh: la ruleta nunca se corta */
         --wheel-radius: min(34vw, 30vh, 13rem);
         width: calc(var(--wheel-radius) * 2);
         max-width: 100%;
@@ -413,7 +541,8 @@ button.wheel-overlay-spin.spinly-btn-primary {
         transition-duration: 0.01ms !important;
     }
 
-    .wheel-spin-button--spinning .wheel-spin-icon {
+    .wheel-spin-button--spinning .wheel-spin-icon,
+    .wheel-light {
         animation: none !important;
     }
 

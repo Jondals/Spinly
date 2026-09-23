@@ -9,26 +9,6 @@
     overflow-y: auto;
 }
 
-/* Cabecera/título/badge: .spinly-panel-header + .spinly-panel-title + .spinly-badge (shared.css) */
-.presets-themes-header-left {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-width: 0;
-}
-
-.presets-themes-icon {
-    display: inline-flex;
-    flex-shrink: 0;
-    color: var(--font-color-muted);
-}
-
-.presets-themes-icon svg {
-    width: 1.1rem;
-    height: 1.1rem;
-    display: block;
-}
-
 .presets-themes-subtitle {
     font-size: 0.8rem;
     color: var(--font-color-muted);
@@ -44,7 +24,6 @@
     gap: var(--spinly-card-gap);
 }
 
-/* Fondo, borde y radio: .spinly-panel-card (clase compartida con Options/Presets) */
 .presets-themes-card {
     position: relative;
     overflow: hidden;
@@ -136,10 +115,7 @@
     color: var(--color-focus);
 }
 
-/* Acciones de tarjeta (Compartir/Editar/Borrar): .spinly-card-actions en shared.css,
-   idénticas en Themes y Presets (siempre visibles, también en táctil). */
-
-/* Tarjeta de la comunidad: contenedor estático (la acción es "Descargar") */
+/* En la comunidad la tarjeta no es clicable: la acción es "Descargar" */
 .presets-themes-card--community .presets-themes-card-inner {
     cursor: default;
     text-align: left;
@@ -150,9 +126,6 @@
     color: var(--font-color-muted);
     padding: 1rem;
 }
-
-/* Botón "Guardar tema actual" (.spinly-new-btn) y su formulario en acordeón
-   (.spinly-collapse + .spinly-field-input): clases compartidas en shared.css */
 
 @media (max-width: 750px) {
     .presets-themes-grid {

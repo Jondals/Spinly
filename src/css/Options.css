@@ -1,4 +1,3 @@
-/* COLORES DE LAS OPCIONES */
 .option-color-indigo { background-color: var(--item-indigo); }
 .option-color-coral { background-color: var(--item-coral); }
 .option-color-amber { background-color: var(--item-amber); }
@@ -18,7 +17,6 @@
     border-right: 1px solid var(--color-border);
     overflow: hidden;
 
-    /* Estructura/título/badge: .spinly-panel-header + .spinly-panel-title + .spinly-badge (shared.css) */
     .options-title {
         .options-limit-value {
             padding: 0;
@@ -77,7 +75,6 @@
         padding: var(--spinly-panel-pad-y) var(--spinly-panel-pad-x);
         overflow-y: auto;
 
-        /* Fondo, borde y radio vienen de .spinly-panel-card (clase compartida) */
         .option-item {
             display: flex;
             align-items: center;
@@ -88,11 +85,31 @@
             min-height: 3.25rem;
             padding: 0 1rem;
 
+            /* touch-action: none → el dedo arrastra la fila en vez de desplazar la página */
             .drag {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                align-self: stretch;
+                min-width: 1.75rem;
+                padding: 0;
+                border: none;
+                border-radius: var(--radius-sm);
+                background: transparent;
                 color: var(--font-color-muted);
                 font-size: 1rem;
                 cursor: grab;
                 user-select: none;
+                touch-action: none;
+
+                &:active {
+                    cursor: grabbing;
+                }
+
+                &:focus-visible {
+                    outline: 2px solid var(--color-focus-light);
+                    outline-offset: 1px;
+                }
             }
 
             .option-swatch {
@@ -109,8 +126,6 @@
                 transition: transform 0.15s ease, box-shadow 0.15s ease;
             }
 
-            /* Hover/focus del swatch: escala sutil + anillo del mismo color focus
-               (mismo lenguaje que los anillos de tarjeta activa de Themes/Presets) */
             .option-swatch:hover,
             .option-swatch:focus-visible {
                 transform: scale(1.1);
@@ -159,11 +174,18 @@
             }
 
             &.option-item--dragging {
-                opacity: 0.4;
+                position: relative;
+                z-index: 2;
+                border-color: var(--color-focus);
+                box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
             }
 
-            &.option-item--over {
-                border-top: 2px solid var(--color-focus);
+            &.option-item--drop-before {
+                box-shadow: 0 -3px 0 var(--color-focus);
+            }
+
+            &.option-item--drop-after {
+                box-shadow: 0 3px 0 var(--color-focus);
             }
 
             &.option-item--has-img {
@@ -312,7 +334,6 @@
         padding: var(--spinly-panel-pad-y) var(--spinly-panel-pad-x);
         border-top: 1px solid var(--color-border);
 
-        /* "Añadir opción": acción a ancho completo con tono propio (no es un item de la lista) */
         .add-option-button {
             width: 100%;
             height: 2.75rem;
@@ -351,7 +372,6 @@
                 color: #ffffff;
             }
 
-            /* Límite de opciones alcanzado: estado claramente apagado */
             &:disabled {
                 opacity: 0.4;
                 cursor: not-allowed;
@@ -362,7 +382,6 @@
     }
 }
 
-/* ===== Mobile ===== */
 @media (max-width: 750px) {
     .Options {
         height: auto;

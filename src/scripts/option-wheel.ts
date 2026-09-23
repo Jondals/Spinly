@@ -28,7 +28,6 @@ export function createOption(name: string, index: number): WheelOption {
     };
 }
 
-// `label` = palabra "Option"/"Opción" del idioma activo (la pasa la UI desde el diccionario)
 export function createDefaultOptions(label = 'Option'): WheelOption[] {
     return [0, 1, 2, 3].map((index) => createOption(`${label} ${index + 1}`, index));
 }
@@ -39,9 +38,10 @@ export function addOption(options: WheelOption[], limit: number = MAX_WHEEL_OPTI
     return [...options, createOption(`${label} ${options.length + 1}`, options.length)];
 }
 
-// Al cambiar de idioma: SOLO los nombres por defecto sin editar ("Option 3" / "Opción 3")
-// pasan al nuevo idioma. Un nombre escrito por el usuario nunca se toca.
-// Devuelve el mismo array si no hay nada que renombrar (evita renders inútiles).
+/**
+ * Traduce solo los nombres por defecto sin editar; lo escrito por el usuario no se toca.
+ * Devuelve el mismo array si no hay cambios, para no provocar renders.
+ */
 export function relabelDefaultOptions(options: WheelOption[], knownLabels: readonly string[], label: string): WheelOption[] {
     const escaped = knownLabels.map((known) => known.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
     const pattern = new RegExp(`^(?:${escaped.join('|')}) (\\d+)$`);

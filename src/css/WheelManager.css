@@ -8,20 +8,19 @@
     flex-direction: column;
 }
 
-.Wheelmanager h1 {
+.wheelmanager-title {
     font-size: 1.4rem;
     font-weight: 700;
     margin-bottom: 0.35rem;
 }
 
-.Wheelmanager h3 {
+.wheelmanager-subtitle {
     font-size: 0.9rem;
     font-weight: 500;
     color: var(--font-color-muted);
     margin-bottom: 1.75rem;
 }
 
-/* Overlay del drawer: en desktop el panel ya está visible, así que nunca se muestra */
 .Wheelmanager-backdrop {
     display: none;
 }
@@ -54,7 +53,6 @@
     margin-bottom: 0;
 }
 
-/* Icono SVG a la izquierda del texto: mismo tamaño y trazo en las tres secciones */
 .button-menu-icon {
     display: inline-flex;
     flex-shrink: 0;
@@ -91,7 +89,19 @@
     background-color: var(--bg-transparence);
 }
 
-/* ===== Mobile: Wheelmanager como DRAWER lateral (entra desde la derecha) ===== */
+/* En escritorio el idioma está en la cabecera */
+.wheelmanager-lang {
+    display: none;
+}
+
+.wheelmanager-lang-title {
+    margin-bottom: 0.6rem;
+    color: var(--font-color-muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+/* Móvil: drawer lateral desde la derecha */
 @media (max-width: 750px) {
     .Wheelmanager {
         position: fixed;
@@ -100,23 +110,20 @@
         bottom: 0;
         left: auto;
         width: min(18rem, 85vw);
-        /* height auto (no 100vh) para que iOS no corte el final del panel */
+        /* height auto y no 100vh: iOS cortaría el final del panel */
         height: auto;
-        padding: 4.75rem 1.25rem 1.5rem; /* hueco arriba para el header */
+        padding: 4.75rem 1.25rem 1.5rem;
         border-right: none;
         border-left: 1px solid var(--color-border);
         overflow-y: auto;
-        /* el scroll del panel no arrastra el de la página de detrás */
         overscroll-behavior: contain;
         z-index: 60;
 
-        /* Cerrado: fuera de pantalla a la derecha y no interactivo
-           (sin transición: así nunca se anima en la carga inicial) */
+        /* Sin transición en el estado base: nunca se anima en la carga inicial */
         transform: translateX(100%);
         visibility: hidden;
     }
 
-    /* La transición solo se activa cuando el usuario ya ha interactuado */
     .Wheelmanager--animated {
         transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.28s ease;
     }
@@ -126,7 +133,6 @@
         visibility: visible;
     }
 
-    /* Overlay: cierra el drawer al tocar fuera */
     .Wheelmanager-backdrop {
         display: block;
         position: fixed;
@@ -141,5 +147,12 @@
     .Wheelmanager-backdrop--visible {
         opacity: 1;
         pointer-events: auto;
+    }
+
+    .wheelmanager-lang {
+        display: block;
+        margin-top: 1.75rem;
+        padding-top: 1.25rem;
+        border-top: 1px solid var(--color-border);
     }
 }

@@ -1,0 +1,207 @@
+.spinly-imgadj {
+    position: fixed;
+    inset: 0;
+    z-index: 160;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: color-mix(in srgb, var(--bg-color) 75%, transparent);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    animation: spinly-imgadj-fade 0.18s ease-out;
+}
+
+.spinly-imgadj-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spinly-list-gap);
+    width: min(26rem, 100%);
+    max-height: 100%;
+    overflow-y: auto;
+    padding: var(--spinly-panel-pad-y) var(--spinly-panel-pad-x);
+    background: var(--bg-options-color);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.6);
+}
+
+.spinly-imgadj-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.spinly-imgadj-heading {
+    min-width: 0;
+}
+
+.spinly-imgadj-title {
+    font-family: var(--font-family-alternative);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+}
+
+.spinly-imgadj-sector {
+    margin-top: 0.2rem;
+    color: var(--font-color-muted);
+    font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.spinly-imgadj-stage {
+    position: relative;
+    width: min(100%, 20rem);
+    aspect-ratio: 1 / 1;
+    margin: 1rem auto 0;
+    border-radius: 50%;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.spinly-imgadj-stage:active {
+    cursor: grabbing;
+}
+
+.spinly-imgadj-stage:focus-visible {
+    outline: 2px solid var(--color-focus-light);
+    outline-offset: 4px;
+}
+
+.spinly-imgadj-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 0.3rem solid var(--wheel-rim-bottom);
+    background: var(--wheel-color-dark);
+    overflow: hidden;
+}
+
+.spinly-imgadj-pointer {
+    top: -1.1rem;
+}
+
+.spinly-imgadj-other {
+    opacity: 0.35;
+}
+
+.spinly-imgadj-outline {
+    fill: none;
+    stroke: var(--color-focus-light);
+    stroke-width: 3;
+    stroke-dasharray: 10 6;
+}
+
+.spinly-imgadj-hub {
+    fill: var(--wheel-center-color);
+    stroke: var(--wheel-rim-bottom);
+    stroke-width: 5;
+}
+
+.spinly-imgadj-label {
+    fill: #ffffff;
+    font-family: var(--font-family);
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    paint-order: stroke;
+    stroke: rgba(0, 0, 0, 0.55);
+    stroke-width: 4px;
+}
+
+.spinly-imgadj-hint {
+    color: var(--font-color-muted);
+    font-size: 0.75rem;
+    line-height: 1.4;
+    text-align: center;
+}
+
+.spinly-imgadj-controls {
+    display: grid;
+    gap: 0.6rem;
+}
+
+.spinly-imgadj-range {
+    display: grid;
+    gap: 0.3rem;
+    font-size: 0.8rem;
+    color: var(--font-color-light);
+}
+
+.spinly-imgadj-range-head {
+    display: flex;
+    justify-content: space-between;
+}
+
+.spinly-imgadj-range-head output {
+    color: var(--font-color-muted);
+    font-family: var(--font-family-alternative);
+}
+
+.spinly-imgadj-range input {
+    width: 100%;
+    accent-color: var(--color-focus);
+}
+
+.spinly-imgadj-presets {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.spinly-imgadj-remove:hover:not(:disabled) {
+    color: var(--color-remove);
+    border-color: var(--color-remove);
+}
+
+.spinly-imgadj-footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    padding-top: 0.25rem;
+}
+
+button.spinly-imgadj-apply {
+    width: 100%;
+    padding: 0.55rem 0.8rem;
+    font-size: 0.85rem;
+}
+
+@keyframes spinly-imgadj-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Móvil: hoja inferior a ancho completo, con la vista previa lo más grande posible */
+@media (max-width: 750px) {
+    .spinly-imgadj {
+        align-items: flex-end;
+        padding: 0;
+    }
+
+    .spinly-imgadj-card {
+        width: 100%;
+        max-height: 100dvh;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        padding-bottom: calc(var(--spinly-panel-pad-y) + env(safe-area-inset-bottom));
+    }
+
+    .spinly-imgadj-stage {
+        width: min(100%, 70vw, 45dvh);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .spinly-imgadj {
+        animation: none;
+    }
+}

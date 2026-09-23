@@ -1,6 +1,4 @@
-// Borradores del formulario ÚNICO de Themes/Presets (crear / editar local / editar en la nube).
-// Viven en App (no en el panel): así sobreviven al ir al Wheel Editor a cambiar
-// colores/opciones y volver para guardar.
+// Viven en App y no en el panel: sobreviven a una visita al editor para cambiar colores u opciones.
 export type EditTarget =
     | { mode: 'create' }
     | { mode: 'local'; id: string }
@@ -20,5 +18,5 @@ export type PresetDraft = {
     tags: string;
 };
 
-// El formulario de edición en la nube se muestra en la vista Comunidad; el resto en "Mis ..."
+// La edición en la nube se abre en la vista Comunidad; el resto en la vista propia.
 export const isCloudTarget = (target: EditTarget): boolean => target.mode === 'cloud';

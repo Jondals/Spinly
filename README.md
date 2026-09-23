@@ -1,46 +1,92 @@
-# Getting Started with Create React App
+# Spinly
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A customizable spinning wheel for giveaways and quick decisions. Edit the options, colors and per-sector images, save your setups as themes and presets, and share them with the community.
 
-## Available Scripts
+Live demo: [spinly-psi.vercel.app](https://spinly-psi.vercel.app)
 
-In the project directory, you can run:
+## Features
 
-### `npm start`
+- **Wheel editor**: up to 25 options with an editable limit and a custom color picker (HSV, hex and RGB). Reorder options by dragging with a mouse or a finger, or with the arrow keys.
+- **Per-sector images**: uploading a photo opens an editor that previews the sector exactly as it looks when it wins. Drag, pinch, scroll or use the keyboard to move, zoom and rotate it.
+- **Wheel colors**: tap the pointer to change its color, or tap the wheel to change the color of the animated lights. Both are saved with themes and presets.
+- **Fairground lights**: animated lights run around the rim and the hub, and speed up while the wheel spins.
+- **Sound**: a tick each time a sector passes the pointer, a short chime for the winner and soft feedback on every button. Sounds are synthesized with the Web Audio API, so there are no audio files, and a single toggle mutes them all.- **Themes and presets**: a theme stores the look; a preset stores the options together with their theme. Both are saved locally and can be edited, deleted and searched.
+- **Community** (optional, requires Supabase): share themes and presets, download other people's, and edit or delete your own. Profiles are anonymous: a username and an optional photo, no email or password.
+- **English and Spanish**, light and dark mode, and a responsive layout for desktop and mobile.
+- **Fast and accessible**: scores 100 in every Lighthouse category on mobile and desktop.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+Without Supabase the app runs fully offline on `localStorage`.
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+## Tech stack
 
-### `npm test`
+- React 19 + TypeScript (Create React App)
+- Supabase (anonymous auth, Postgres with row level security, Storage), loaded on demand so it never delays the first paint
+- Plain CSS with custom properties, no UI library
+- Jest + Testing Library
+- Deployed on Vercel as a static site
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Getting started
 
-### `npm run build`
+Requires Node 18+ and [pnpm](https://pnpm.io).
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```bash
+pnpm install
+pnpm start
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+The app opens at `http://localhost:3000`.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### Community (optional)
 
-### `npm run eject`
+Create a `.env.local` file in the project root:
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+```bash
+REACT_APP_SUPABASE_URL=https://<your-project>.supabase.co
+REACT_APP_SUPABASE_ANON_KEY=<anon key>
+```
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+Then run the SQL in [SUPABASE_SETUP.md](SUPABASE_SETUP.md) (tables, RLS policies and the avatar bucket) and [supabase-update-policies.sql](supabase-update-policies.sql), which enables editing shared items.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+## Scripts
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+| Command | Description |
+| --- | --- |
+| `pnpm start` | Development server |
+| `pnpm build` | Production build in `build/`, with the main stylesheet inlined into `index.html` |
+| `pnpm test` | Tests in watch mode |
+| `pnpm test:ci` | Run the tests once (CI) |
+| `pnpm typecheck` | Type-check the project |
+| `pnpm test:supabase` | Runs the full flow against your real Supabase project and checks that RLS blocks what it should. Creates an anonymous test user |
 
-## Learn More
+## Project structure
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+```
+src/
+  App.tsx              Global state: options, active theme, presets and persistence
+  Components/
+    common/            Reusable pieces: Icon, Modal, PanelHeader, ItemList, CollapsePanel...
+    layout/            Header, profile menu and WheelManager (navigation / mobile drawer)
+    wheel/             The wheel and the winner dialog
+    editor/            Option editor, color picker and per-sector image editor
+    presets/           Presets panel
+    themes/            Themes panel
+    i18n/              LanguageProvider (active language) and language switch
+  hooks/               Reusable UI logic: sorting, click-outside, community data, sounds...
+  scripts/             Framework-free logic: wheel geometry, colors, sounds, strings, Supabase services
+  types/               Theme and preset models and their sanitization
+  css/                 Per-component styles plus a shared base (shared.css)
+  spinly.test.tsx      Test suite
+  setupTests.ts        Test environment
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+Dependencies point one way: `Components` and `hooks` use `scripts` and `types`, and `scripts` and `types` never import components.
+
+## Deployment
+
+`vercel.json` publishes `build/` as a static site. Files in `/static` are cached for a year because their names change on every build. Set the same `REACT_APP_*` variables in your Vercel project.
+
+## Security
+
+- Everything read from `localStorage` or Supabase is sanitized: colors must be hex and images must be raster `data:` URLs.
+- Only the author can edit or delete what they share. This is enforced by row level security in the database, not by the client.
+- Cloud writes are rate-limited to avoid duplicates.

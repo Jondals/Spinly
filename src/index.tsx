@@ -1,10 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-// Base visual compartida: se importa ANTES que App para que los estilos de cada
-// componente (y sus estados) puedan sobreescribir estos valores base.
+// Antes que App: los estilos de cada componente deben poder sobrescribir la base.
 import './css/shared.css';
 import App from './App';
-import { LanguageProvider } from './lib/i18n';
+import { LanguageProvider } from './Components/i18n/LanguageProvider';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement

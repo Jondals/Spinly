@@ -25,7 +25,6 @@
         text-overflow: ellipsis;
     }
 
-    /* Botones de la derecha (Wheel Manager + tema) */
     .spinly-actions {
         display: flex;
         align-items: center;
@@ -34,7 +33,7 @@
         flex-shrink: 0;
     }
 
-    /* Botón del Wheel Manager: en desktop el panel ya está visible, así que se oculta */
+    /* En escritorio el gestor siempre está visible */
     .spinly-menu-button {
         display: none;
         width: 2.5rem;
@@ -90,7 +89,6 @@
         }
     }
 
-    /* Selector de idioma EN/ES: mismo alto y hover que el botón de tema */
     .spinly-lang {
         display: inline-flex;
         align-items: center;
@@ -104,19 +102,6 @@
         border-radius: 0.5rem;
         color: var(--font-color);
         cursor: pointer;
-
-        svg {
-            width: 1.15rem;
-            height: 1.15rem;
-            display: block;
-        }
-
-        .spinly-lang-code {
-            font-family: var(--font-family-alternative);
-            font-size: 0.75rem;
-            font-weight: 600;
-            letter-spacing: 0.05em;
-        }
 
         &:hover {
             background-color: var(--color-hover);
@@ -140,7 +125,6 @@
         }
     }
 
-    /* ===== Perfil (solo nombre de usuario, sin email/contraseña) ===== */
     .spinly-profile {
         position: relative;
         flex-shrink: 0;
@@ -187,7 +171,6 @@
         z-index: 120;
     }
 
-    /* Dentro del menú los mensajes ya llevan su propio padding del menú */
     .spinly-profile-menu .spinly-status {
         margin: 0;
     }
@@ -274,15 +257,12 @@
     }
 }
 
-
-
 @media (max-width: 750px) {
     .Header {
         position: sticky;
         top: 0;
-        /* por encima del drawer del Wheel Manager (60) y de su overlay (50) */
+        /* Sobre el drawer (60) y su overlay (50) */
         z-index: 100;
-        /* height auto + min-height: el contenido nunca se corta en pantallas estrechas */
         height: auto;
         min-height: 4rem;
         gap: 0.5rem;
@@ -297,22 +277,14 @@
             font-size: 1.2rem;
         }
 
-        /* En mobile el Wheel Manager es un drawer: aquí sí se muestra el botón */
         .spinly-menu-button {
             display: flex;
         }
 
-        .spinly-lang {
-            padding: 0 0.4rem;
+        /* En móvil el idioma se elige dentro del drawer */
+        .spinly-lang--header {
+            display: none;
         }
     }
 }
-
-/* Móviles muy estrechos: el selector de idioma queda solo con el código EN/ES */
-@media (max-width: 380px) {
-    .Header .spinly-lang svg {
-        display: none;
-    }
-}
-
 

@@ -1,20 +1,64 @@
 import { MAX_OPTION_LENGTH, MAX_WHEEL_OPTIONS } from '../scripts/option-wheel';
 import type { WheelOption } from '../scripts/option-wheel';
-import { pickText } from '../lib/strings';
-import type { SpinlyLang } from '../lib/i18n';
+import { pickText, type SpinlyLang } from '../scripts/strings';
 
 export { MAX_WHEEL_OPTIONS };
 
-// ── Visual-only ──────────────────────────────────────────────
-// WheelSegmentStyle es SOLO visual: color + imagen/textura de fondo.
-// No incluye label/nombre: los nombres viven en WheelOption (Wheel editor)
-// y en WheelPreset.options.
+/**
+ * Encaje de la imagen de un sector, en coordenadas de la ruleta sin girar.
+ * x/y: desplazamiento del centro de la imagen respecto al centro de la ruleta,
+ * en fracción del diámetro. scale: 1 = la imagen cubre la ruleta entera.
+ * rotate: grados alrededor del centro de la imagen.
+ */
+export type ImageFit = {
+    x: number;
+    y: number;
+    scale: number;
+    rotate: number;
+};
+
+export const DEFAULT_IMAGE_FIT: ImageFit = { x: 0, y: 0, scale: 1, rotate: 0 };
+
+export const IMAGE_FIT_LIMITS = {
+    minScale: 0.2,
+    maxScale: 4,
+    maxOffset: 1,
+    maxRotate: 180,
+} as const;
+
+/** Solo visual: los nombres viven en WheelOption. */
 export type WheelSegmentStyle = {
     color: string;
     backgroundImage?: string;
+    imageFit?: ImageFit;
 };
 
-// Theme = SOLO visual. No toca nombres ni número de opciones.
+const clampFinite = (value: unknown, min: number, max: number, fallback: number): number =>
+    typeof value === 'number' && Number.isFinite(value) ? Math.min(Math.max(value, min), max) : fallback;
+
+/** Valida un encaje venido de storage/red; undefined si no es un objeto. */
+export function sanitizeImageFit(raw: unknown): ImageFit | undefined {
+    if (!raw || typeof raw !== 'object') return undefined;
+    const fit = raw as Record<string, unknown>;
+    const { minScale, maxScale, maxOffset, maxRotate } = IMAGE_FIT_LIMITS;
+    return {
+        x: clampFinite(fit['x'], -maxOffset, maxOffset, 0),
+        y: clampFinite(fit['y'], -maxOffset, maxOffset, 0),
+        scale: clampFinite(fit['scale'], minScale, maxScale, 1),
+        rotate: clampFinite(fit['rotate'], -maxRotate, maxRotate, 0),
+    };
+}
+
+function copySegment(s: WheelSegmentStyle | undefined, fallbackColor: string): WheelSegmentStyle {
+    const out: WheelSegmentStyle = { color: s?.color ?? fallbackColor };
+    if (s?.backgroundImage) {
+        out.backgroundImage = s.backgroundImage;
+        if (s.imageFit) out.imageFit = { ...s.imageFit };
+    }
+    return out;
+}
+
+/** Solo visual: nunca cambia nombres ni número de opciones. */
 export type WheelTheme = {
     id: string;
     name: string;
@@ -22,12 +66,16 @@ export type WheelTheme = {
     styleTag?: string;
     category?: string;
     segments: WheelSegmentStyle[];
+    /** Aro de la ruleta; sin valor se usa el del modo claro/oscuro. */
     borderColor?: string;
     centerColor?: string;
+    /** Flecha; sin valor, ámbar (--wheel-pointer-color). */
     pointerColor?: string;
+    /** Luces animadas del aro y del centro; sin valor, ámbar (--wheel-light-color). */
+    lightColor?: string;
 };
 
-// Preset = TODO: contenido (opciones) + tema visual completo del momento.
+/** Opciones más el tema visual completo del momento en que se guardó. */
 export type WheelPreset = {
     id: string;
     name: string;
@@ -61,16 +109,12 @@ export function ensureSegments(
     const out: WheelSegmentStyle[] = [];
     const len = Math.max(segments.length, 1);
     for (let i = 0; i < count; i++) {
-        const s = segments[i % len];
-        out.push({
-            color: s?.color ?? fallbackColor,
-            backgroundImage: s?.backgroundImage,
-        });
+        out.push(copySegment(segments[i % len], fallbackColor));
     }
     return out;
 }
 
-// Visual del sector i ciclando la paleta (sin expandir el tema guardado).
+/** Estilo del sector `index` ciclando la paleta, sin expandir el tema guardado. */
 export function segmentForIndex(
     theme: WheelTheme | null | undefined,
     index: number,
@@ -78,8 +122,7 @@ export function segmentForIndex(
 ): WheelSegmentStyle {
     const segs = theme?.segments ?? [];
     if (segs.length === 0) return { color: fallbackColor };
-    const s = segs[index % segs.length];
-    return { color: s?.color ?? fallbackColor, backgroundImage: s?.backgroundImage };
+    return copySegment(segs[index % segs.length], fallbackColor);
 }
 
 export function timeAgo(updatedAt: number, lang: SpinlyLang): string {
@@ -110,9 +153,8 @@ export const DEFAULT_THEMES: WheelTheme[] = [
             seg('#6366f1'),
             seg('#c7d2fe'),
         ],
-        borderColor: '#0b0f19',
-        centerColor: '#0b0f19',
-        pointerColor: '#818cf8',
+        pointerColor: '#a5b4fc',
+        lightColor: '#818cf8',
     },
     {
         id: 'theme-neon',
@@ -127,16 +169,11 @@ export const DEFAULT_THEMES: WheelTheme[] = [
             seg('#3b82f6'),
             seg('#ec4899'),
         ],
-        borderColor: '#0b0f19',
-        centerColor: '#0b0f19',
-        pointerColor: '#ffffff',
+        pointerColor: '#22d3ee',
+        lightColor: '#f472b6',
     },
 ];
 
-// Sunset Horizon, Emerald Glow y Spinly Light se retiraron temporalmente
-// (fase de iteración). Viven en el historial de git por si se recuperan.
-
-// Limpia un preset leído de storage: valida opciones y tema.
 export function sanitizePreset(raw: unknown): WheelPreset | null {
     if (!raw || typeof raw !== 'object') return null;
     const p = raw as Partial<WheelPreset>;
@@ -171,10 +208,13 @@ export function clonePreset(p: WheelPreset): WheelPreset {
         tags: p.tags ? [...p.tags] : [],
     };
 }
-// Sanitización de datos que pueden venir de localStorage o de Supabase (defensa en profundidad):
-// colores solo hex saneado y imágenes solo data:image raster segura (sin svg con scripts ni URLs externas).
+// Lo que llega de storage o de Supabase no es de fiar: colores solo hex e imágenes solo
+// data:image raster (nada de SVG con scripts ni URLs externas).
 const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 const SAFE_DATA_IMAGE = /^data:image\/(?:png|jpeg|webp|gif|avif);base64,/i;
+
+const hexOrUndefined = (value: unknown): string | undefined =>
+    typeof value === 'string' && HEX_COLOR.test(value) ? value : undefined;
 
 export function sanitizeTheme(raw: unknown): WheelTheme | null {
     if (!raw || typeof raw !== 'object') return null;
@@ -186,14 +226,16 @@ export function sanitizeTheme(raw: unknown): WheelTheme | null {
         .map((s) => {
             const rawColor = s['color'];
             const rawImage = s['backgroundImage'];
-            // Color inválido → fallback al color por defecto (nunca se pierde el tema entero)
+            // Un color inválido cae al de por defecto en vez de invalidar el tema entero.
             const color = typeof rawColor === 'string' && HEX_COLOR.test(rawColor)
                 ? rawColor
                 : DEFAULT_SEGMENT_COLOR;
             const backgroundImage = typeof rawImage === 'string' && SAFE_DATA_IMAGE.test(rawImage)
                 ? rawImage
                 : undefined;
-            return backgroundImage ? { color, backgroundImage } : { color };
+            if (!backgroundImage) return { color };
+            const imageFit = sanitizeImageFit(s['imageFit']);
+            return imageFit ? { color, backgroundImage, imageFit } : { color, backgroundImage };
         })
         .filter((s) => typeof s.color === 'string' && s.color.length > 0);
     if (segments.length === 0) return null;
@@ -204,14 +246,15 @@ export function sanitizeTheme(raw: unknown): WheelTheme | null {
         styleTag: typeof t.styleTag === 'string' ? t.styleTag : undefined,
         category: typeof t.category === 'string' ? t.category : undefined,
         segments,
-        borderColor: typeof t.borderColor === 'string' ? t.borderColor : undefined,
-        centerColor: typeof t.centerColor === 'string' ? t.centerColor : undefined,
-        pointerColor: typeof t.pointerColor === 'string' ? t.pointerColor : undefined,
+        borderColor: hexOrUndefined(t.borderColor),
+        centerColor: hexOrUndefined(t.centerColor),
+        pointerColor: hexOrUndefined(t.pointerColor),
+        lightColor: hexOrUndefined(t.lightColor),
     };
 }
 
 export function cloneTheme(t: WheelTheme): WheelTheme {
-    return { ...t, segments: t.segments.map((s) => ({ ...s })) };
+    return { ...t, segments: t.segments.map((s) => copySegment(s, s.color)) };
 }
 
 function mkPresetOptions(names: string[], prefix: string): WheelOption[] {
@@ -222,12 +265,10 @@ function mkPresetOptions(names: string[], prefix: string): WheelOption[] {
     }));
 }
 
-// Referencia por ID (no por índice) para no romper si cambia el orden de DEFAULT_THEMES.
 function defaultThemeById(id: string): WheelTheme {
     return DEFAULT_THEMES.find((theme) => theme.id === id) ?? DEFAULT_THEMES[0];
 }
 
-// Solo 2 presets de ejemplo de momento (fase de iteración).
 export const DEFAULT_PRESETS: WheelPreset[] = [
     {
         id: 'default-preset-cena',
@@ -246,8 +287,4 @@ export const DEFAULT_PRESETS: WheelPreset[] = [
         tags: [],
     },
 ];
-
-// "Decisiones Rápidas" y "Asignación de Turnos" se retiraron temporalmente
-// (fase de iteración). Viven en el historial de git por si se recuperan.
-
 

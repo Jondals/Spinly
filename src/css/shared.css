@@ -1,27 +1,18 @@
-/* ===================================================================== */
-/* Base visual COMPARTIDA (Wheel editor / Themes / Presets / UI común)    */
-/* Se importa primero (ver src/index.tsx): los componentes sobreescriben. */
-/* ===================================================================== */
+/* Base visual compartida. Se importa antes que App (src/index.tsx) para que cada componente pueda sobrescribirla. */
 
 :root {
-    /* Geometría compartida de los tres paneles */
     --spinly-panel-pad-x: 1.1rem;
     --spinly-panel-pad-y: 0.9rem;
-    /* Tarjetas de Themes/Presets: más aire entre ellas (misma var en ambos paneles) */
     --spinly-card-gap: 1.1rem;
-    /* Filas densas del Wheel editor: se quedan como estaban, sin desalinearse */
     --spinly-list-gap: 0.6rem;
     --spinly-card-radius: 0.55rem;
     --spinly-badge-radius: 0.25rem;
 
-    /* Tokens usados por varios componentes que antes estaban SIN definir
-       (ColorPicker, badges/botones de Presets): ahora con valor real. */
     --radius-sm: 0.4rem;
     --radius-lg: 0.75rem;
     --bg-panel-color: var(--bg-card-color);
 }
 
-/* Los tres paneles: mismo fondo y mismo borde contenedor */
 .Options,
 .Presets,
 .Themes {
@@ -29,19 +20,13 @@
     border-right: 1px solid var(--color-border);
 }
 
-/* Tarjeta/fila base: mismo fondo, mismo grosor/color de borde y mismo radio
-   en Wheel editor (filas), Themes (tarjetas) y Presets (tarjetas). */
 .spinly-panel-card {
     background-color: var(--bg-card-color);
     border: 1px solid var(--color-border);
     border-radius: var(--spinly-card-radius);
 }
 
-/* ===== Toggle segmentado "Mis X / Comunidad" (Themes y Presets) =====
-   Componente único (SegmentedToggle.tsx). Mismo lenguaje que .spinly-badge:
-   radio --spinly-badge-radius, tipografía alternativa 0.75rem/600 y mismo alto.
-   El segmento activo es un indicador índigo que se desliza (transform) bajo
-   los botones; --spinly-seg-count / --spinly-seg-index llegan inline. */
+/* SegmentedToggle.tsx: el indicador se desliza con transform; --spinly-seg-count e --spinly-seg-index llegan inline. */
 .spinly-segmented {
     --spinly-seg-pad: 3px;
     position: relative;
@@ -96,12 +81,36 @@
     color: #ffffff;
 }
 
+/* Selector de idioma del drawer: ocupa todo el ancho y cada opción lleva su bandera */
+.spinly-lang-choice {
+    display: grid;
+    margin: 0;
+}
+
+.spinly-lang-choice .spinly-segmented-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    padding: 0.5rem 0.6rem;
+    font-family: var(--font-family);
+    font-size: 0.85rem;
+}
+
+.spinly-flag {
+    display: block;
+    flex-shrink: 0;
+    width: 1.5rem;
+    height: 1rem;
+    border-radius: 0.2rem;
+    box-shadow: 0 0 0 1px var(--color-border);
+}
+
 .spinly-segmented-btn:focus-visible {
     outline: 2px solid var(--color-focus-light);
     outline-offset: 1px;
 }
 
-/* ===== Fila toolbar + buscador (Themes y Presets) ===== */
 .spinly-toolbar {
     display: flex;
     align-items: center;
@@ -109,13 +118,31 @@
     padding: 0 var(--spinly-panel-pad-x);
 }
 
-/* Fila del botón "+ Nuevo" / "Guardar tema actual": DEBAJO de las tarjetas,
-   justo encima de su acordeón (se oculta mientras el formulario está abierto). */
+/* CreateRow.tsx: se pliega con la misma técnica y duración que .spinly-collapse, a la inversa. */
 .spinly-create-row {
-    padding: 0 var(--spinly-panel-pad-x) var(--spinly-panel-pad-y);
+    display: grid;
+    grid-template-rows: 1fr;
+    margin: 0 var(--spinly-panel-pad-x) var(--spinly-panel-pad-y);
+    transition: grid-template-rows 0.26s ease, opacity 0.2s ease, margin 0.26s ease;
 }
 
-/* Botón que abre el acordeón; aspecto (gradiente, glow, radio) → .spinly-btn-primary */
+.spinly-create-row--hidden {
+    grid-template-rows: 0fr;
+    opacity: 0;
+    pointer-events: none;
+    /* Anula el gap del contenedor flex para no dejar hueco */
+    margin-top: calc(-1 * var(--spinly-card-gap));
+    margin-bottom: 0;
+}
+
+/* El margen negativo compensado con padding deja sitio a la sombra del botón sin recortarla. */
+.spinly-create-row-inner {
+    min-height: 0;
+    overflow: hidden;
+    margin: -0.75rem;
+    padding: 0.75rem;
+}
+
 .spinly-new-btn {
     width: 100%;
     display: inline-flex;
@@ -134,13 +161,12 @@
     height: 0.95rem;
 }
 
-/* ===== Acordeón / panel desplegable (CollapsePanel.tsx) =====
-   Siempre DEBAJO de las tarjetas. Altura animada con grid-template-rows 0fr → 1fr. */
+/* CollapsePanel.tsx: la altura se anima con grid-template-rows 0fr → 1fr. */
 .spinly-collapse {
     display: grid;
     grid-template-rows: 0fr;
     opacity: 0;
-    /* cerrado no deja hueco: anula el gap del contenedor flex */
+    /* Cerrado no deja hueco: anula el gap del contenedor flex */
     margin: calc(-1 * var(--spinly-card-gap)) var(--spinly-panel-pad-x) 0;
     transition: grid-template-rows 0.26s ease, opacity 0.2s ease, margin 0.26s ease;
 }
@@ -213,7 +239,6 @@
     width: auto;
 }
 
-/* Campos de formulario compartidos (acordeón de Presets y Themes) */
 .spinly-field-input {
     width: 100%;
     min-width: 0;
@@ -244,12 +269,12 @@
 
 @media (prefers-reduced-motion: reduce) {
     .spinly-segmented-indicator,
-    .spinly-collapse {
+    .spinly-collapse,
+    .spinly-create-row {
         transition: none;
     }
 }
 
-/* Buscador: ocupa TODO el ancho de su fila (Mis presets y Comunidad en ambos paneles) */
 .spinly-search {
     position: relative;
     flex: 1 1 100%;
@@ -284,7 +309,6 @@
     border-color: var(--color-focus);
 }
 
-/* ===== Autor de la comunidad (nombre + foto con placeholder) ===== */
 .spinly-author {
     display: inline-flex;
     align-items: center;
@@ -301,7 +325,6 @@
     text-overflow: ellipsis;
 }
 
-/* ===== Avatar compartido (foto real o placeholder neutro) ===== */
 .spinly-avatar {
     display: block;
     flex-shrink: 0;
@@ -339,7 +362,6 @@
     fill: currentColor;
 }
 
-/* ===== Mensajes de estado (carga / error / éxito) ===== */
 .spinly-status {
     margin: 0 var(--spinly-panel-pad-x);
     padding: 0.5rem 0.75rem;
@@ -361,7 +383,6 @@
     color: var(--color-focus);
 }
 
-/* ===== Acción secundaria de ancho completo (Descargar / Usar) ===== */
 .spinly-action-btn {
     width: 100%;
     display: inline-flex;
@@ -386,15 +407,11 @@
     color: var(--font-color);
 }
 
-/* Variante primaria (Entrar/Guardar): se compone con .spinly-btn-primary (final del archivo) */
-
 .spinly-action-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
-/* ===== Cabecera compartida de los tres paneles =====
-   Fila única de 4rem, sin wrap: título a la izquierda + badge a la derecha. */
 .spinly-panel-header {
     display: flex;
     flex-wrap: nowrap;
@@ -407,8 +424,6 @@
     border-bottom: 1px solid var(--color-border);
 }
 
-/* ===== Título de cabecera: mismo estilo compacto que "WHEEL EDITOR" =====
-   Monoespaciada 0.75rem/600/0.15em y UNA sola línea (ellipsis si aprieta). */
 .spinly-panel-title {
     margin: 0;
     min-width: 0;
@@ -422,9 +437,25 @@
     text-overflow: ellipsis;
 }
 
-/* ===== Badge base compartido =====
-   "4 / 10" (Wheel editor), "N Listas", "N Disponibles", "N en Comunidad":
-   mismo radio, padding, tamaño y color en toda la app. */
+.spinly-panel-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.spinly-panel-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    color: var(--font-color-muted);
+}
+
+.spinly-panel-icon svg {
+    width: 1.1rem;
+    height: 1.1rem;
+    display: block;
+}
+
 .spinly-badge {
     display: inline-flex;
     align-items: center;
@@ -433,34 +464,20 @@
     padding: 0.3rem 0.6rem;
     border-radius: var(--spinly-badge-radius);
     background-color: var(--bg-transparence);
-    color: var(--color-focus);
+    /* Contraste AA sobre --bg-transparence en ambos temas */
+    color: var(--color-focus-text);
     font-family: var(--font-family-alternative);
     font-size: 0.75rem;
     font-weight: 600;
     white-space: nowrap;
 }
 
-/* Variante apilada (contador de Comunidad): dos líneas alineadas a la derecha,
-   mismo radio/color/tipografía que el badge base, sin comerse el título. */
-/* El reset global de index.css (* { color: var(--font-color) }) pintaba de BLANCO los
-   <span> internos del badge de Comunidad: dentro del badge todo hereda su color. */
+/* El reset global `* { color }` de index.css pintaría de blanco los hijos del badge */
 .spinly-badge * {
     color: inherit;
 }
 
-/* Contador de Comunidad: MISMO badge (fondo, color, radio, tipografía, padding) que
-   el de "Mis temas/presets"; solo cambia que el texto va en dos líneas para no
-   robar ancho al título en el panel de escritorio (320px). */
-.spinly-badge--stack {
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 0;
-    line-height: 1.25;
-    text-align: right;
-}
-
-/* ===== Acciones de tarjeta unificadas (ItemActions.tsx): Themes y Presets =====
-   Compartir → Editar → Borrar, esquina superior derecha, SIEMPRE visibles. */
+/* ItemActions.tsx: Compartir → Editar → Borrar, siempre visibles (también en táctil). */
 .spinly-card-actions {
     position: absolute;
     top: 0.55rem;
@@ -503,7 +520,7 @@
     border-color: var(--color-remove, #f87171);
 }
 
-/* Borrar de la nube "armado": el segundo clic confirma (irreversible) */
+/* Borrado en la nube armado: el segundo clic confirma */
 .spinly-card-action--armed,
 .spinly-card-action--armed:hover:not(:disabled) {
     color: #ffffff;
@@ -521,7 +538,7 @@
     outline-offset: 1px;
 }
 
-/* Hueco reservado para N acciones (1.7rem c/u + 0.3rem de gap + margen) */
+/* Hueco para N acciones: 1.7rem cada una + 0.3rem de separación + margen */
 .spinly-card--actions-1 .presets-presets-card-top,
 .spinly-card--actions-1 .presets-themes-card-head {
     padding-right: 2.3rem;
@@ -537,7 +554,6 @@
     padding-right: 6.3rem;
 }
 
-/* Nota del formulario en modo edición (de dónde salen colores/opciones) */
 .spinly-collapse-hint {
     margin: 0;
     font-size: 0.75rem;
@@ -545,7 +561,6 @@
     color: var(--font-color-muted);
 }
 
-/* ===== Aviso de cuota de localStorage (fijo: sin desplazar el layout) ===== */
 .spinly-storage-warning {
     position: fixed;
     right: 1rem;
@@ -585,13 +600,9 @@
     color: var(--color-remove, #f87171);
 }
 
-/* ===== Botón primario compartido: ÚNICA clase base de todos los botones índigo =====
-   "SPIN WHEEL", "+ New", "Save current theme", "Load into Wheel", "Save preset/theme",
-   "Join/Save changes". Mismo lenguaje que el botón de girar: gradiente de la paleta
-   (--color-focus-light → --color-focus), brillo interior sutil, glow derivado de
-   --color-focus (color-mix, sin colores nuevos) y respuesta suave en hover/active.
-   Selector con elemento para ganar especificidad: shared.css se importa primero
-   y sin esto las reglas propias de cada componente lo sobreescribirían. */
+/* Base de todos los botones primarios. El selector lleva elemento para ganar
+   especificidad: este archivo se importa primero y las reglas de cada componente
+   lo sobrescribirían. */
 :root {
     --spinly-primary-gradient: linear-gradient(135deg, var(--color-focus-light), var(--color-focus));
     --spinly-primary-glow: color-mix(in srgb, var(--color-focus) 55%, transparent);
@@ -660,9 +671,6 @@ button.spinly-btn-primary:disabled {
     }
 }
 
-/* ===== Tooltip ligero (Tooltip.tsx) =====
-   Burbuja absoluta (no desplaza el layout), mismo lenguaje que los menús flotantes:
-   fondo de cabecera, borde y radio de tarjeta, sombra suave. */
 .spinly-tooltip {
     position: relative;
     display: inline-flex;
@@ -708,7 +716,6 @@ button.spinly-btn-primary:disabled {
     transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
 }
 
-/* Flecha de la burbuja */
 .spinly-tooltip-bubble::after {
     content: '';
     position: absolute;

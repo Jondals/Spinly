@@ -1,4 +1,6 @@
 import type { WheelOption } from './option-wheel';
+import { hexToHue, hslToHex } from './color';
+import { IMAGE_FIT_LIMITS, type ImageFit } from '../types/theme-types';
 
 type WheelColors = Record<string, string>;
 
@@ -33,7 +35,6 @@ export function getWheelBackground(
     }
 
     const getColor = (option: WheelOption, index: number): string => {
-        // Usa color hex del tema activo si está disponible y tiene ese índice
         if (segmentColors?.[index] && segmentColors[index] !== option.color) {
             return segmentColors[index] as string;
         }
@@ -89,13 +90,75 @@ export function spinWheel(options: WheelOption[], rotation: number): SpinResult 
 
 export type OptionProbability = { id: string; name: string; probability: number };
 
-// Probabilidad REAL de cada opción según spinWheel (índice uniforme: 1/N cada una).
-// Si algún día hay pesos por opción, se cambian aquí y en spinWheel a la vez y el
-// tooltip de "Aleatoriedad certificada" los refleja sin tocar la UI.
+/** Probabilidad de cada opción; debe cambiar a la vez que spinWheel si algún día hay pesos. */
 export function getOptionProbabilities(options: WheelOption[]): OptionProbability[] {
     if (options.length === 0) return [];
     const share = 1 / options.length;
     return options.map((option) => ({ id: option.id, name: option.name, probability: share }));
+}
+
+/** Lado del viewBox SVG de la ruleta; toda la geometría de imágenes se expresa en él. */
+export const WHEEL_VIEWBOX = 480;
+
+export type SectorAngles = { start: number; end: number; mid: number };
+
+/** Ángulos en grados (0 = arriba, sentido horario) del sector `index` de `count`. */
+export function getSectorAngles(index: number, count: number): SectorAngles {
+    const size = 360 / Math.max(count, 1);
+    const start = index * size;
+    return { start, end: start + size, mid: start + size / 2 };
+}
+
+export type ImageBox = { x: number; y: number; width: number; height: number; transform?: string };
+
+/** Caja del <image> (preserveAspectRatio slice) para un encaje en un viewBox de lado `size`. */
+export function getImageBox(fit: ImageFit | undefined, size = WHEEL_VIEWBOX): ImageBox {
+    const scale = fit?.scale ?? 1;
+    const side = size * scale;
+    const cx = size / 2 + (fit?.x ?? 0) * size;
+    const cy = size / 2 + (fit?.y ?? 0) * size;
+    const rotate = fit?.rotate ?? 0;
+    return {
+        x: cx - side / 2,
+        y: cy - side / 2,
+        width: side,
+        height: side,
+        transform: rotate ? `rotate(${rotate} ${cx} ${cy})` : undefined,
+    };
+}
+
+/** Punto de la ruleta que queda bajo el puntero cuando gana este sector. */
+const SECTOR_FOCUS_RADIUS = 0.55;
+
+/**
+ * Encaje inicial para una imagen nueva: centrada en el sector, derecha cuando el
+ * sector queda arriba (al ganar) y lo justo de grande para cubrirlo entero.
+ */
+export function fitImageToSector(index: number, count: number): ImageFit {
+    if (count <= 1) return { x: 0, y: 0, scale: 1, rotate: 0 };
+    const { mid } = getSectorAngles(index, count);
+    const radius = 0.5;
+    const focus = radius * SECTOR_FOCUS_RADIUS;
+    const rad = (mid * Math.PI) / 180;
+    const halfAngle = Math.PI / count;
+    const farthest = Math.max(
+        focus,
+        radius - focus,
+        Math.sqrt(radius * radius + focus * focus - 2 * radius * focus * Math.cos(halfAngle)),
+    );
+    const scale = Math.min(Math.max(farthest * 2, IMAGE_FIT_LIMITS.minScale), IMAGE_FIT_LIMITS.maxScale);
+    return {
+        x: focus * Math.sin(rad),
+        y: -focus * Math.cos(rad),
+        scale,
+        rotate: normalizeDegrees(mid),
+    };
+}
+
+/** Grados en el rango (-180, 180]. */
+export function normalizeDegrees(deg: number): number {
+    const d = ((deg % 360) + 360) % 360;
+    return d > 180 ? d - 360 : d;
 }
 
 export function getLabelTransform(index: number, total: number): string {
@@ -104,51 +167,18 @@ export function getLabelTransform(index: number, total: number): string {
     return `rotate(${angle}deg)`;
 }
 
-// —— Color aleatorio para un sector nuevo ("Add option") ——
-// Tono aleatorio con saturación/luminosidad fijas → siempre vivo y legible.
+// Saturación y luminosidad fijas: cualquier tono sale vivo y legible.
 const RANDOM_SATURATION = 70;
 const RANDOM_LIGHTNESS = 55;
-// Diferencia mínima de tono con el sector anterior (que contiguos no se confundan)
+// Separación mínima de tono con el sector anterior para que no se confundan.
 const MIN_HUE_DISTANCE = 40;
-
-function hslToHex(h: number, s: number, l: number): string {
-    const sat = s / 100;
-    const light = l / 100;
-    const k = (n: number) => (n + h / 30) % 12;
-    const a = sat * Math.min(light, 1 - light);
-    const channel = (n: number) => {
-        const value = light - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
-        return Math.round(value * 255).toString(16).padStart(2, '0');
-    };
-    return `#${channel(0)}${channel(8)}${channel(4)}`;
-}
-
-// Tono (0-360) de un hex #rgb/#rrggbb; null si no es un hex válido o es gris.
-export function hexToHue(color: string | undefined): number | null {
-    if (!color || !color.startsWith('#')) return null;
-    let hex = color.slice(1);
-    if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
-    if (hex.length !== 6 || !/^[0-9a-fA-F]{6}$/.test(hex)) return null;
-    const r = parseInt(hex.slice(0, 2), 16) / 255;
-    const g = parseInt(hex.slice(2, 4), 16) / 255;
-    const b = parseInt(hex.slice(4, 6), 16) / 255;
-    const max = Math.max(r, g, b);
-    const delta = max - Math.min(r, g, b);
-    if (delta === 0) return null;
-    let hue: number;
-    if (max === r) hue = ((g - b) / delta) % 6;
-    else if (max === g) hue = (b - r) / delta + 2;
-    else hue = (r - g) / delta + 4;
-    return (hue * 60 + 360) % 360;
-}
 
 const hueDistance = (a: number, b: number): number => {
     const diff = Math.abs(a - b) % 360;
     return diff > 180 ? 360 - diff : diff;
 };
 
-// hsl(aleatorio, 70%, 55%) en hex, a ≥40° de tono del sector anterior si se conoce.
-// `random` inyectable solo para tests deterministas.
+/** Color de sector aleatorio y distinguible del anterior. `random` se inyecta en los tests. */
 export function randomSegmentColor(previousColor?: string, random: () => number = Math.random): string {
     const previousHue = hexToHue(previousColor);
     let hue = Math.floor(random() * 360);
@@ -156,7 +186,7 @@ export function randomSegmentColor(previousColor?: string, random: () => number 
         hue = Math.floor(random() * 360);
     }
     if (previousHue !== null && hueDistance(hue, previousHue) < MIN_HUE_DISTANCE) {
-        hue = (previousHue + 180) % 360; // último recurso: el tono opuesto
+        hue = (previousHue + 180) % 360;
     }
     return hslToHex(hue, RANDOM_SATURATION, RANDOM_LIGHTNESS);
 }
@@ -164,7 +194,6 @@ export function randomSegmentColor(previousColor?: string, random: () => number 
 export function isLightColor(color: string | undefined): boolean {
     if (!color) return false;
     if (LIGHT_COLORS.includes(color)) return true;
-    // Soporta hex del tema activo (#rgb / #rrggbb)
     if (typeof color === 'string' && color.startsWith('#')) {
         let hex = color.slice(1);
         if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
@@ -172,7 +201,6 @@ export function isLightColor(color: string | undefined): boolean {
         const r = parseInt(hex.slice(0, 2), 16);
         const g = parseInt(hex.slice(2, 4), 16);
         const b = parseInt(hex.slice(4, 6), 16);
-        // Luminancia relativa aproximada
         const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
         return luminance > 0.6;
     }

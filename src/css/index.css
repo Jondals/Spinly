@@ -29,28 +29,33 @@ html {
     --bg-input-color: #f6f6f9;
 
     --font-color: #14141a;
-    --font-color-wheel: #ffffff;
     --font-color-light: #4a4956;
-    --font-color-muted: #7a7887;
+    --font-color-muted: #686675;
     --font-color-disabled: #b8b6c2;
 
-    --color-border: #e2e2ea;
-    --color-border-light: #ececf3;
-    --color-border-dark: #d4d4de;
+    --color-border: #cdcdda;
+    --color-border-light: #dcdce6;
+    --color-border-dark: #a9a9ba;
 
     --color-hover: #eeeef4;
     --color-active: #e4e4ee;
     --color-focus: #6366f1;
     --color-focus-light: #818cf8;
+    /* Acento sobre --bg-transparence (badges) con contraste AA */
+    --color-focus-text: #4f46e5;
+    --color-primary: #6366f1;
+    --color-primary-light: #818cf8;
+    --color-remove: #ef4444;
 
     --wheel-color-dark: #e6e6ee;
     --wheel-center-color: #ffffff;
+    --wheel-pointer-edge: #1f1f27;
+    --wheel-rim-top: #3b3b4c;
+    --wheel-rim-bottom: #1f1f27;
+    --wheel-rim-line: rgba(255, 255, 255, 0.18);
 }
 
 :root {
-
-    /* BACKGROUNDS */
-
     --bg-color: #000000;
     --bg-header-color: #13131b;
     --bg-wheelmanager-color: #121214;
@@ -61,39 +66,36 @@ html {
     --bg-card-hover-color: #18181c;
     --bg-input-color: #0d0d10;
 
-    /* TEXT */
-
     --font-color: #ffffff;
-    --font-color-wheel: #000000;
     --font-color-light: #bab7c9;
-    --font-color-muted: #777583;
+    --font-color-muted: #8b899a;
     --font-color-disabled: #4f4e59;
     --font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     --font-family-alternative: monospace;
-
-    /* BORDERS */
 
     --color-border: #2a2a35;
     --color-border-light: #343440;
     --color-border-dark: #1c1c23;
 
-    /* STATES */
-
     --color-hover: #24242d;
     --color-active: #2b2b35;
     --color-focus: #6366f1;
     --color-focus-light: #818cf8;
+    --color-focus-text: #818cf8;
+    --color-primary: #6366f1;
+    --color-primary-light: #818cf8;
     --color-remove: #ef4444;
-
-    /* WHEEL */
 
     --wheel-color-primary: #6366f1;
     --wheel-color-secondary: #a78bfa;
     --wheel-color-dark: #202026;
-    --wheel-pointer-color: #6366f1;
+    --wheel-pointer-color: #fbbf24;
+    --wheel-light-color: #fbbf24;
+    --wheel-pointer-edge: #ffffff;
     --wheel-center-color: #121214;
-
-    /* ITEMS */
+    --wheel-rim-top: #34344a;
+    --wheel-rim-bottom: #14141b;
+    --wheel-rim-line: rgba(255, 255, 255, 0.12);
 
     --item-indigo: #3730a3;
     --item-coral: #ff7d7d;
@@ -120,21 +122,22 @@ html {
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: minmax(9rem, 13rem) minmax(11rem, 17rem) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 20rem) minmax(0, 20rem) minmax(0, 1fr);
     overflow: hidden;
 }
 
 @media (max-width: 1000px) {
     .Main {
-        grid-template-columns: minmax(8rem, 11rem) minmax(10rem, 14rem) minmax(0, 1fr);
+        grid-template-columns: minmax(0, 16rem) minmax(0, 17rem) minmax(0, 1fr);
     }
 
-    .Options {
+    .Options,
+    .Presets,
+    .Themes {
         padding: 1.5rem 1rem;
     }
 }
 
-/* Tablet: en mobile el Wheelmanager es un drawer y usa su propio padding */
 @media (min-width: 751px) and (max-width: 1000px) {
     .Wheelmanager {
         padding: 1.5rem 0.75rem 0.75rem;
@@ -156,13 +159,7 @@ html {
     min-height: 0;
 }
 
-/* Escritorio: la ruleta siempre visible en su columna; solo cambia el panel central */
-
-/* Responsive */
-
-/* En móvil el layout termina siendo UN grid de una sola celda: eso garantiza que
-   este bloque gana de forma inequívoca al grid de escritorio (que usa columnas múltiples)
-   y que el Main nunca quede con dos reglas contradictorias en la misma media query. */
+/* Móvil: un grid de una sola celda, sin reglas que compitan con el grid de columnas de escritorio. */
 @media (max-width: 750px) {
     html, body, #root {
         overflow-x: hidden;
@@ -191,10 +188,9 @@ html {
     }
 
     .Wheelmanager {
-        /* El layout mobile del Wheelmanager (drawer lateral) se define en WheelManager.css */
+        /* El drawer se define en WheelManager.css */
     }
 
-    /* La ruleta manda: siempre visible, siempre en el mismo lugar, nunca desborda */
     .Wheel {
         order: unset;
         grid-area: wheel;
@@ -214,16 +210,15 @@ html {
     }
 
     .wheel-container {
-        /* el radio ya está limitado por vw/vh, así que la rueda nunca se corta */
+        /* El radio ya está acotado por vw/vh: la ruleta nunca se corta */
         --wheel-radius: min(34vw, 30vh, 13rem);
     }
 
     .wheel-spin-button {
-        padding: 0.95rem 1.25rem;
+        padding: 0.95rem 2.75rem;
         font-size: 0.95rem;
     }
 
-    /* El panel activo (Options/Presets/Themes) comparte el mismo hueco en móvil */
     .spinly-panel {
         grid-area: panel;
         width: 100%;
@@ -231,7 +226,6 @@ html {
         overflow: hidden;
     }
 
-    /* Los tres paneles de sección comparten EXACTAMENTE el mismo hueco, ancho y padding */
     .Options,
     .Presets,
     .Themes {
@@ -243,5 +237,18 @@ html {
         padding: 1.5rem 1rem;
         margin: 0;
         overflow: hidden;
+    }
+}
+
+/* El zoom está permitido por accesibilidad. Esto evita el zoom por doble toque en
+      controles y el auto-zoom de iOS al enfocar campos con fuente menor de 16px. */
+button, a, input, select, textarea, label {
+    touch-action: manipulation;
+}
+
+@media (max-width: 750px) {
+    /* !important: cada campo fija un tamaño menor en su propia clase */
+    input, select, textarea {
+        font-size: max(1rem, 1em) !important;
     }
 }

@@ -5,7 +5,7 @@ import Options from './Components/Options';
 import Wheel from './Components/Wheel';
 import Presets from './Components/Presets';
 import Themes from './Components/Themes';
-import { createDefaultOptions, MAX_WHEEL_OPTIONS } from './scripts/option-wheel';
+import { createDefaultOptions, relabelDefaultOptions, MAX_WHEEL_OPTIONS } from './scripts/option-wheel';
 import {
     ACTIVE_PRESET_STORAGE_KEY,
     ACTIVE_THEME_STORAGE_KEY,
@@ -23,17 +23,37 @@ import {
     type WheelTheme,
 } from './types/theme-types';
 
+import { useTranslation } from './lib/i18n';
+import { pickText, STRINGS } from './lib/strings';
+import type { PresetDraft, ThemeDraft } from './types/form-drafts';
 import './index.css';
 
+type StorageWhat = 'whatThemes' | 'whatActiveTheme' | 'whatPresets';
+
+// Palabra "Option" en todos los idiomas: reconoce los nombres por defecto sin editar
+const DEFAULT_OPTION_LABELS = Object.values(STRINGS.options.defaultName);
+
 function App() {
-    const [options, setOptions] = useState(createDefaultOptions);
+    const { lang, t } = useTranslation();
+    const [options, setOptions] = useState(() => createDefaultOptions(t('options', 'defaultName')));
     const [activeSection, setActiveSection] = useState<WheelSectionId>('options');
     // En mobile el Wheelmanager es un drawer: el botón vive en el Header
     const [isMenuOpen, setIsMenuOpen] = useState(false);
-    // Aviso fijo si localStorage se queda sin espacio (nunca fallar en silencio)
-    const [storageWarning, setStorageWarning] = useState<string | null>(null);
+
+    // Cambio de idioma: "Option 2" ↔ "Opción 2" solo en nombres por defecto sin editar
+    useEffect(() => {
+        const label = pickText('options', 'defaultName', lang);
+        setOptions((prev) => relabelDefaultOptions(prev, DEFAULT_OPTION_LABELS, label));
+    }, [lang]);
+    // Aviso fijo si localStorage se queda sin espacio (nunca fallar en silencio).
+    // Guarda QUÉ falló (clave), no el texto: así se traduce si cambia el idioma.
+    const [storageWarning, setStorageWarning] = useState<StorageWhat | null>(null);
     // La transición se activa con la primera interacción (nunca en la carga inicial)
     const [isMenuAnimated, setIsMenuAnimated] = useState(false);
+    // Borradores del formulario de Themes/Presets (crear / editar local / editar en la nube).
+    // Aquí y no en el panel: sobreviven al ir al Wheel Editor a cambiar colores/opciones.
+    const [themeDraft, setThemeDraft] = useState<ThemeDraft | null>(null);
+    const [presetDraft, setPresetDraft] = useState<PresetDraft | null>(null);
 
     // Tema activo de la ruleta: SOLO visual (colores + imágenes). Nunca toca nombres.
     const [activeTheme, setActiveTheme] = useState<WheelTheme | null>(() => {
@@ -134,17 +154,12 @@ function App() {
     // Si localStorage está lleno (~5MB, típico con presets con texturas en base64),
     // avisamos con un banner fijo: los datos previos quedan intactos porque
     // setItem falla ANTES de escribir nada (no puede corromperse lo que ya había).
-    const reportStorageError = (error: unknown, what: string): void => {
+    const reportStorageError = (error: unknown, what: StorageWhat): void => {
         const name = (error as { name?: string } | null)?.name;
         const code = (error as { code?: number } | null)?.code;
         const message = String((error as { message?: string } | null)?.message ?? error);
         const isQuota = name === 'QuotaExceededError' || code === 22 || /quota|exceed/i.test(message);
-        if (isQuota) {
-            setStorageWarning(
-                `Sin espacio en el navegador (localStorage ~5MB): no se han podido guardar ${what}. `
-                + 'Borra guardados que no necesites o usa imágenes más ligeras.'
-            );
-        }
+        if (isQuota) setStorageWarning(what);
     };
 
     useEffect(() => {
@@ -152,16 +167,16 @@ function App() {
         try {
             localStorage.setItem(THEMES_STORAGE_KEY, JSON.stringify(userThemes));
         } catch (error) {
-            reportStorageError(error, 'los temas');
+            reportStorageError(error, 'whatThemes');
         }
     }, [userThemes]);
 
-        useEffect(() => {
+    useEffect(() => {
         if (typeof window === 'undefined') return;
         try {
             if (activeTheme) localStorage.setItem(ACTIVE_THEME_STORAGE_KEY, JSON.stringify(activeTheme));
         } catch (error) {
-            reportStorageError(error, 'el tema activo (sus texturas pesan)');
+            reportStorageError(error, 'whatActiveTheme');
         }
     }, [activeTheme]);
 
@@ -170,7 +185,7 @@ function App() {
         try {
             localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(userPresets));
         } catch (error) {
-            reportStorageError(error, 'los presets');
+            reportStorageError(error, 'whatPresets');
         }
     }, [userPresets]);
 
@@ -226,7 +241,7 @@ function App() {
         if (!activeTheme) return;
         const preset: WheelPreset = {
             id: crypto.randomUUID(),
-            name: name.trim() || 'Sin nombre',
+            name: name.trim() || t('presets', 'untitled'),
             options: options.map((o) => ({ ...o })),
             theme: cloneTheme(activeTheme),
             updatedAt: Date.now(),
@@ -255,19 +270,33 @@ function App() {
         setUserPresets((prev) => prev.filter((p) => p.id !== id));
     };
 
-    // Renombrar un preset (botón "editar" de la tarjeta activa).
-    const handleRenamePreset = (id: string, name: string) => {
-        setUserPresets((prev) => prev.map((p) => (p.id === id ? { ...p, name, updatedAt: Date.now() } : p)));
+    // Editar un preset PROPIO en local (formulario compartido en modo "local"):
+    // mismo id, con nombre/tags del formulario y opciones + tema actuales de la ruleta.
+    const handleUpdatePreset = (id: string, name: string, tags: string[]) => {
+        if (!activeTheme) return;
+        setUserPresets((prev) => prev.map((p) => (p.id === id
+            ? {
+                ...p,
+                name: name.trim() || p.name,
+                tags,
+                options: options.map((o) => ({ ...o })),
+                theme: cloneTheme(activeTheme),
+                updatedAt: Date.now(),
+            }
+            : p)));
+        setActivePresetId(id);
     };
 
     // Importar un preset de la comunidad: guarda copia local + la carga de golpe.
+    // Conserva el id de shared_presets (igual que "Descargar" en Themes): así el
+    // contador "descargados / disponibles" compara por id, y reimportar el mismo
+    // preset sustituye la copia en vez de duplicarla.
     const handleImportPreset = (preset: WheelPreset) => {
         const copy: WheelPreset = {
             ...clonePreset(preset),
-            id: crypto.randomUUID(),
             updatedAt: Date.now(),
         };
-        setUserPresets((prev) => [copy, ...prev]);
+        setUserPresets((prev) => [copy, ...prev.filter((p) => p.id !== copy.id)]);
         setOptions(copy.options.map((o) => ({ ...o })));
         setActiveTheme(cloneTheme({
             ...copy.theme,
@@ -297,8 +326,10 @@ function App() {
                         onSavePreset={handleSavePreset}
                         onLoadPreset={handleLoadPreset}
                         onDeletePreset={handleDeletePreset}
-                        onRenamePreset={handleRenamePreset}
+                        onUpdatePreset={handleUpdatePreset}
                         onImportPreset={handleImportPreset}
+                        draft={presetDraft}
+                        setDraft={setPresetDraft}
                     />
                 );
             case 'themes':
@@ -309,6 +340,8 @@ function App() {
                         savedThemes={savedThemes}
                         onSaveTheme={handleSaveTheme}
                         onDeleteTheme={handleDeleteTheme}
+                        draft={themeDraft}
+                        setDraft={setThemeDraft}
                     />
                 );
             case 'options':
@@ -347,11 +380,11 @@ function App() {
             {/* Aviso fijo (position:fixed: NO desplaza el layout) de cuota localStorage */}
             {storageWarning && (
                 <div className="spinly-storage-warning" role="alert">
-                    <span>{storageWarning}</span>
+                    <span>{t('common', 'noSpace', { what: t('common', storageWarning) })}</span>
                     <button
                         type="button"
                         onClick={() => setStorageWarning(null)}
-                        aria-label="Descartar aviso de almacenamiento"
+                        aria-label={t('common', 'dismissStorage')}
                     >✕</button>
                 </div>
             )}

@@ -87,10 +87,78 @@ export function spinWheel(options: WheelOption[], rotation: number): SpinResult 
     };
 }
 
+export type OptionProbability = { id: string; name: string; probability: number };
+
+// Probabilidad REAL de cada opción según spinWheel (índice uniforme: 1/N cada una).
+// Si algún día hay pesos por opción, se cambian aquí y en spinWheel a la vez y el
+// tooltip de "Aleatoriedad certificada" los refleja sin tocar la UI.
+export function getOptionProbabilities(options: WheelOption[]): OptionProbability[] {
+    if (options.length === 0) return [];
+    const share = 1 / options.length;
+    return options.map((option) => ({ id: option.id, name: option.name, probability: share }));
+}
+
 export function getLabelTransform(index: number, total: number): string {
     const segmentAngle = 360 / total;
     const angle = index * segmentAngle + segmentAngle / 2;
     return `rotate(${angle}deg)`;
+}
+
+// —— Color aleatorio para un sector nuevo ("Add option") ——
+// Tono aleatorio con saturación/luminosidad fijas → siempre vivo y legible.
+const RANDOM_SATURATION = 70;
+const RANDOM_LIGHTNESS = 55;
+// Diferencia mínima de tono con el sector anterior (que contiguos no se confundan)
+const MIN_HUE_DISTANCE = 40;
+
+function hslToHex(h: number, s: number, l: number): string {
+    const sat = s / 100;
+    const light = l / 100;
+    const k = (n: number) => (n + h / 30) % 12;
+    const a = sat * Math.min(light, 1 - light);
+    const channel = (n: number) => {
+        const value = light - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+        return Math.round(value * 255).toString(16).padStart(2, '0');
+    };
+    return `#${channel(0)}${channel(8)}${channel(4)}`;
+}
+
+// Tono (0-360) de un hex #rgb/#rrggbb; null si no es un hex válido o es gris.
+export function hexToHue(color: string | undefined): number | null {
+    if (!color || !color.startsWith('#')) return null;
+    let hex = color.slice(1);
+    if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
+    if (hex.length !== 6 || !/^[0-9a-fA-F]{6}$/.test(hex)) return null;
+    const r = parseInt(hex.slice(0, 2), 16) / 255;
+    const g = parseInt(hex.slice(2, 4), 16) / 255;
+    const b = parseInt(hex.slice(4, 6), 16) / 255;
+    const max = Math.max(r, g, b);
+    const delta = max - Math.min(r, g, b);
+    if (delta === 0) return null;
+    let hue: number;
+    if (max === r) hue = ((g - b) / delta) % 6;
+    else if (max === g) hue = (b - r) / delta + 2;
+    else hue = (r - g) / delta + 4;
+    return (hue * 60 + 360) % 360;
+}
+
+const hueDistance = (a: number, b: number): number => {
+    const diff = Math.abs(a - b) % 360;
+    return diff > 180 ? 360 - diff : diff;
+};
+
+// hsl(aleatorio, 70%, 55%) en hex, a ≥40° de tono del sector anterior si se conoce.
+// `random` inyectable solo para tests deterministas.
+export function randomSegmentColor(previousColor?: string, random: () => number = Math.random): string {
+    const previousHue = hexToHue(previousColor);
+    let hue = Math.floor(random() * 360);
+    for (let attempt = 0; previousHue !== null && hueDistance(hue, previousHue) < MIN_HUE_DISTANCE && attempt < 12; attempt += 1) {
+        hue = Math.floor(random() * 360);
+    }
+    if (previousHue !== null && hueDistance(hue, previousHue) < MIN_HUE_DISTANCE) {
+        hue = (previousHue + 180) % 360; // último recurso: el tono opuesto
+    }
+    return hslToHex(hue, RANDOM_SATURATION, RANDOM_LIGHTNESS);
 }
 
 export function isLightColor(color: string | undefined): boolean {

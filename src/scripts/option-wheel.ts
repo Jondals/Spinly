@@ -28,19 +28,33 @@ export function createOption(name: string, index: number): WheelOption {
     };
 }
 
-export function createDefaultOptions(): WheelOption[] {
-    return [
-        createOption('Option 0', 0),
-        createOption('Option 1', 1),
-        createOption('Option 2', 2),
-        createOption('Option 3', 3),
-    ];
+// `label` = palabra "Option"/"Opción" del idioma activo (la pasa la UI desde el diccionario)
+export function createDefaultOptions(label = 'Option'): WheelOption[] {
+    return [0, 1, 2, 3].map((index) => createOption(`${label} ${index + 1}`, index));
 }
 
-export function addOption(options: WheelOption[], limit: number = MAX_WHEEL_OPTIONS): WheelOption[] {
+export function addOption(options: WheelOption[], limit: number = MAX_WHEEL_OPTIONS, label = 'Option'): WheelOption[] {
     const max = Number.isFinite(limit) ? limit : MAX_WHEEL_OPTIONS;
     if (options.length >= max) return options;
-    return [...options, createOption(`Opción ${options.length + 1}`, options.length)];
+    return [...options, createOption(`${label} ${options.length + 1}`, options.length)];
+}
+
+// Al cambiar de idioma: SOLO los nombres por defecto sin editar ("Option 3" / "Opción 3")
+// pasan al nuevo idioma. Un nombre escrito por el usuario nunca se toca.
+// Devuelve el mismo array si no hay nada que renombrar (evita renders inútiles).
+export function relabelDefaultOptions(options: WheelOption[], knownLabels: readonly string[], label: string): WheelOption[] {
+    const escaped = knownLabels.map((known) => known.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const pattern = new RegExp(`^(?:${escaped.join('|')}) (\\d+)$`);
+    let changed = false;
+    const next = options.map((option) => {
+        const match = pattern.exec(option.name);
+        if (!match) return option;
+        const renamed = `${label} ${match[1]}`;
+        if (renamed === option.name) return option;
+        changed = true;
+        return { ...option, name: renamed };
+    });
+    return changed ? next : options;
 }
 
 export function removeOption(options: WheelOption[], id: string): WheelOption[] {

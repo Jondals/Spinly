@@ -4,12 +4,15 @@ import ReactDOM from 'react-dom/client';
 // componente (y sus estados) puedan sobreescribir estos valores base.
 import './css/shared.css';
 import App from './App';
+import { LanguageProvider } from './lib/i18n';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
 root.render(
   <React.StrictMode>
-    <App />
+    <LanguageProvider>
+      <App />
+    </LanguageProvider>
   </React.StrictMode>
 );

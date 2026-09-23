@@ -33,6 +33,9 @@
 
 .button-menu {
     width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
     text-align: left;
     padding: 0.85rem 1rem;
     margin-bottom: 0.5rem;
@@ -49,6 +52,27 @@
 
 .button-menu:last-child {
     margin-bottom: 0;
+}
+
+/* Icono SVG a la izquierda del texto: mismo tamaño y trazo en las tres secciones */
+.button-menu-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    width: 1.15rem;
+    height: 1.15rem;
+    color: var(--font-color-muted);
+    transition: color 0.15s ease;
+}
+
+.button-menu-icon svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.button-menu:hover .button-menu-icon,
+.button-menu--active .button-menu-icon {
+    color: var(--color-focus);
 }
 
 .button-menu:hover {

@@ -4,6 +4,9 @@ import ColorPicker from './ColorPicker';
 import { addOption, removeOption, updateOption, reorderOptions, MAX_OPTION_LENGTH, MAX_WHEEL_OPTIONS, type WheelOption } from '../scripts/option-wheel';
 import { DEFAULT_SEGMENT_COLOR, WHEEL_LIMIT_STORAGE_KEY, ensureSegments, type WheelSegmentStyle, type WheelTheme } from '../types/theme-types';
 import { isAllowedImageMime, MAX_UPLOAD_BYTES } from '../lib/supabaseClient';
+import { randomSegmentColor } from '../scripts/wheel';
+import { useTranslation } from '../lib/i18n';
+import { dictMessage, type LocalMessage } from '../lib/strings';
 
 interface OptionsProps {
     options: WheelOption[];
@@ -15,9 +18,11 @@ interface OptionsProps {
 }
 
 function Options({ options, setOptions, activeTheme, setActiveTheme, wheelLimit, setWheelLimit }: OptionsProps) {
+    const { t, tm } = useTranslation();
     const [dragIndex, setDragIndex] = useState<number | null>(null);
     const [overIndex, setOverIndex] = useState<number | null>(null);
-    const [imageWarning, setImageWarning] = useState<string | null>(null);
+    // LocalMessage (no string): el aviso se re-traduce si cambia el idioma con él visible
+    const [imageWarning, setImageWarning] = useState<LocalMessage | null>(null);
     const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
     const [isEditingLimit, setIsEditingLimit] = useState<boolean>(false);
     const [limitDraft, setLimitDraft] = useState<string>('');
@@ -30,7 +35,7 @@ function Options({ options, setOptions, activeTheme, setActiveTheme, wheelLimit,
         const next = Math.min(Math.max(Math.round(value), 2), MAX_WHEEL_OPTIONS);
         // No borrar nada: bloquear bajar por debajo del número actual
         if (next < options.length) {
-            setImageWarning(`No se puede bajar el límite a ${next}: ya tienes ${options.length} opciones.`);
+            setImageWarning(dictMessage('options', 'limitBlocked', { next, count: options.length }));
             return;
         }
         setImageWarning(null);
@@ -85,11 +90,11 @@ function Options({ options, setOptions, activeTheme, setActiveTheme, wheelLimit,
         if (!file) return;
         // MIME real del archivo (no la extensión) + whitelist estricta + límite duro de 2MB
         if (!isAllowedImageMime(file.type)) {
-            setImageWarning('Formato no permitido: usa PNG, JPEG o WEBP.');
+            setImageWarning(dictMessage('options', 'badImgFormat'));
             return;
         }
         if (file.size > MAX_UPLOAD_BYTES) {
-            setImageWarning('Imagen mayor de 2MB: excede el límite de localStorage (~5MB). Elige una más ligera.');
+            setImageWarning(dictMessage('options', 'imgTooBig'));
             return;
         }
         setImageWarning(null);
@@ -97,7 +102,7 @@ function Options({ options, setOptions, activeTheme, setActiveTheme, wheelLimit,
         reader.onload = () => {
             const dataUrl = String(reader.result ?? '');
             if (dataUrl.length > 2800000) {
-                setImageWarning('Esta imagen en base64 es muy pesada para localStorage. No se ha guardado.');
+                setImageWarning(dictMessage('options', 'imgTooHeavy'));
                 return;
             }
             syncSeg(index, { backgroundImage: dataUrl });
@@ -105,22 +110,20 @@ function Options({ options, setOptions, activeTheme, setActiveTheme, wheelLimit,
         reader.readAsDataURL(file);
     };
 
+    // Nueva opción = nuevo sector con color ALEATORIO vivo (hsl(rand, 70%, 55%)),
+    // distinto en tono del sector anterior; sin heredar imagen de la paleta cíclica.
+    // El color se calcula fuera de los updaters (puros: StrictMode los ejecuta dos veces).
     const handleAdd = () => {
-        setOptions((prev) => {
-                        const next = addOption(prev, lim);
-            if (next.length !== prev.length) {
-                const targetLen = next.length;
-                            setActiveTheme((themePrev) => {
-                    if (!themePrev) return themePrev;
-                    const segs = ensureSegments(themePrev.segments, targetLen);
-                    segs[targetLen - 1] = {
-                        color: segs[targetLen - 1]?.color ?? DEFAULT_SEGMENT_COLOR,
-                        backgroundImage: segs[targetLen - 1]?.backgroundImage,
-                    };
-                    return { ...themePrev, segments: segs };
-                });
-            }
-            return next;
+        const next = addOption(options, lim, t('options', 'defaultName'));
+        if (next.length === options.length) return;
+        const targetLen = next.length;
+        const color = randomSegmentColor(segments[options.length - 1]?.color);
+        setOptions(next);
+        setActiveTheme((themePrev) => {
+            if (!themePrev) return themePrev;
+            const segs = ensureSegments(themePrev.segments, targetLen);
+            segs[targetLen - 1] = { color };
+            return { ...themePrev, segments: segs };
         });
     };
 
@@ -186,8 +189,8 @@ function Options({ options, setOptions, activeTheme, setActiveTheme, wheelLimit,
     return (
         <div className='Options'>
             <div className="options-title spinly-panel-header">
-                <p className="spinly-panel-title">WHEEL EDITOR</p>
-                <span className="number-items spinly-badge" title={`Límite ${lim} de ${MAX_WHEEL_OPTIONS}: clic para editar`}>
+                <p className="spinly-panel-title">{t('options', 'title')}</p>
+                <span className="number-items spinly-badge" title={t('options', 'limitTitle', { lim, max: MAX_WHEEL_OPTIONS })}>
                     {options.length} / {isEditingLimit ? (
                         <input
                             className="options-limit-inline"
@@ -202,16 +205,16 @@ function Options({ options, setOptions, activeTheme, setActiveTheme, wheelLimit,
                                 if (e.key === 'Enter') commitLimit((e.target as HTMLInputElement).value);
                                 if (e.key === 'Escape') setIsEditingLimit(false);
                             }}
-                            aria-label={`Límite de opciones (máximo ${MAX_WHEEL_OPTIONS})`}
+                            aria-label={t('options', 'limitAria', { max: MAX_WHEEL_OPTIONS })}
                         />
                     ) : (
-                        <button type="button" className="options-limit-value" onClick={startLimitEdit} title="Clic para editar el límite">
+                        <button type="button" className="options-limit-value" onClick={startLimitEdit} title={t('options', 'limitEdit')}>
                             {lim}
                         </button>
                     )}
                 </span>
             </div>
-            {imageWarning && <p className="options-warning" role="alert">{imageWarning}</p>}
+            {imageWarning && <p className="options-warning" role="alert">{tm(imageWarning)}</p>}
 
             <div className='container-options'>
                 {options.map((option, index) => {
@@ -225,17 +228,17 @@ function Options({ options, setOptions, activeTheme, setActiveTheme, wheelLimit,
                             onDragOver={handleDragOver(index)}
                             onDrop={handleDrop(index)}
                         >
-                            <span className='drag' draggable onDragStart={handleDragStart(index)} onDragEnd={handleDragEnd}>⠿</span>
+                            <span className='drag' draggable onDragStart={handleDragStart(index)} onDragEnd={handleDragEnd} title={t('options', 'dragHandle')}>⠿</span>
                             <button
                                 type="button"
                                 className="option-swatch"
                                 style={{ backgroundColor: swatch }}
-                                title={`Cambiar color del sector ${index + 1}`}
+                                title={t('options', 'changeColor', { n: index + 1 })}
                                 onClick={(event) => openColorPicker(index, event.currentTarget)}
-                                aria-label={`Color de ${option.name}`}
+                                aria-label={t('options', 'colorOf', { name: option.name })}
                             />
-                            <input value={option.name} maxLength={MAX_OPTION_LENGTH} onChange={(event) => renameOpt(option.id, index, event.target.value)} aria-label={`Nombre opción ${index + 1}`} />
-                            <button type="button" className={`option-img-btn${hasImg ? ' option-img-btn--active' : ''}`} onClick={() => openFilePicker(option.id)} title={hasImg ? 'Cambiar imagen de fondo' : 'Añadir imagen de fondo'} aria-label={`Imagen de fondo opción ${index + 1}`}>
+                            <input value={option.name} maxLength={MAX_OPTION_LENGTH} onChange={(event) => renameOpt(option.id, index, event.target.value)} aria-label={t('options', 'optName', { n: index + 1 })} />
+                            <button type="button" className={`option-img-btn${hasImg ? ' option-img-btn--active' : ''}`} onClick={() => openFilePicker(option.id)} title={hasImg ? t('options', 'changeImg') : t('options', 'addImg')} aria-label={t('options', 'imgAria', { n: index + 1 })}>
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
                                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
                                     <circle cx="8.5" cy="8.5" r="1.5" />
@@ -248,24 +251,24 @@ function Options({ options, setOptions, activeTheme, setActiveTheme, wheelLimit,
                                 accept="image/*"
                                 hidden
                                 onChange={(event) => handleImageFile(index, event.target.files?.[0])}
-                                aria-label={`Archivo imagen opción ${index + 1}`}
+                                aria-label={t('options', 'imgFile', { n: index + 1 })}
                             />
                             {hasImg && (
-                                <button type="button" className="option-img-remove" onClick={() => removeSegImage(index)} title="Quitar imagen" aria-label={`Quitar imagen opción ${index + 1}`}>✕</button>
+                                <button type="button" className="option-img-remove" onClick={() => removeSegImage(index)} title={t('options', 'removeImg')} aria-label={t('options', 'removeImgAria', { n: index + 1 })}>✕</button>
                             )}
-                            <button className='remove-option-button' onClick={() => handleRemove(option.id, index)} aria-label={`Eliminar opción ${index + 1}`}>×</button>
+                            <button className='remove-option-button' onClick={() => handleRemove(option.id, index)} aria-label={t('options', 'removeOpt', { n: index + 1 })}>×</button>
                         </div>
                     );
                 })}
             </div>
 
             <div className='options-bottom'>
-                <button className='add-option-button' onClick={handleAdd} disabled={reachedLimit} title={reachedLimit ? `Máximo ${lim} opciones` : undefined}>
+                <button className='add-option-button' onClick={handleAdd} disabled={reachedLimit} title={reachedLimit ? t('options', 'maxReached', { lim }) : undefined}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24" aria-hidden="true">
                         <line x1="12" y1="5" x2="12" y2="19" />
                         <line x1="5" y1="12" x2="19" y2="12" />
                     </svg>
-                    Añadir opción
+                    {t('options', 'add')}
                 </button>
             </div>
 

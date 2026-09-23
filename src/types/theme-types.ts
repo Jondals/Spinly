@@ -1,5 +1,7 @@
 import { MAX_OPTION_LENGTH, MAX_WHEEL_OPTIONS } from '../scripts/option-wheel';
 import type { WheelOption } from '../scripts/option-wheel';
+import { pickText } from '../lib/strings';
+import type { SpinlyLang } from '../lib/i18n';
 
 export { MAX_WHEEL_OPTIONS };
 
@@ -80,18 +82,18 @@ export function segmentForIndex(
     return { color: s?.color ?? fallbackColor, backgroundImage: s?.backgroundImage };
 }
 
-export function timeAgo(updatedAt: number): string {
+export function timeAgo(updatedAt: number, lang: SpinlyLang): string {
     const diff = Date.now() - updatedAt;
     const min = Math.floor(diff / 60000);
-    if (min < 1) return 'ahora mismo';
-    if (min < 60) return `hace ${min}min`;
+    if (min < 1) return pickText('time', 'justNow', lang);
+    if (min < 60) return pickText('time', 'minutes', lang, { n: min });
     const h = Math.floor(min / 60);
-    if (h < 24) return `hace ${h}h`;
+    if (h < 24) return pickText('time', 'hours', lang, { n: h });
     const d = Math.floor(h / 24);
-    if (d < 30) return `hace ${d}d`;
+    if (d < 30) return pickText('time', 'days', lang, { n: d });
     const m = Math.floor(d / 30);
-        if (m < 12) return `hace ${m} mes`;
-    return `hace ${Math.floor(m / 12)}a`;
+    if (m < 12) return pickText('time', 'months', lang, { n: m });
+    return pickText('time', 'years', lang, { n: Math.floor(m / 12) });
 }
 
 export const DEFAULT_THEMES: WheelTheme[] = [
@@ -233,7 +235,7 @@ export const DEFAULT_PRESETS: WheelPreset[] = [
         options: mkPresetOptions(['Pizza Night', 'Sushi', 'Burgers', 'Tacos'], 'cena'),
         theme: cloneTheme(defaultThemeById('theme-neon')),
         updatedAt: Date.now() - 2 * 24 * 60 * 60 * 1000,
-        tags: ['Equipo'],
+        tags: [],
     },
     {
         id: 'default-preset-juegos',

@@ -1,11 +1,27 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { timeAgo, type WheelPreset } from '../types/theme-types';
 import type { WheelOption } from '../scripts/option-wheel';
 import type { WheelTheme } from '../types/theme-types';
 import Avatar from './Avatar';
-import SearchIcon from './SearchIcon';
-import { fetchCommunityPresets, sharePreset, type CommunityPreset } from '../lib/community';
+import SearchBar from './SearchBar';
+import SegmentedToggle from './SegmentedToggle';
+import CollapsePanel from './CollapsePanel';
+import CommunityCountBadge from './CommunityCountBadge';
+import ItemActions, { countItemActions } from './ItemActions';
+import OptionChips from './OptionChips';
+import {
+    deleteSharedPreset,
+    fetchCommunityPresets,
+    sharePreset,
+    updateSharedPreset,
+    type CommunityAuthor,
+    type CommunityPreset,
+} from '../lib/community';
+import { useSessionUserId } from '../lib/useSessionUserId';
 import { useShareCooldown } from '../lib/useShareCooldown';
+import { useTranslation } from '../lib/i18n';
+import { dictMessage, seedText, type LocalMessage } from '../lib/strings';
+import { isCloudTarget, type PresetDraft } from '../types/form-drafts';
 import '../css/Presets.css';
 
 interface PresetsProps {
@@ -16,11 +32,20 @@ interface PresetsProps {
     onSavePreset: (name: string, tags?: string[]) => void;
     onLoadPreset: (preset: WheelPreset) => void;
     onDeletePreset: (id: string) => void;
-    onRenamePreset: (id: string, name: string) => void;
+    onUpdatePreset: (id: string, name: string, tags: string[]) => void;
     onImportPreset: (preset: WheelPreset) => void;
+    // Borrador del formulario (vive en App: sobrevive al ir al Wheel Editor y volver)
+    draft: PresetDraft | null;
+    setDraft: React.Dispatch<React.SetStateAction<PresetDraft | null>>;
 }
 
-type PanelNotice = { tone: 'ok' | 'error'; text: string };
+// LocalMessage: el aviso se re-traduce si cambia el idioma mientras está visible
+type PanelNotice = { tone: 'ok' | 'error'; text: LocalMessage };
+type PresetView = 'mine' | 'community';
+
+const CREATE_PANEL_ID = 'presets-create-panel';
+
+const EMPTY_DRAFT: PresetDraft = { target: { mode: 'create' }, name: '', tags: '' };
 
 const PlusIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
@@ -28,28 +53,38 @@ const PlusIcon = () => (
     </svg>
 );
 
-function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, onSavePreset, onLoadPreset, onDeletePreset, onRenamePreset, onImportPreset }: PresetsProps) {
+// Los presets semilla (DEFAULT_PRESETS) nunca se pueden editar/borrar/compartir
+const isDefault = (id: string) => id.startsWith('default-preset-');
+
+const parseTags = (raw: string): string[] => (raw.trim()
+    ? raw.split(',').map((tag) => tag.trim()).filter(Boolean)
+    : []);
+
+function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, onSavePreset, onLoadPreset, onDeletePreset, onUpdatePreset, onImportPreset, draft, setDraft }: PresetsProps) {
+    const { lang, t, tm } = useTranslation();
+    const userId = useSessionUserId();
     const [search, setSearch] = useState('');
-    const [creating, setCreating] = useState(false);
-    const [draftName, setDraftName] = useState('');
-    const [draftTags, setDraftTags] = useState('');
-    const inputRef = useRef<HTMLInputElement>(null);
-    const editInputRef = useRef<HTMLInputElement>(null);
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [editDraft, setEditDraft] = useState('');
-    const isDefault = (id: string) => id.startsWith('default-preset-');
-    const filtered = savedPresets.filter((p) =>
-        p.name.toLowerCase().includes(search.toLowerCase()) ||
-        (p.tags ?? []).some((t) => t.toLowerCase().includes(search.toLowerCase()))
-    );
-    const [view, setView] = useState<'mine' | 'community'>('mine');
+    // Si se estaba editando algo de la nube, volver directamente a la vista Comunidad
+    const [view, setView] = useState<PresetView>(() => (draft && isCloudTarget(draft.target) ? 'community' : 'mine'));
     const [community, setCommunity] = useState<CommunityPreset[]>([]);
     const [communitySearch, setCommunitySearch] = useState('');
     const [loadingCommunity, setLoadingCommunity] = useState(false);
-    const [communityError, setCommunityError] = useState<string | null>(null);
+    const [communityError, setCommunityError] = useState<LocalMessage | null>(null);
     const [notice, setNotice] = useState<PanelNotice | null>(null);
     const [refreshToken, setRefreshToken] = useState(0);
-    const share = useShareCooldown();
+    // Anti-spam compartido por TODAS las escrituras en la nube (compartir, editar, borrar)
+    const cloudOps = useShareCooldown();
+
+    // Nombre visible: los semilla se localizan; los del usuario se muestran tal cual
+    const displayName = (preset: WheelPreset): string => seedText(preset.id, 'name', lang) ?? preset.name;
+    // Autor huérfano (username vacío): "User"/"Usuario" en el idioma activo
+    const authorName = (author: CommunityAuthor): string => author.username || t('common', 'unknownUser');
+
+    const query = search.trim().toLowerCase();
+    const filtered = savedPresets.filter((p) =>
+        displayName(p).toLowerCase().includes(query) ||
+        (p.tags ?? []).some((tag) => tag.toLowerCase().includes(query))
+    );
 
     // Se carga SIEMPRE (montaje + cada entrada en Comunidad): así el badge
     // muestra el contador REAL de Supabase, nunca un 0 hardcodeado.
@@ -72,15 +107,25 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
         };
     }, [view, refreshToken]);
 
+    // Descargados = presets de la comunidad que ya están guardados en local (mismo id)
+    const savedIds = new Set(savedPresets.map((p) => p.id));
+    const downloadedCount = community.filter((entry) => savedIds.has(entry.preset.id)).length;
+
+    const communityQuery = communitySearch.trim().toLowerCase();
+    const communityFiltered = community.filter((entry) => {
+        if (!communityQuery) return true;
+        return entry.preset.name.toLowerCase().includes(communityQuery)
+            || authorName(entry.author).toLowerCase().includes(communityQuery);
+    });
+
     // Compartir: el servicio asocia SIEMPRE author_id a la fila subida.
-    // useShareCooldown evita el doble clic y un bucle de peticiones (4s de cooldown).
     const handleShare = async (preset: WheelPreset) => {
-        if (!share.begin(preset.id)) return;
+        if (!cloudOps.begin(preset.id)) return;
         setNotice(null);
         const result = await sharePreset(preset);
-        share.finish();
+        cloudOps.finish();
         if (result.ok) {
-            setNotice({ tone: 'ok', text: `"${preset.name}" compartido en la comunidad.` });
+            setNotice({ tone: 'ok', text: dictMessage('presets', 'sharedOk', { name: preset.name }) });
             setRefreshToken((token) => token + 1);
         } else {
             setNotice({ tone: 'error', text: result.error });
@@ -89,70 +134,107 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
 
     // "Usar" de la comunidad: lo guarda como preset propio y lo carga en la ruleta.
     const handleUseCommunity = (preset: WheelPreset) => {
-        setNotice(null);
         onImportPreset(preset);
-        setNotice({ tone: 'ok', text: `"${preset.name}" cargado y guardado en Mis presets.` });
+        setNotice({ tone: 'ok', text: dictMessage('presets', 'usedOk', { name: preset.name }) });
     };
 
-    const communityFiltered = community.filter((entry) => {
-        const query = communitySearch.trim().toLowerCase();
-        if (!query) return true;
-        return entry.preset.name.toLowerCase().includes(query)
-            || entry.author.username.toLowerCase().includes(query);
-    });
+    // —— Formulario único: crear / editar local / editar en la nube ——
+    // El último borrador se conserva mientras el acordeón se pliega (animación sin "saltos").
+    const lastDraft = useRef<PresetDraft>(EMPTY_DRAFT);
+    if (draft) lastDraft.current = draft;
+    const shownDraft = draft ?? lastDraft.current;
+    const formOpen = draft !== null && isCloudTarget(draft.target) === (view === 'community');
+    const editingId = draft && draft.target.mode !== 'create' ? draft.target.id : null;
+    const canSubmit = Boolean(activeTheme) && currentOptions.length > 0;
 
-    const handleCreate = () => {
-        setCreating(true);
-        setDraftName('');
-        setDraftTags('');
-        setTimeout(() => inputRef.current?.focus(), 10);
-    };
+    const startCreate = () => setDraft({ ...EMPTY_DRAFT });
 
-    const handleSaveNew = () => {
-        const name = draftName.trim();
-        const tags = draftTags.trim()
-            ? draftTags.split(',').map((t) => t.trim()).filter(Boolean)
-            : [];
-        onSavePreset(name || 'Sin nombre', tags);
-        setCreating(false);
-        setDraftName('');
-        setDraftTags('');
-    };
-
-    const handleCancelCreate = () => {
-        setCreating(false);
-        setDraftName('');
-        setDraftTags('');
-    };
-
-    const handleDuplicate = (preset: WheelPreset) => {
-        onSavePreset(`${preset.name} (copia)`, preset.tags);
-    };
-
-    const startRename = (preset: WheelPreset) => {
-        setEditingId(preset.id);
-        setEditDraft(preset.name);
-        setTimeout(() => editInputRef.current?.focus(), 10);
-    };
-
-    const commitRename = () => {
-        if (editingId) {
-            const name = editDraft.trim();
-            if (name) onRenamePreset(editingId, name);
+    // Editar = cargar el preset en la ruleta (opciones y aspecto se editan en Wheel Editor)
+    // + abrir el MISMO formulario con sus datos. Pulsar otra vez Editar lo cierra.
+    const startEdit = (preset: WheelPreset, mode: 'local' | 'cloud') => {
+        if (draft?.target.mode === mode && editingId === preset.id) {
+            setDraft(null);
+            return;
         }
-        setEditingId(null);
-        setEditDraft('');
+        onLoadPreset(preset);
+        setDraft({ target: { mode, id: preset.id }, name: preset.name, tags: (preset.tags ?? []).join(', ') });
     };
 
-    const cancelRename = () => {
-        setEditingId(null);
-        setEditDraft('');
+    const closeForm = () => setDraft(null);
+
+    const handleSubmit = async () => {
+        if (!draft || !canSubmit || !activeTheme) return;
+        const target = draft.target;
+        const name = draft.name.trim() || t('presets', 'untitled');
+        const tags = parseTags(draft.tags);
+
+        if (target.mode === 'cloud') {
+            // UPDATE de la MISMA fila en Supabase (mismo id y author_id), nunca un duplicado.
+            // Independiente de las copias locales: no toca "Mis presets".
+            if (!cloudOps.begin(target.id)) return;
+            setNotice(null);
+            const result = await updateSharedPreset(target.id, {
+                id: target.id,
+                name,
+                tags,
+                options: currentOptions.map((option) => ({ ...option })),
+                theme: activeTheme,
+                updatedAt: Date.now(),
+            });
+            cloudOps.finish();
+            if (!result.ok) {
+                setNotice({ tone: 'error', text: result.error });
+                return;
+            }
+            setNotice({ tone: 'ok', text: dictMessage('common', 'cloudUpdated', { name }) });
+            setRefreshToken((token) => token + 1);
+            setDraft(null);
+            return;
+        }
+
+        if (target.mode === 'local') {
+            onUpdatePreset(target.id, name, tags);
+            setNotice({ tone: 'ok', text: dictMessage('presets', 'updatedOk', { name }) });
+        } else {
+            onSavePreset(name, tags);
+        }
+        setDraft(null);
     };
 
-    const handleDelete = (preset: WheelPreset, e: React.MouseEvent) => {
-        e.stopPropagation();
+    const handleDeleteLocal = (preset: WheelPreset) => {
+        if (isDefault(preset.id)) return;
+        if (draft?.target.mode === 'local' && editingId === preset.id) setDraft(null);
         onDeletePreset(preset.id);
     };
+
+    const handleDeleteCloud = async (preset: WheelPreset) => {
+        if (!cloudOps.begin(preset.id)) return;
+        setNotice(null);
+        const result = await deleteSharedPreset(preset.id);
+        cloudOps.finish();
+        if (!result.ok) {
+            setNotice({ tone: 'error', text: result.error });
+            return;
+        }
+        if (draft?.target.mode === 'cloud' && editingId === preset.id) setDraft(null);
+        // Lista y contador al instante (sin recargar); luego se re-sincroniza con Supabase
+        setCommunity((prev) => prev.filter((entry) => entry.preset.id !== preset.id));
+        setNotice({ tone: 'ok', text: dictMessage('common', 'cloudDeleted', { name: preset.name }) });
+        setRefreshToken((token) => token + 1);
+    };
+
+    const onFieldEnter = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') void handleSubmit();
+    };
+
+    const formTitle = shownDraft.target.mode === 'cloud'
+        ? t('presets', 'editCloudTitle')
+        : shownDraft.target.mode === 'local' ? t('presets', 'editTitle') : t('presets', 'newTitle');
+    const submitLabel = shownDraft.target.mode === 'cloud'
+        ? t('common', 'updateCloud')
+        : shownDraft.target.mode === 'local' ? t('common', 'saveChanges') : t('presets', 'create');
+    // Botón "+ Nuevo" oculto mientras el formulario de "Mis presets" está abierto
+    const showCreateButton = !(draft && !isCloudTarget(draft.target));
 
     return (
         <div className="Presets presets-presets">
@@ -165,303 +247,252 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
                             <polyline points="7 3 7 8 15 8" />
                         </svg>
                     </span>
-                    <h2 className="presets-presets-title spinly-panel-title">Presets Guardados</h2>
+                    <h2 className="presets-presets-title spinly-panel-title">{t('presets', 'title')}</h2>
                 </div>
-                <span className="presets-presets-badge spinly-badge">
-                    {view === 'mine' ? `${savedPresets.length} Listas` : `${community.length} en Comunidad`}
-                </span>
+                {view === 'mine' ? (
+                    <span className="presets-presets-badge spinly-badge">
+                        {t('presets', 'savedCount', { n: savedPresets.length })}
+                    </span>
+                ) : (
+                    <CommunityCountBadge className="presets-presets-badge" downloaded={downloadedCount} available={community.length} />
+                )}
             </header>
-            <p className="presets-presets-subtitle">
-                Alterna instantáneamente o crea configuraciones predefinidas para tus sorteos.
-            </p>
+            <p className="presets-presets-subtitle">{t('presets', 'subtitle')}</p>
 
-            {/* Toggle Mis presets / Comunidad (mismo patrón en Themes) */}
-            <div className="spinly-segmented" role="tablist" aria-label="Vista de presets">
-                <button
-                    type="button"
-                    role="tab"
-                    aria-selected={view === 'mine'}
-                    className={`spinly-segmented-btn${view === 'mine' ? ' spinly-segmented-btn--active' : ''}`}
-                    onClick={() => setView('mine')}
-                >Mis presets</button>
-                <button
-                    type="button"
-                    role="tab"
-                    aria-selected={view === 'community'}
-                    className={`spinly-segmented-btn${view === 'community' ? ' spinly-segmented-btn--active' : ''}`}
-                    onClick={() => setView('community')}
-                >Comunidad</button>
-            </div>
+            {/* Toggle Mis presets / Comunidad (mismo componente en Themes) */}
+            <SegmentedToggle<PresetView>
+                ariaLabel={t('presets', 'viewLabel')}
+                value={view}
+                onChange={setView}
+                options={[
+                    { id: 'mine', label: t('presets', 'mine') },
+                    { id: 'community', label: t('common', 'community') },
+                ]}
+            />
 
             {notice && (
                 <p
                     className={`spinly-status ${notice.tone === 'error' ? 'spinly-status--error' : 'spinly-status--ok'}`}
                     role="status"
-                >{notice.text}</p>
+                >{tm(notice.text)}</p>
             )}
 
             {view === 'mine' && (
             <>
-            <div className="presets-presets-toolbar">
-                <label className="spinly-search">
-                    <SearchIcon />
-                    <input
-                        type="text"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Buscar preset..."
-                    />
-                </label>
-                {!creating && (
-                    <button
-                        type="button"
-                        className="presets-presets-new-btn spinly-btn-primary"
-                        onClick={handleCreate}
-                        aria-label="Crear nuevo preset"
-                    >
-                        <PlusIcon /> Nuevo
-                    </button>
-                )}
-            </div>
-
-            {creating && (
-                <div className="presets-presets-create-form">
-                    <input
-                        ref={inputRef}
-                        type="text"
-                        className="presets-presets-create-input"
-                        value={draftName}
-                        onChange={(e) => setDraftName(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleSaveNew();
-                            if (e.key === 'Escape') handleCancelCreate();
-                        }}
-                        placeholder="Nombre del preset"
-                        maxLength={40}
-                    />
-                    <input
-                        type="text"
-                        className="presets-presets-create-input"
-                        value={draftTags}
-                        onChange={(e) => setDraftTags(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveNew(); }}
-                        placeholder="Tags (separados por coma)"
-                        maxLength={80}
-                    />
-                    <div className="presets-presets-create-actions">
-                        <button
-                            type="button"
-                            className="presets-presets-create-btn"
-                            onClick={handleSaveNew}
-                            disabled={!activeTheme || currentOptions.length === 0}
-                        >Guardar</button>
-                        <button
-                            type="button"
-                            className="presets-presets-cancel-btn"
-                            onClick={handleCancelCreate}
-                        >Cancelar</button>
-                    </div>
-                </div>
-            )}
+            <SearchBar
+                value={search}
+                onChange={setSearch}
+                placeholder={t('presets', 'searchMine')}
+                ariaLabel={t('presets', 'searchMineAria')}
+            />
 
             {filtered.length === 0 ? (
-                <p className="presets-presets-empty">No se encontraron presets.</p>
+                <p className="presets-presets-empty">{t('presets', 'empty')}</p>
             ) : (
                 <ul className="presets-presets-grid">
                     {filtered.map((preset) => {
                         const isActive = preset.id === activePresetId;
-                        const optionChips = preset.options.slice(0, 4);
-                        const extraCount = preset.options.length - 4;
-                        const isDefaultPreset = isDefault(preset.id);
+                        const name = displayName(preset);
+                        const actions = isDefault(preset.id)
+                            ? {}
+                            : {
+                                onShare: () => { void handleShare(preset); },
+                                onEdit: () => startEdit(preset, 'local'),
+                                onDelete: () => handleDeleteLocal(preset),
+                            };
+                        const actionCount = countItemActions(actions);
                         return (
                             <li
                                 key={preset.id}
-                                className={`presets-presets-card spinly-panel-card ${isActive ? 'presets-presets-card--active' : ''}${isDefaultPreset ? '' : ' presets-presets-card--own'}`}
+                                className={`presets-presets-card spinly-panel-card${isActive ? ' presets-presets-card--active' : ''}${actionCount ? ` spinly-card--actions-${actionCount}` : ''}`}
                             >
                                 <div className="presets-presets-card-inner">
                                     <div className="presets-presets-card-top">
-                                        <span className="presets-presets-card-badge">{preset.options.length} opciones</span>
+                                        <span className="presets-presets-card-badge">{t('presets', 'optionsCount', { n: preset.options.length })}</span>
                                         <span className="presets-presets-meta">
                                             {[
-                                                `· ${timeAgo(preset.updatedAt)}`,
-                                                ...(preset.tags ?? []).map((t) => `· ${t}`),
+                                                `· ${timeAgo(preset.updatedAt, lang)}`,
+                                                ...(preset.tags ?? []).map((tag) => `· ${tag}`),
                                             ].join(' ')}
                                         </span>
                                     </div>
-                                    {editingId === preset.id ? (
-                                        <input
-                                            ref={editInputRef}
-                                            type="text"
-                                            className="presets-presets-rename-input"
-                                            value={editDraft}
-                                            maxLength={40}
-                                            onChange={(e) => setEditDraft(e.target.value)}
-                                            onBlur={commitRename}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') commitRename();
-                                                if (e.key === 'Escape') cancelRename();
-                                            }}
-                                            aria-label={`Renombrar preset ${preset.name}`}
-                                        />
-                                    ) : (
-                                        <span className="presets-presets-card-name">{preset.name}</span>
-                                    )}
-                                    <div className="presets-presets-chips">
-                                        {optionChips.map((opt) => (
-                                            <span key={opt.id} className="presets-presets-chip">
-                                                {opt.name}
-                                            </span>
-                                        ))}
-                                        {extraCount > 0 && (
-                                            <span className="presets-presets-chip presets-presets-chip--more">+{extraCount} más</span>
-                                        )}
-                                    </div>
+                                    <span className="presets-presets-card-name">{name}</span>
+                                    <OptionChips options={preset.options} />
                                     <div className="presets-presets-card-actions">
                                         {isActive ? (
-                                            <span className="presets-presets-loaded">✓ Cargado actualmente</span>
+                                            <span className="presets-presets-loaded">✓ {t('presets', 'loaded')}</span>
                                         ) : (
                                             <button
                                                 type="button"
-                                                className="presets-presets-load-btn"
+                                                className="presets-presets-load-btn spinly-btn-primary"
                                                 onClick={() => onLoadPreset(preset)}
-                                                aria-label={`Cargar preset ${preset.name}`}
+                                                aria-label={t('presets', 'loadAria', { name })}
                                             >
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
                                                     <polygon points="6 3 20 12 6 21 6 3" />
                                                 </svg>
-                                                Cargar en Ruleta
+                                                {t('presets', 'load')}
                                             </button>
                                         )}
                                     </div>
                                 </div>
-                                {!isDefaultPreset && (
-                                    <div className="presets-presets-active-icons">
-                                        <button
-                                            type="button"
-                                            className="presets-presets-action-icon"
-                                            onClick={() => handleShare(preset)}
-                                            aria-label={`Compartir ${preset.name}`}
-                                            title="Compartir en la comunidad"
-                                            disabled={share.blocked}
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
-                                                <path d="M7 17 17 7" />
-                                                <path d="M8 7h9v9" />
-                                            </svg>
-                                        </button>
-                                        {isActive && (
-                                            <>
-                                                <button
-                                                    type="button"
-                                                    className="presets-presets-action-icon"
-                                                    onClick={() => handleDuplicate(preset)}
-                                                    aria-label={`Duplicar ${preset.name}`}
-                                                    title="Duplicar"
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
-                                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                                                    </svg>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className="presets-presets-action-icon"
-                                                    onClick={() => startRename(preset)}
-                                                    aria-label={`Editar ${preset.name}`}
-                                                    title="Editar"
-                                                >✎</button>
-                                                <button
-                                                    type="button"
-                                                    className="presets-presets-action-icon"
-                                                    onClick={(e) => handleDelete(preset, e)}
-                                                    aria-label={`Borrar ${preset.name}`}
-                                                    title="Borrar"
-                                                >✕</button>
-                                            </>
-                                        )}
-                                    </div>
+                                {actionCount > 0 && (
+                                    <ItemActions
+                                        itemName={name}
+                                        {...actions}
+                                        editing={draft?.target.mode === 'local' && editingId === preset.id}
+                                        busy={cloudOps.blocked}
+                                    />
                                 )}
                             </li>
                         );
                     })}
                 </ul>
             )}
+
+            {/* "+ Nuevo" DESPUÉS de la lista: al pulsarlo, el formulario se despliega justo
+                debajo (acordeón) y el botón se oculta mientras está abierto. */}
+            {showCreateButton && (
+                <div className="spinly-create-row">
+                    <button
+                        type="button"
+                        className="spinly-new-btn spinly-btn-primary"
+                        onClick={startCreate}
+                        aria-label={t('presets', 'newAria')}
+                        aria-expanded={false}
+                        aria-controls={CREATE_PANEL_ID}
+                    >
+                        <PlusIcon /> {t('presets', 'newBtn')}
+                    </button>
+                </div>
+            )}
             </>
             )}
 
             {view === 'community' && (
                 <>
-                    <div className="spinly-toolbar">
-                        <label className="spinly-search">
-                            <SearchIcon />
-                            <input
-                                type="text"
-                                value={communitySearch}
-                                onChange={(e) => setCommunitySearch(e.target.value)}
-                                placeholder="Buscar por nombre o autor..."
-                                aria-label="Buscar presets en la comunidad"
-                            />
-                        </label>
-                    </div>
+                    <SearchBar
+                        value={communitySearch}
+                        onChange={setCommunitySearch}
+                        placeholder={t('common', 'searchCommunity')}
+                        ariaLabel={t('presets', 'searchCommunityAria')}
+                    />
 
                     {loadingCommunity && (
-                        <p className="spinly-status" role="status">Cargando comunidad…</p>
+                        <p className="spinly-status" role="status">{t('common', 'loadingCommunity')}</p>
                     )}
                     {!loadingCommunity && communityError && (
-                        <p className="spinly-status spinly-status--error" role="alert">{communityError}</p>
+                        <p className="spinly-status spinly-status--error" role="alert">{tm(communityError)}</p>
                     )}
                     {!loadingCommunity && !communityError && communityFiltered.length === 0 && (
-                        <p className="presets-presets-empty">No hay presets en la comunidad todavía.</p>
+                        <p className="presets-presets-empty">{t('presets', 'emptyCommunity')}</p>
                     )}
 
                     {!loadingCommunity && !communityError && communityFiltered.length > 0 && (
                         <ul className="presets-presets-grid">
-                            {communityFiltered.map(({ preset, author }) => (
-                                <li
-                                    key={preset.id}
-                                    className="presets-presets-card presets-presets-card--community spinly-panel-card"
-                                >
-                                    <div className="presets-presets-card-inner">
-                                        <div className="presets-presets-card-top">
-                                            <span className="presets-presets-card-badge">
-                                                {preset.options.length} opciones
-                                            </span>
-                                        </div>
-                                        <span className="presets-presets-card-name">{preset.name}</span>
-                                        <div className="presets-presets-chips">
-                                            {preset.options.slice(0, 4).map((opt) => (
-                                                <span key={opt.id} className="presets-presets-chip">{opt.name}</span>
-                                            ))}
-                                            {preset.options.length > 4 && (
-                                                <span className="presets-presets-chip presets-presets-chip--more">
-                                                    +{preset.options.length - 4} más
+                            {communityFiltered.map(({ preset, author, authorId }) => {
+                                // Editar/Borrar en la nube SOLO si eres el autor (RLS lo impone igualmente)
+                                const isMine = Boolean(userId) && authorId === userId;
+                                const actions = isMine
+                                    ? {
+                                        onEdit: () => startEdit(preset, 'cloud'),
+                                        onDelete: () => { void handleDeleteCloud(preset); },
+                                    }
+                                    : {};
+                                const actionCount = countItemActions(actions);
+                                return (
+                                    <li
+                                        key={preset.id}
+                                        className={`presets-presets-card presets-presets-card--community spinly-panel-card${actionCount ? ` spinly-card--actions-${actionCount}` : ''}`}
+                                    >
+                                        <div className="presets-presets-card-inner">
+                                            <div className="presets-presets-card-top">
+                                                <span className="presets-presets-card-badge">
+                                                    {t('presets', 'optionsCount', { n: preset.options.length })}
                                                 </span>
-                                            )}
+                                            </div>
+                                            <span className="presets-presets-card-name">{preset.name}</span>
+                                            <OptionChips options={preset.options} />
+                                            <span className="spinly-author" title={authorName(author)}>
+                                                <Avatar src={author.avatar_url} size="sm" alt={t('common', 'photoOf', { name: authorName(author) })} />
+                                                <span className="spinly-author-name">{authorName(author)}</span>
+                                            </span>
+                                            <div className="presets-presets-card-actions">
+                                                <button
+                                                    type="button"
+                                                    className="spinly-action-btn"
+                                                    onClick={() => handleUseCommunity(preset)}
+                                                    aria-label={t('presets', 'useAria', { name: preset.name })}
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                                                        <polygon points="6 3 20 12 6 21 6 3" />
+                                                    </svg>
+                                                    {t('presets', 'use')}
+                                                </button>
+                                            </div>
                                         </div>
-                                        <span className="spinly-author" title={author.username}>
-                                            <Avatar src={author.avatar_url} size="sm" alt={`Foto de ${author.username}`} />
-                                            <span className="spinly-author-name">{author.username}</span>
-                                        </span>
-                                        <div className="presets-presets-card-actions">
-                                            <button
-                                                type="button"
-                                                className="spinly-action-btn"
-                                                onClick={() => handleUseCommunity(preset)}
-                                                aria-label={`Usar preset ${preset.name}`}
-                                            >
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
-                                                    <polygon points="6 3 20 12 6 21 6 3" />
-                                                </svg>
-                                                Usar
-                                            </button>
-                                        </div>
-                                    </div>
-                                </li>
-                            ))}
+                                        {actionCount > 0 && (
+                                            <ItemActions
+                                                itemName={preset.name}
+                                                {...actions}
+                                                cloud
+                                                editing={draft?.target.mode === 'cloud' && editingId === preset.id}
+                                                busy={cloudOps.blocked}
+                                            />
+                                        )}
+                                    </li>
+                                );
+                            })}
                         </ul>
                     )}
                 </>
             )}
+
+            {/* Formulario ÚNICO (crear / editar local / editar en la nube): acordeón DEBAJO
+                de las tarjetas de la vista donde se abrió. Mismo componente que Themes. */}
+            <CollapsePanel
+                id={CREATE_PANEL_ID}
+                open={formOpen}
+                title={formTitle}
+                onClose={closeForm}
+            >
+                {shownDraft.target.mode !== 'create' && (
+                    <p className="spinly-collapse-hint">{t('presets', 'editHint')}</p>
+                )}
+                <input
+                    type="text"
+                    className="spinly-field-input"
+                    value={shownDraft.name}
+                    onChange={(e) => setDraft((prev) => (prev ? { ...prev, name: e.target.value } : prev))}
+                    onKeyDown={onFieldEnter}
+                    placeholder={t('presets', 'namePh')}
+                    aria-label={t('presets', 'namePh')}
+                    maxLength={40}
+                />
+                <input
+                    type="text"
+                    className="spinly-field-input"
+                    value={shownDraft.tags}
+                    onChange={(e) => setDraft((prev) => (prev ? { ...prev, tags: e.target.value } : prev))}
+                    onKeyDown={onFieldEnter}
+                    placeholder={t('presets', 'tagsPh')}
+                    aria-label={t('presets', 'tagsPh')}
+                    maxLength={80}
+                />
+                <div className="spinly-collapse-actions">
+                    <button
+                        type="button"
+                        className="spinly-action-btn spinly-btn-primary"
+                        onClick={() => { void handleSubmit(); }}
+                        disabled={!canSubmit || (shownDraft.target.mode === 'cloud' && cloudOps.blocked)}
+                    >{submitLabel}</button>
+                    <button
+                        type="button"
+                        className="spinly-action-btn"
+                        onClick={closeForm}
+                    >{t('common', 'cancel')}</button>
+                </div>
+            </CollapsePanel>
         </div>
     );
 }

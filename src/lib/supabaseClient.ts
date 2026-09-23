@@ -2,6 +2,7 @@
 // Sin variables configuradas la app sigue funcionando 100% local (modo offline).
 // El proyecto es Create React App (react-scripts): el prefijo correcto es REACT_APP_.
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { dictMessage, dictMessageWith, type LocalMessage } from './strings';
 
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
 const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
@@ -14,32 +15,36 @@ export const supabase: SupabaseClient | null = isSupabaseConfigured
 
 // Resultado uniforme de todos los servicios: nunca lanzamos excepciones hacia la UI,
 // así un fallo de red/Supabase jamás rompe el modo 100% local.
+// Errores/avisos como LocalMessage (todos los idiomas): la UI los pinta con tm()
+// y se re-traducen al cambiar de idioma aunque ya estén en pantalla.
 export type ServiceResult<T> =
-    | { ok: true; data: T; warning?: string }
-    | { ok: false; error: string };
+    | { ok: true; data: T; warning?: LocalMessage }
+    | { ok: false; error: LocalMessage };
 
-export const SUPABASE_NOT_CONFIGURED_ERROR =
-    'Supabase no está configurado: la app sigue en modo 100% local.';
+export function notConfiguredError(): LocalMessage {
+    return dictMessage('errors', 'notConfigured');
+}
 
 // Traduce errores de Supabase/RED a mensajes claros para el usuario.
-export function supabaseErrorMessage(fallback: string, error: unknown): string {
+export function supabaseErrorMessage(fallback: LocalMessage, error: unknown): LocalMessage {
     const err = error as { code?: string; message?: string } | null;
     const message = err?.message ?? (typeof error === 'string' ? error : '');
     if (err?.code === '23505' || /duplicate key|unique constraint/i.test(message)) {
-        return 'Ese nombre de usuario ya está en uso.';
+        return dictMessage('errors', 'usernameTaken');
     }
     // El trigger handle_new_user inserta en profiles(username unique): si el nombre
     // ya existe, Supabase devuelve este error genérico en vez del 23505.
     if (/database error creating anonymous user/i.test(message)) {
-        return 'No se pudo crear el usuario: ese nombre ya está en uso. Prueba con otro.';
+        return dictMessage('errors', 'usernameTakenCreate');
     }
     if (/anonymous/i.test(message) && /(sign|enable|disabled|not allowed)/i.test(message)) {
-        return 'El acceso anónimo está desactivado: actívalo en Supabase → Authentication → Providers → Anonymous sign-ins.';
+        return dictMessage('errors', 'anonDisabled');
     }
     if (/failed to fetch|networkerror|network request failed|load failed/i.test(message)) {
-        return 'Sin conexión con Supabase. Tu modo local sigue funcionando.';
+        return dictMessage('errors', 'offline');
     }
-    return message || fallback;
+    // Error desconocido: mensaje localizado + el detalle técnico del servidor entre paréntesis
+    return message ? dictMessageWith('errors', 'withDetail', { message: fallback, detail: message }) : fallback;
 }
 
 // Texto limpio para enviar a Supabase: colapsa espacios, recorta y limita longitud.

@@ -37,39 +37,68 @@
     border-radius: var(--spinly-card-radius);
 }
 
-/* ===== Toggle segmentado "Mis X / Comunidad" (Themes y Presets) ===== */
+/* ===== Toggle segmentado "Mis X / Comunidad" (Themes y Presets) =====
+   Componente único (SegmentedToggle.tsx). Mismo lenguaje que .spinly-badge:
+   radio --spinly-badge-radius, tipografía alternativa 0.75rem/600 y mismo alto.
+   El segmento activo es un indicador índigo que se desliza (transform) bajo
+   los botones; --spinly-seg-count / --spinly-seg-index llegan inline. */
 .spinly-segmented {
-    display: inline-flex;
+    --spinly-seg-pad: 3px;
+    position: relative;
+    display: inline-grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
     align-self: flex-start;
-    gap: 0.25rem;
-    padding: 0.25rem;
+    padding: var(--spinly-seg-pad);
     margin: 0 var(--spinly-panel-pad-x);
     background: var(--bg-transparence);
     border: 1px solid var(--color-border);
     border-radius: var(--spinly-badge-radius);
+    isolation: isolate;
+}
+
+.spinly-segmented-indicator {
+    position: absolute;
+    top: var(--spinly-seg-pad);
+    bottom: var(--spinly-seg-pad);
+    left: var(--spinly-seg-pad);
+    width: calc((100% - 2 * var(--spinly-seg-pad)) / var(--spinly-seg-count, 2));
+    transform: translateX(calc(100% * var(--spinly-seg-index, 0)));
+    background: var(--color-focus);
+    border-radius: calc(var(--spinly-badge-radius) - 1px);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+    z-index: -1;
 }
 
 .spinly-segmented-btn {
     border: none;
     background: transparent;
     color: var(--font-color-muted);
-    font: inherit;
-    font-size: 0.8rem;
+    font-family: var(--font-family-alternative);
+    font-size: 0.75rem;
     font-weight: 600;
-    padding: 0.4rem 0.9rem;
-    border-radius: calc(var(--spinly-badge-radius) - 0.1rem);
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+    white-space: nowrap;
+    padding: 0.3rem 0.9rem;
+    border-radius: calc(var(--spinly-badge-radius) - 1px);
     cursor: pointer;
-    transition: background-color 0.15s ease, color 0.15s ease;
+    transition: color 0.18s ease;
 }
 
 .spinly-segmented-btn:hover {
     color: var(--font-color);
 }
 
-.spinly-segmented-btn--active {
-    background: var(--bg-card-color);
-    color: var(--font-color);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+.spinly-segmented-btn--active,
+.spinly-segmented-btn--active:hover {
+    color: #ffffff;
+}
+
+.spinly-segmented-btn:focus-visible {
+    outline: 2px solid var(--color-focus-light);
+    outline-offset: 1px;
 }
 
 /* ===== Fila toolbar + buscador (Themes y Presets) ===== */
@@ -80,9 +109,152 @@
     padding: 0 var(--spinly-panel-pad-x);
 }
 
+/* Fila del botón "+ Nuevo" / "Guardar tema actual": DEBAJO de las tarjetas,
+   justo encima de su acordeón (se oculta mientras el formulario está abierto). */
+.spinly-create-row {
+    padding: 0 var(--spinly-panel-pad-x) var(--spinly-panel-pad-y);
+}
+
+/* Botón que abre el acordeón; aspecto (gradiente, glow, radio) → .spinly-btn-primary */
+.spinly-new-btn {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+    font-size: 0.85rem;
+    padding: 0.6rem 1rem;
+}
+
+.spinly-new-btn svg {
+    display: block;
+    flex-shrink: 0;
+    width: 0.95rem;
+    height: 0.95rem;
+}
+
+/* ===== Acordeón / panel desplegable (CollapsePanel.tsx) =====
+   Siempre DEBAJO de las tarjetas. Altura animada con grid-template-rows 0fr → 1fr. */
+.spinly-collapse {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    /* cerrado no deja hueco: anula el gap del contenedor flex */
+    margin: calc(-1 * var(--spinly-card-gap)) var(--spinly-panel-pad-x) 0;
+    transition: grid-template-rows 0.26s ease, opacity 0.2s ease, margin 0.26s ease;
+}
+
+.spinly-collapse--open {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    margin: 0 var(--spinly-panel-pad-x) var(--spinly-panel-pad-y);
+}
+
+.spinly-collapse-inner {
+    min-height: 0;
+    overflow: hidden;
+}
+
+.spinly-collapse-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.9rem;
+}
+
+.spinly-collapse-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.spinly-collapse-title {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--font-color);
+}
+
+.spinly-collapse-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1.7rem;
+    height: 1.7rem;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-badge-radius);
+    background: transparent;
+    color: var(--font-color-muted);
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.spinly-collapse-close:hover {
+    color: var(--font-color);
+    border-color: var(--color-focus);
+}
+
+.spinly-collapse-close svg {
+    display: block;
+}
+
+.spinly-collapse-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.15rem;
+}
+
+.spinly-collapse-actions .spinly-action-btn {
+    flex: 1;
+    width: auto;
+}
+
+/* Campos de formulario compartidos (acordeón de Presets y Themes) */
+.spinly-field-input {
+    width: 100%;
+    min-width: 0;
+    padding: 0.5rem 0.75rem;
+    font: inherit;
+    font-size: 0.85rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-card-radius);
+    background: var(--bg-input-color);
+    color: var(--font-color);
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.spinly-field-input:focus {
+    border-color: var(--color-focus);
+}
+
+.spinly-field-input--textarea {
+    resize: vertical;
+    min-height: 3.2rem;
+}
+
+.spinly-field-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .spinly-segmented-indicator,
+    .spinly-collapse {
+        transition: none;
+    }
+}
+
+/* Buscador: ocupa TODO el ancho de su fila (Mis presets y Comunidad en ambos paneles) */
 .spinly-search {
     position: relative;
-    flex: 1;
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
     display: flex;
     align-items: center;
 }
@@ -214,18 +386,7 @@
     color: var(--font-color);
 }
 
-/* Variante primaria (acciones de confirmación, p. ej. Entrar/Guardar) */
-.spinly-action-btn--primary {
-    background: var(--color-focus);
-    border-color: var(--color-focus);
-    color: #ffffff;
-}
-
-.spinly-action-btn--primary:hover:not(:disabled) {
-    background: var(--color-focus-light);
-    border-color: var(--color-focus-light);
-    color: #ffffff;
-}
+/* Variante primaria (Entrar/Guardar): se compone con .spinly-btn-primary (final del archivo) */
 
 .spinly-action-btn:disabled {
     opacity: 0.5;
@@ -279,6 +440,111 @@
     white-space: nowrap;
 }
 
+/* Variante apilada (contador de Comunidad): dos líneas alineadas a la derecha,
+   mismo radio/color/tipografía que el badge base, sin comerse el título. */
+/* El reset global de index.css (* { color: var(--font-color) }) pintaba de BLANCO los
+   <span> internos del badge de Comunidad: dentro del badge todo hereda su color. */
+.spinly-badge * {
+    color: inherit;
+}
+
+/* Contador de Comunidad: MISMO badge (fondo, color, radio, tipografía, padding) que
+   el de "Mis temas/presets"; solo cambia que el texto va en dos líneas para no
+   robar ancho al título en el panel de escritorio (320px). */
+.spinly-badge--stack {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0;
+    line-height: 1.25;
+    text-align: right;
+}
+
+/* ===== Acciones de tarjeta unificadas (ItemActions.tsx): Themes y Presets =====
+   Compartir → Editar → Borrar, esquina superior derecha, SIEMPRE visibles. */
+.spinly-card-actions {
+    position: absolute;
+    top: 0.55rem;
+    right: 0.55rem;
+    z-index: 1;
+    display: flex;
+    gap: 0.3rem;
+}
+
+.spinly-card-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.7rem;
+    height: 1.7rem;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-badge-radius);
+    background-color: var(--bg-card-color);
+    color: var(--font-color-muted);
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.spinly-card-action svg {
+    display: block;
+    width: 0.85rem;
+    height: 0.85rem;
+}
+
+.spinly-card-action:hover:not(:disabled),
+.spinly-card-action--active {
+    color: var(--font-color);
+    border-color: var(--color-focus);
+    background-color: var(--bg-transparence);
+}
+
+.spinly-card-action--danger:hover:not(:disabled) {
+    color: var(--color-remove, #f87171);
+    border-color: var(--color-remove, #f87171);
+}
+
+/* Borrar de la nube "armado": el segundo clic confirma (irreversible) */
+.spinly-card-action--armed,
+.spinly-card-action--armed:hover:not(:disabled) {
+    color: #ffffff;
+    border-color: var(--color-remove, #f87171);
+    background-color: var(--color-remove, #f87171);
+}
+
+.spinly-card-action:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.spinly-card-action:focus-visible {
+    outline: 2px solid var(--color-focus-light);
+    outline-offset: 1px;
+}
+
+/* Hueco reservado para N acciones (1.7rem c/u + 0.3rem de gap + margen) */
+.spinly-card--actions-1 .presets-presets-card-top,
+.spinly-card--actions-1 .presets-themes-card-head {
+    padding-right: 2.3rem;
+}
+
+.spinly-card--actions-2 .presets-presets-card-top,
+.spinly-card--actions-2 .presets-themes-card-head {
+    padding-right: 4.3rem;
+}
+
+.spinly-card--actions-3 .presets-presets-card-top,
+.spinly-card--actions-3 .presets-themes-card-head {
+    padding-right: 6.3rem;
+}
+
+/* Nota del formulario en modo edición (de dónde salen colores/opciones) */
+.spinly-collapse-hint {
+    margin: 0;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: var(--font-color-muted);
+}
+
 /* ===== Aviso de cuota de localStorage (fijo: sin desplazar el layout) ===== */
 .spinly-storage-warning {
     position: fixed;
@@ -319,22 +585,163 @@
     color: var(--color-remove, #f87171);
 }
 
-/* ===== Botón primario compartido (estilo "GIRAR RULETA" / "+ Nuevo") =====
+/* ===== Botón primario compartido: ÚNICA clase base de todos los botones índigo =====
+   "SPIN WHEEL", "+ New", "Save current theme", "Load into Wheel", "Save preset/theme",
+   "Join/Save changes". Mismo lenguaje que el botón de girar: gradiente de la paleta
+   (--color-focus-light → --color-focus), brillo interior sutil, glow derivado de
+   --color-focus (color-mix, sin colores nuevos) y respuesta suave en hover/active.
    Selector con elemento para ganar especificidad: shared.css se importa primero
    y sin esto las reglas propias de cada componente lo sobreescribirían. */
+:root {
+    --spinly-primary-gradient: linear-gradient(135deg, var(--color-focus-light), var(--color-focus));
+    --spinly-primary-glow: color-mix(in srgb, var(--color-focus) 55%, transparent);
+    --spinly-primary-glow-soft: color-mix(in srgb, var(--color-focus) 30%, transparent);
+    --spinly-primary-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
 button.spinly-btn-primary {
-    background: var(--color-focus);
-    border-color: var(--color-focus);
+    position: relative;
+    background: var(--spinly-primary-gradient);
+    border: 1px solid transparent;
+    border-radius: var(--spinly-card-radius);
     color: #ffffff;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    box-shadow:
+        0 6px 16px -8px var(--spinly-primary-glow),
+        var(--spinly-primary-highlight);
+    cursor: pointer;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+button.spinly-btn-primary svg,
+button.spinly-btn-primary span {
+    color: inherit;
 }
 
 button.spinly-btn-primary:hover:not(:disabled) {
-    background: var(--color-focus-light);
-    border-color: var(--color-focus-light);
+    background: var(--spinly-primary-gradient);
+    border-color: transparent;
     color: #ffffff;
+    transform: translateY(-1px);
+    filter: brightness(1.08);
+    box-shadow:
+        0 10px 22px -8px var(--spinly-primary-glow),
+        0 0 18px var(--spinly-primary-glow-soft),
+        var(--spinly-primary-highlight);
+}
+
+button.spinly-btn-primary:active:not(:disabled) {
+    transform: translateY(0);
+    filter: brightness(0.96);
+    box-shadow:
+        0 3px 10px -6px var(--spinly-primary-glow),
+        inset 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+button.spinly-btn-primary:focus-visible {
+    outline: 2px solid var(--color-focus-light);
+    outline-offset: 2px;
 }
 
 button.spinly-btn-primary:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+    transform: none;
+    filter: none;
+    box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    button.spinly-btn-primary,
+    button.spinly-btn-primary:hover:not(:disabled) {
+        transition: none;
+        transform: none;
+    }
+}
+
+/* ===== Tooltip ligero (Tooltip.tsx) =====
+   Burbuja absoluta (no desplaza el layout), mismo lenguaje que los menús flotantes:
+   fondo de cabecera, borde y radio de tarjeta, sombra suave. */
+.spinly-tooltip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: var(--spinly-badge-radius);
+    cursor: help;
+    -webkit-touch-callout: none;
+    user-select: none;
+    outline: none;
+}
+
+.spinly-tooltip:focus-visible {
+    outline: 2px solid var(--color-focus-light);
+    outline-offset: 2px;
+}
+
+.spinly-tooltip-bubble {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 0.6rem);
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    width: max-content;
+    max-width: min(16rem, calc(100vw - 2rem));
+    padding: 0.55rem 0.75rem;
+    background-color: var(--bg-header-color);
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-card-radius);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    color: var(--font-color);
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.4;
+    text-align: center;
+    white-space: normal;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: translate(-50%, 4px);
+    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
+}
+
+/* Flecha de la burbuja */
+.spinly-tooltip-bubble::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    width: 0.5rem;
+    height: 0.5rem;
+    background-color: var(--bg-header-color);
+    border-right: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
+    transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.spinly-tooltip--open .spinly-tooltip-bubble,
+.spinly-tooltip:focus-visible .spinly-tooltip-bubble {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, 0);
+}
+
+/* Hover solo con puntero real (en táctil el :hover se "pega" tras un toque) */
+@media (hover: hover) {
+    .spinly-tooltip:hover .spinly-tooltip-bubble {
+        opacity: 1;
+        visibility: visible;
+        transform: translate(-50%, 0);
+    }
+}
+
+.spinly-tooltip-title {
+    font-weight: 700;
+}
+
+.spinly-tooltip-row {
+    color: var(--font-color-light);
 }

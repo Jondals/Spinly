@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import '../css/ColorPicker.css';
+import { useTranslation } from '../lib/i18n';
 
 interface ColorPickerProps {
     color: string;
@@ -66,6 +67,7 @@ export function hsvToRgb({ h, s, v }: Hsv): Rgb {
 }
 
 function ColorPicker({ color, onChange, onClose, anchorEl }: ColorPickerProps) {
+    const { t } = useTranslation();
     // HSV inicial SOLO al montar (el picker se re-monta por key en cada apertura)
     const [hsv, setHsv] = useState<Hsv>(() => rgbToHsv(hexToRgb(color)));
     const dragAreaRef = useRef<'sv' | 'hue' | null>(null);
@@ -207,11 +209,11 @@ function ColorPicker({ color, onChange, onClose, anchorEl }: ColorPickerProps) {
             ref={panelRef}
             style={pos ? { top: pos.top, left: pos.left } : { visibility: 'hidden' }}
             role="dialog"
-            aria-label="Selector de color personalizado"
+            aria-label={t('colorPicker', 'dialog')}
         >
             <div className="cpicker-head">
-                <span className="cpicker-title">Color personalizado</span>
-                <button type="button" className="cpicker-close" onClick={onClose} aria-label="Cerrar selector de color">✕</button>
+                <span className="cpicker-title">{t('colorPicker', 'title')}</span>
+                <button type="button" className="cpicker-close" onClick={onClose} aria-label={t('colorPicker', 'close')}>✕</button>
             </div>
             <div className="cpicker-body">
                 <div
@@ -249,7 +251,7 @@ function ColorPicker({ color, onChange, onClose, anchorEl }: ColorPickerProps) {
                             if (e.key === 'Escape') setHexDraft(null);
                         }}
                         spellCheck={false}
-                        aria-label="Color en hexadecimal"
+                        aria-label={t('colorPicker', 'hex')}
                     />
                 </label>
             </div>
@@ -265,7 +267,7 @@ function ColorPicker({ color, onChange, onClose, anchorEl }: ColorPickerProps) {
                             onChange={(e) => setRgbDrafts((prev) => ({ ...prev, [ch]: e.target.value }))}
                             onBlur={() => commitChannel(ch)}
                             onKeyDown={(e) => { if (e.key === 'Enter') commitChannel(ch); }}
-                            aria-label={`Canal ${ch.toUpperCase()}`}
+                            aria-label={t('colorPicker', 'channel', { ch: ch.toUpperCase() })}
                         />
                     </label>
                 ))}

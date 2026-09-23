@@ -3,11 +3,12 @@
 // desde theme-types.ts: cero tipos duplicados entre lo local y lo de Supabase.
 import {
     supabase,
-    SUPABASE_NOT_CONFIGURED_ERROR,
+    notConfiguredError,
     normalizeText,
     supabaseErrorMessage,
     type ServiceResult,
 } from './supabaseClient';
+import { dictMessage, type LocalMessage } from './strings';
 import {
     sanitizePreset,
     sanitizeTheme,
@@ -16,17 +17,21 @@ import {
 } from '../types/theme-types';
 import { getCurrentUserId } from './profile';
 
+// username '' = autor huérfano (sin fila en profiles): la UI pinta "User"/"Usuario"
+// en el idioma activo + avatar placeholder, nunca un hueco roto.
 export type CommunityAuthor = {
     username: string;
     avatar_url: string | null;
 };
 
-export type CommunityTheme = { theme: WheelTheme; author: CommunityAuthor };
-export type CommunityPreset = { preset: WheelPreset; author: CommunityAuthor };
+// authorId: solo para decidir en la UI si mostrar Editar/Borrar (el autor).
+// La autorización REAL la hace RLS en Supabase (auth.uid() = author_id).
+export type CommunityTheme = { theme: WheelTheme; author: CommunityAuthor; authorId: string };
+export type CommunityPreset = { preset: WheelPreset; author: CommunityAuthor; authorId: string };
 
-const NO_SESSION_ERROR = 'Inicia sesión con tu nombre de usuario (icono de perfil) para compartir.';
-// Autor huérfano (sin fila en profiles): siempre nombre + avatar placeholder, nunca hueco roto.
-const FALLBACK_AUTHOR: CommunityAuthor = { username: 'Usuario', avatar_url: null };
+const noSessionError = () => dictMessage('errors', 'noSession');
+const loadCommunityError = () => dictMessage('errors', 'loadCommunity');
+const fallbackAuthor = (): CommunityAuthor => ({ username: '', avatar_url: null });
 
 // Límites de campos compartidos (cliente; la verdad última sigue siendo RLS + constraints)
 const MAX_SHARED_NAME = 40;
@@ -37,6 +42,7 @@ type ProfileRef = { username: string; avatar_url: string | null } | null;
 
 type SharedThemeRow = {
     id: string;
+    author_id: string;
     name: string;
     description: string | null;
     style_tag: string | null;
@@ -51,6 +57,7 @@ type SharedThemeRow = {
 
 type SharedPresetRow = {
     id: string;
+    author_id: string;
     name: string;
     options: unknown;
     theme: unknown;
@@ -61,7 +68,7 @@ type SharedPresetRow = {
 
 function toAuthor(author: ProfileRef): CommunityAuthor {
     if (!author || typeof author.username !== 'string' || author.username.length === 0) {
-        return FALLBACK_AUTHOR;
+        return fallbackAuthor();
     }
     return { username: author.username, avatar_url: author.avatar_url ?? null };
 }
@@ -79,26 +86,26 @@ function rowToTheme(row: SharedThemeRow): CommunityTheme | null {
         pointerColor: row.pointer_color ?? undefined,
     });
     if (!theme) return null;
-    return { theme, author: toAuthor(row.author) };
+    return { theme, author: toAuthor(row.author), authorId: String(row.author_id ?? '') };
 }
 
 // Join a profiles (nombre + foto del autor) en la misma consulta.
 const AUTHOR_JOIN = 'author:profiles(username, avatar_url)';
 
 export async function fetchCommunityThemes(): Promise<ServiceResult<CommunityTheme[]>> {
-    if (!supabase) return { ok: false, error: SUPABASE_NOT_CONFIGURED_ERROR };
+    if (!supabase) return { ok: false, error: notConfiguredError() };
     try {
         const { data, error } = await supabase
             .from('shared_themes')
             .select(
-                'id, name, description, style_tag, category, segments, border_color, center_color, pointer_color, created_at, ' + AUTHOR_JOIN
+                'id, author_id, name, description, style_tag, category, segments, border_color, center_color, pointer_color, created_at, ' + AUTHOR_JOIN
             )
             .order('created_at', { ascending: false });
-        if (error) return { ok: false, error: supabaseErrorMessage('No se pudo cargar la comunidad.', error) };
+        if (error) return { ok: false, error: supabaseErrorMessage(loadCommunityError(), error) };
         const rows = (data ?? []) as unknown as SharedThemeRow[];
         return { ok: true, data: rows.map(rowToTheme).filter((item): item is CommunityTheme => item !== null) };
     } catch (error) {
-        return { ok: false, error: supabaseErrorMessage('No se pudo cargar la comunidad.', error) };
+        return { ok: false, error: supabaseErrorMessage(loadCommunityError(), error) };
     }
 }
 
@@ -113,37 +120,37 @@ function rowToPreset(row: SharedPresetRow): CommunityPreset | null {
         tags: row.tags ?? [],
     });
     if (!preset) return null;
-    return { preset, author: toAuthor(row.author) };
+    return { preset, author: toAuthor(row.author), authorId: String(row.author_id ?? '') };
 }
 
 export async function fetchCommunityPresets(): Promise<ServiceResult<CommunityPreset[]>> {
-    if (!supabase) return { ok: false, error: SUPABASE_NOT_CONFIGURED_ERROR };
+    if (!supabase) return { ok: false, error: notConfiguredError() };
     try {
         const { data, error } = await supabase
             .from('shared_presets')
-            .select('id, name, options, theme, tags, created_at, ' + AUTHOR_JOIN)
+            .select('id, author_id, name, options, theme, tags, created_at, ' + AUTHOR_JOIN)
             .order('created_at', { ascending: false });
-        if (error) return { ok: false, error: supabaseErrorMessage('No se pudo cargar la comunidad.', error) };
+        if (error) return { ok: false, error: supabaseErrorMessage(loadCommunityError(), error) };
         const rows = (data ?? []) as unknown as SharedPresetRow[];
         return { ok: true, data: rows.map(rowToPreset).filter((item): item is CommunityPreset => item !== null) };
     } catch (error) {
-        return { ok: false, error: supabaseErrorMessage('No se pudo cargar la comunidad.', error) };
+        return { ok: false, error: supabaseErrorMessage(loadCommunityError(), error) };
     }
 }
 
-// Compartir un tema: author_id SIEMPRE asociado a la fila + payload sanitizado.
-export async function shareTheme(theme: WheelTheme): Promise<ServiceResult<true>> {
-    if (!supabase) return { ok: false, error: SUPABASE_NOT_CONFIGURED_ERROR };
-    try {
-        const userId = await getCurrentUserId();
-        if (!userId) return { ok: false, error: NO_SESSION_ERROR };
-        const name = normalizeText(theme.name, MAX_SHARED_NAME);
-        if (!name) return { ok: false, error: 'El tema no tiene nombre.' };
-        // sanitizeTheme valida colores (hex) y texturas (data:image raster) antes de subir
-        const clean = sanitizeTheme({ ...theme, name });
-        if (!clean) return { ok: false, error: 'El tema contiene datos no válidos.' };
-        const { error } = await supabase.from('shared_themes').insert({
-            author_id: userId,
+// —— Payloads saneados: los MISMOS para crear (insert) y editar (update) ——
+// Así una edición nunca puede colar lo que el alta ya bloqueaba.
+type Payload<T> = { ok: true; row: T } | { ok: false; error: LocalMessage };
+
+function themePayload(theme: WheelTheme): Payload<Record<string, unknown>> {
+    const name = normalizeText(theme.name, MAX_SHARED_NAME);
+    if (!name) return { ok: false, error: dictMessage('errors', 'themeNoName') };
+    // sanitizeTheme valida colores (hex) y texturas (data:image raster) antes de subir
+    const clean = sanitizeTheme({ ...theme, name });
+    if (!clean) return { ok: false, error: dictMessage('errors', 'themeInvalid') };
+    return {
+        ok: true,
+        row: {
             name: clean.name,
             description: normalizeText(theme.description ?? '', MAX_SHARED_DESCRIPTION) || null,
             style_tag: normalizeText(theme.styleTag ?? '', MAX_SHARED_NAME) || null,
@@ -152,39 +159,117 @@ export async function shareTheme(theme: WheelTheme): Promise<ServiceResult<true>
             border_color: clean.borderColor ?? null,
             center_color: clean.centerColor ?? null,
             pointer_color: clean.pointerColor ?? null,
-        });
-        if (error) return { ok: false, error: supabaseErrorMessage('No se pudo compartir el tema.', error) };
+        },
+    };
+}
+
+function presetPayload(preset: WheelPreset): Payload<Record<string, unknown>> {
+    const name = normalizeText(preset.name, MAX_SHARED_NAME);
+    if (!name) return { ok: false, error: dictMessage('errors', 'presetNoName') };
+    // sanitizePreset revalida opciones + tema completo (imágenes incluidas)
+    const clean = sanitizePreset({ ...preset, name });
+    if (!clean) return { ok: false, error: dictMessage('errors', 'presetInvalid') };
+    const tags = (clean.tags ?? [])
+        .map((tag) => normalizeText(tag, 24))
+        .filter(Boolean)
+        .slice(0, MAX_SHARED_TAGS);
+    return { ok: true, row: { name: clean.name, options: clean.options, theme: clean.theme, tags } };
+}
+
+// Compartir un tema: author_id SIEMPRE asociado a la fila + payload sanitizado.
+export async function shareTheme(theme: WheelTheme): Promise<ServiceResult<true>> {
+    if (!supabase) return { ok: false, error: notConfiguredError() };
+    const shareError = dictMessage('errors', 'shareTheme');
+    try {
+        const userId = await getCurrentUserId();
+        if (!userId) return { ok: false, error: noSessionError() };
+        const payload = themePayload(theme);
+        if (!payload.ok) return { ok: false, error: payload.error };
+        const { error } = await supabase.from('shared_themes').insert({ ...payload.row, author_id: userId });
+        if (error) return { ok: false, error: supabaseErrorMessage(shareError, error) };
         return { ok: true, data: true };
     } catch (error) {
-        return { ok: false, error: supabaseErrorMessage('No se pudo compartir el tema.', error) };
+        return { ok: false, error: supabaseErrorMessage(shareError, error) };
     }
 }
 
 // Compartir un preset: author_id SIEMPRE asociado a la fila + payload sanitizado.
 export async function sharePreset(preset: WheelPreset): Promise<ServiceResult<true>> {
-    if (!supabase) return { ok: false, error: SUPABASE_NOT_CONFIGURED_ERROR };
+    if (!supabase) return { ok: false, error: notConfiguredError() };
+    const shareError = dictMessage('errors', 'sharePreset');
     try {
         const userId = await getCurrentUserId();
-        if (!userId) return { ok: false, error: NO_SESSION_ERROR };
-        const name = normalizeText(preset.name, MAX_SHARED_NAME);
-        if (!name) return { ok: false, error: 'El preset no tiene nombre.' };
-        // sanitizePreset revalida opciones + tema completo (imágenes incluidas)
-        const clean = sanitizePreset({ ...preset, name });
-        if (!clean) return { ok: false, error: 'El preset contiene datos no válidos.' };
-        const tags = (clean.tags ?? [])
-            .map((tag) => normalizeText(tag, 24))
-            .filter(Boolean)
-            .slice(0, MAX_SHARED_TAGS);
-        const { error } = await supabase.from('shared_presets').insert({
-            author_id: userId,
-            name: clean.name,
-            options: clean.options,
-            theme: clean.theme,
-            tags,
-        });
-        if (error) return { ok: false, error: supabaseErrorMessage('No se pudo compartir el preset.', error) };
+        if (!userId) return { ok: false, error: noSessionError() };
+        const payload = presetPayload(preset);
+        if (!payload.ok) return { ok: false, error: payload.error };
+        const { error } = await supabase.from('shared_presets').insert({ ...payload.row, author_id: userId });
+        if (error) return { ok: false, error: supabaseErrorMessage(shareError, error) };
         return { ok: true, data: true };
     } catch (error) {
-        return { ok: false, error: supabaseErrorMessage('No se pudo compartir el preset.', error) };
+        return { ok: false, error: supabaseErrorMessage(shareError, error) };
     }
+}
+
+type SharedTable = 'shared_themes' | 'shared_presets';
+
+// Editar una fila propia: UPDATE sobre la MISMA fila (mismo id y author_id), nunca un insert.
+// author_id no va en el payload (no se puede reasignar). Filtro id + author_id además de RLS;
+// .select('id') devuelve las filas realmente tocadas: 0 filas = RLS lo bloqueó / no es tuyo.
+async function updateOwnRow(table: SharedTable, id: string, row: Record<string, unknown>, fallback: LocalMessage): Promise<ServiceResult<true>> {
+    if (!supabase) return { ok: false, error: notConfiguredError() };
+    try {
+        const userId = await getCurrentUserId();
+        if (!userId) return { ok: false, error: noSessionError() };
+        const { data, error } = await supabase
+            .from(table)
+            .update(row)
+            .eq('id', id)
+            .eq('author_id', userId)
+            .select('id');
+        if (error) return { ok: false, error: supabaseErrorMessage(fallback, error) };
+        if (!data || data.length === 0) return { ok: false, error: dictMessage('errors', 'cloudUpdateBlocked') };
+        return { ok: true, data: true };
+    } catch (error) {
+        return { ok: false, error: supabaseErrorMessage(fallback, error) };
+    }
+}
+
+// Borrar una fila propia (RLS "solo el autor borra" + filtro author_id en cliente).
+async function deleteOwnRow(table: SharedTable, id: string, fallback: LocalMessage): Promise<ServiceResult<true>> {
+    if (!supabase) return { ok: false, error: notConfiguredError() };
+    try {
+        const userId = await getCurrentUserId();
+        if (!userId) return { ok: false, error: noSessionError() };
+        const { data, error } = await supabase
+            .from(table)
+            .delete()
+            .eq('id', id)
+            .eq('author_id', userId)
+            .select('id');
+        if (error) return { ok: false, error: supabaseErrorMessage(fallback, error) };
+        if (!data || data.length === 0) return { ok: false, error: dictMessage('errors', 'cloudDeleteBlocked') };
+        return { ok: true, data: true };
+    } catch (error) {
+        return { ok: false, error: supabaseErrorMessage(fallback, error) };
+    }
+}
+
+export async function updateSharedTheme(id: string, theme: WheelTheme): Promise<ServiceResult<true>> {
+    const payload = themePayload(theme);
+    if (!payload.ok) return { ok: false, error: payload.error };
+    return updateOwnRow('shared_themes', id, payload.row, dictMessage('errors', 'cloudUpdate'));
+}
+
+export async function updateSharedPreset(id: string, preset: WheelPreset): Promise<ServiceResult<true>> {
+    const payload = presetPayload(preset);
+    if (!payload.ok) return { ok: false, error: payload.error };
+    return updateOwnRow('shared_presets', id, payload.row, dictMessage('errors', 'cloudUpdate'));
+}
+
+export async function deleteSharedTheme(id: string): Promise<ServiceResult<true>> {
+    return deleteOwnRow('shared_themes', id, dictMessage('errors', 'cloudDelete'));
+}
+
+export async function deleteSharedPreset(id: string): Promise<ServiceResult<true>> {
+    return deleteOwnRow('shared_presets', id, dictMessage('errors', 'cloudDelete'));
 }

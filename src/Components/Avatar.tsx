@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from '../lib/i18n';
 
 interface AvatarProps {
     src?: string | null;
@@ -10,6 +11,7 @@ interface AvatarProps {
 // Avatar reutilizable (Header + galerías): foto si existe, si no —o si la URL falla—
 // placeholder neutro. Nunca inventa fotos ni muestra imágenes rotas.
 function Avatar({ src, alt = '', size = 'md', className = '' }: AvatarProps) {
+    const { t } = useTranslation();
     const [failed, setFailed] = useState(false);
 
     // Una URL nueva (p. ej. foto recién subida) vuelve a intentar cargar la imagen.
@@ -27,7 +29,7 @@ function Avatar({ src, alt = '', size = 'md', className = '' }: AvatarProps) {
         <span
             className={`${classes} spinly-avatar--placeholder`}
             role="img"
-            aria-label={alt || 'Sin foto de perfil'}
+            aria-label={alt || t('common', 'noPhoto')}
         >
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0 1.8c-3.6 0-7.2 1.8-7.2 4.2v1.5h14.4v-1.5c0-2.4-3.6-4.2-7.2-4.2Z" />

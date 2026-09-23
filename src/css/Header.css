@@ -90,6 +90,39 @@
         }
     }
 
+    /* Selector de idioma EN/ES: mismo alto y hover que el botón de tema */
+    .spinly-lang {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.3rem;
+        flex-shrink: 0;
+        height: 2.5rem;
+        padding: 0 0.55rem;
+        background: transparent;
+        border: none;
+        border-radius: 0.5rem;
+        color: var(--font-color);
+        cursor: pointer;
+
+        svg {
+            width: 1.15rem;
+            height: 1.15rem;
+            display: block;
+        }
+
+        .spinly-lang-code {
+            font-family: var(--font-family-alternative);
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+        }
+
+        &:hover {
+            background-color: var(--color-hover);
+        }
+    }
+
     .spinly-profile-picture {
         background: transparent;
         border: none;
@@ -268,6 +301,17 @@
         .spinly-menu-button {
             display: flex;
         }
+
+        .spinly-lang {
+            padding: 0 0.4rem;
+        }
+    }
+}
+
+/* Móviles muy estrechos: el selector de idioma queda solo con el código EN/ES */
+@media (max-width: 380px) {
+    .Header .spinly-lang svg {
+        display: none;
     }
 }
 

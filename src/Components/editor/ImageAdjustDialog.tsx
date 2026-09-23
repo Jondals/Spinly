@@ -29,7 +29,6 @@ const WHEEL_ZOOM_SENSITIVITY = 0.0015;
 const LABEL_Y = SIZE * 0.14 + 18;
 // Proporción del centro real de la ruleta (2.25rem sobre 26rem de diámetro).
 const HUB_RADIUS = 21;
-const IMAGE_SHADE = 'rgba(0,0,0,0.28)';
 
 const clampFit = (fit: ImageFit): ImageFit => sanitizeImageFit(fit) ?? DEFAULT_IMAGE_FIT;
 
@@ -185,7 +184,6 @@ function ImageAdjustDialog({ image, initialFit, index, segments, labels, onApply
                         <g clipPath={`url(#${uid}-sector)`}>
                             <path d={sectorPath} fill={color} />
                             <image href={image} preserveAspectRatio="xMidYMid slice" {...getImageBox(fit)} />
-                            <path d={sectorPath} fill={IMAGE_SHADE} />
                         </g>
                         <path className="spinly-imgadj-outline" d={sectorPath} />
                     </g>

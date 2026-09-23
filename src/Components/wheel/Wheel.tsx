@@ -228,7 +228,6 @@ function Wheel({ options, activeTheme, onColorChange }: WheelProps) {
                                     <g key={`img-${option.id}`} clipPath={`url(#wheel-clip-${index})`}>
                                         <path d={describeSector(radius, radius, radius, start, end)} fill={typeof fill === 'string' && fill.startsWith('#') ? fill : '#6366f1'} />
                                         {img && <image href={img} preserveAspectRatio="xMidYMid slice" {...getImageBox(activeTheme?.segments[index]?.imageFit, size)} />}
-                                        <path d={describeSector(radius, radius, radius, start, end)} fill="rgba(0,0,0,0.28)" />
                                     </g>
                                 );
                             })}

@@ -66,12 +66,15 @@ The app opens at `http://localhost:3000` and runs fully offline on `localStorage
    REACT_APP_SUPABASE_ANON_KEY=<anon key>
    ```
 
+<<<<<<< HEAD
 3. In the Supabase SQL editor, run the SQL from [SUPABASE_SETUP.md](SUPABASE_SETUP.md). It creates the tables, the row level security policies and the avatar bucket.
 4. Then run [supabase-update-policies.sql](supabase-update-policies.sql). It enables editing shared items and adds the `light_color` column. It is idempotent, so run it again whenever it changes.
 5. Enable **anonymous sign-ins** under Authentication, then restart `pnpm start`.
 
 `pnpm test:supabase` checks the whole setup against your real project: the sharing flow, and that row level security blocks what it should. It creates an anonymous test user that can only be removed from the dashboard.
 
+=======
+>>>>>>> 8cdd39285ba8f7de80a2c610d646d86f32d57f21
 ## Scripts
 
 | Command | Description |

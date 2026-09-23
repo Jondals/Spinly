@@ -65,7 +65,7 @@ export const STRINGS = {
         toSpin: { en: 'to spin', es: 'para girar' },
         certified: { en: 'Certified randomness', es: 'Aleatoriedad certificada' },
         empty: { en: 'Add options to spin', es: 'Añade opciones para girar' },
-        winnerBadge: { en: 'WINNER SELECTED', es: 'GANADOR SELECCIONADO' },
+        winnerBadge: { en: 'WINNER', es: 'GANADOR' },
         spinAgain: { en: 'Spin Again', es: 'Girar de nuevo' },
         closeResult: { en: 'Close result', es: 'Cerrar resultado' },
         oddsEqual: { en: 'Each option has a {pct}% chance ({n} options).', es: 'Cada opción tiene un {pct}% de probabilidad ({n} opciones).' },

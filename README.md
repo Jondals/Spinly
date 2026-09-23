@@ -45,8 +45,6 @@ REACT_APP_SUPABASE_URL=https://<your-project>.supabase.co
 REACT_APP_SUPABASE_ANON_KEY=<anon key>
 ```
 
-Then run the SQL in [SUPABASE_SETUP.md](SUPABASE_SETUP.md) (tables, RLS policies and the avatar bucket) and [supabase-update-policies.sql](supabase-update-policies.sql), which enables editing shared items.
-
 ## Scripts
 
 | Command | Description |

@@ -5,6 +5,8 @@ import Icon from '../common/Icon';
 import DotField from './DotField';
 import AudioControls from '../music/AudioControls';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { useMusicPulse } from '../../hooks/useMusicPulse';
+import { useMusic } from '../music/MusicProvider';
 import { MOBILE_QUERY } from '../../scripts/layout';
 import Tooltip from '../common/Tooltip';
 import type { WheelTheme } from '../../types/theme-types';
@@ -64,6 +66,13 @@ function Wheel({ options, activeTheme, onColorChange }: WheelProps) {
     const [picker, setPicker] = useState<{ field: WheelColorField; anchor: HTMLElement; color: string } | null>(null);
     const sound = useSoundPreference();
     const isMobile = useMediaQuery(MOBILE_QUERY);
+    // Con música sonando, las luces siguen su ritmo y su patrón, también mientras gira; sin música, al
+    // girar hacen su persecución rápida de siempre.
+    const music = useMusic();
+    const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
+    const containerRef = useRef<HTMLDivElement>(null);
+    const lightsFollowMusic = music.playing && !reducedMotion;
+    useMusicPulse(containerRef, lightsFollowMusic);
 
     useWheelColors(activeTheme);
     useSpinTicks(discRef, spinning, options.length, sound.enabled);
@@ -174,7 +183,7 @@ function Wheel({ options, activeTheme, onColorChange }: WheelProps) {
                     <WinnerOverlay winner={winner} onClose={closeResult} onSpinAgain={handleSpinAgain} />
                 </Suspense>
             )}
-            <div className={`wheel-container${spinning ? ' wheel-container--spinning' : ''}`}>
+            <div ref={containerRef} className={`wheel-container${spinning ? ' wheel-container--spinning' : ''}${lightsFollowMusic ? ' wheel-container--music' : ''}`}>
                 <button
                     ref={pointerRef}
                     type="button"
@@ -206,11 +215,11 @@ function Wheel({ options, activeTheme, onColorChange }: WheelProps) {
                     <circle className="wheel-rim-ring" cx="50" cy="50" r="48.6" />
                     <circle className="wheel-rim-inner" cx="50" cy="50" r="47.1" />
                     {RIM_LIGHTS.map((light, i) => (
-                        <circle key={i} className="wheel-light" cx={light.x} cy={light.y} r="0.75" style={{ animationDelay: light.delay }} />
+                        <circle key={i} className="wheel-light wheel-light--rim" cx={light.x} cy={light.y} r="0.75" style={{ animationDelay: light.delay }} />
                     ))}
                     <circle className="wheel-hub" cx="50" cy="50" r="5" />
                     {HUB_LIGHTS.map((light, i) => (
-                        <circle key={i} className="wheel-light" cx={light.x} cy={light.y} r="0.6" style={{ animationDelay: light.delay }} />
+                        <circle key={i} className="wheel-light wheel-light--hub" cx={light.x} cy={light.y} r="0.6" style={{ animationDelay: light.delay }} />
                     ))}
                 </svg>
                 <div ref={discRef} className={`wheel-disc ${!hasOptions ? 'wheel-disc--empty' : ''}${hasAnyImage ? ' wheel-disc--with-img' : ''}`} style={wheelStyle}>

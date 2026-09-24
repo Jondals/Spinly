@@ -1,4 +1,7 @@
 import { useEffect, useRef } from 'react';
+import { isPulseActive, readMusic } from '../../scripts/music-pulse';
+
+type MusicVisuals = typeof import('../../scripts/music-visuals');
 
 // Trama: separación y radio base en px CSS.
 const SPACING = 28;
@@ -62,18 +65,24 @@ function DotField() {
         let height = 0;
         let base: Rgb = [38, 40, 56];
         let glow: Rgb = [139, 144, 184];
+        let melodyTint: Rgb = [244, 114, 182];
         let baseFill = `rgb(${base.join(', ')})`;
         let frame = 0;
         let lastTime = 0;
         let lastDraw = 0;
         let onScreen = true;
         let colorsRead = false;
+        let center = { x: 0, y: 0 };
+        // Capas de la música: se descargan la primera vez que suena una canción.
+        let visuals: MusicVisuals | null = null;
+        let visualsRequested = false;
         const pointer = { x: 0, y: 0, targetX: 0, targetY: 0, level: 0, inside: false };
 
         const readColors = () => {
             const style = getComputedStyle(canvas);
             base = toRgb(ctx, style.getPropertyValue('--wheel-dots').trim(), base);
             glow = toRgb(ctx, style.getPropertyValue('--wheel-dots-glow').trim(), glow);
+            melodyTint = toRgb(ctx, style.getPropertyValue('--wheel-dots-melody').trim(), melodyTint);
             baseFill = `rgb(${base.join(', ')})`;
         };
 
@@ -85,16 +94,38 @@ function DotField() {
             const offsetY = (seconds * DRIFT_Y) % SPACING;
             const reach2 = REACH * REACH;
             const level = still ? 0 : pointer.level;
+            // Con música, cada golpe enciende y agranda puntos según el patrón de la canción.
+            const music = still ? null : readMusic(time);
+            if (isPulseActive() && !visualsRequested) {
+                visualsRequested = true;
+                void import('../../scripts/music-visuals').then((loaded) => { visuals = loaded; }).catch(() => { visualsRequested = false; });
+            }
+            const layers = visuals;
+            const musicOn = music !== null && layers !== null && (isPulseActive() || music.pulse > 0.01);
             const buckets = Array.from({ length: ALPHA_STEPS }, () => new Path2D());
-            const lit: Array<{ x: number; y: number; radius: number; alpha: number; amount: number }> = [];
+            // tint: 0 color de acento (golpes y cursor), 1 color de la melodía.
+            const lit: Array<{ x: number; y: number; radius: number; alpha: number; amount: number; tint: number }> = [];
 
             for (let y = offsetY - SPACING; y < height + SPACING; y += SPACING) {
                 for (let x = offsetX - SPACING; x < width + SPACING; x += SPACING) {
                     const wave = still ? 0.5 : 0.5 + 0.5 * Math.sin((x + y * 0.6) / WAVE_LENGTH - seconds * WAVE_SPEED);
                     let px = x;
                     let py = y;
-                    let radius = BASE_RADIUS + wave * 0.35;
+                    let beatLift = 0;
+                    if (musicOn && layers) {
+                        const ix = Math.round((x - offsetX) / SPACING);
+                        const iy = Math.round((y - offsetY) / SPACING);
+                        const from = layers.patternLift(music.previousPattern, music, x, y, ix, iy, wave, center, width, height);
+                        const to = layers.patternLift(music.pattern, music, x, y, ix, iy, wave, center, width, height);
+                        beatLift = from + (to - from) * music.patternBlend;
+                    }
+                    const lift = Math.min(1, beatLift);
+                    // El efecto de la melodía pinta en su color; los demás, en el de acento.
+                    const tint = musicOn && (music.patternBlend > 0.5 ? music.pattern : music.previousPattern) === 'melody' ? 1 : 0;
+                    let radius = BASE_RADIUS + wave * 0.35 + lift * 1.8;
                     let alpha = 0.6 + wave * 0.4;
+                    alpha += (1 - alpha) * lift;
+                    const beatGlow = lift * 0.9;
                     if (level > 0.001) {
                         const dx = x - pointer.x;
                         const dy = y - pointer.y;
@@ -107,11 +138,15 @@ function DotField() {
                             py += (dy / d) * amount * PUSH;
                             radius += amount * GROW;
                             alpha += (1 - alpha) * amount;
-                            if (amount > 0.02) {
-                                lit.push({ x: px, y: py, radius, alpha, amount });
+                            if (amount > 0.02 || beatGlow > 0.05) {
+                                lit.push({ x: px, y: py, radius, alpha, amount: Math.max(amount, beatGlow), tint: amount > beatGlow ? 0 : tint });
                                 continue;
                             }
                         }
+                    }
+                    if (beatGlow > 0.05) {
+                        lit.push({ x: px, y: py, radius, alpha, amount: beatGlow, tint });
+                        continue;
                     }
                     const bucket = buckets[Math.min(ALPHA_STEPS - 1, Math.round(((alpha - 0.6) / 0.4) * (ALPHA_STEPS - 1)))];
                     bucket.moveTo(px + radius, py);
@@ -126,7 +161,7 @@ function DotField() {
             });
             for (const dot of lit) {
                 ctx.globalAlpha = dot.alpha;
-                ctx.fillStyle = mixRgb(base, glow, dot.amount);
+                ctx.fillStyle = mixRgb(base, dot.tint ? melodyTint : glow, dot.amount);
                 ctx.beginPath();
                 ctx.arc(dot.x, dot.y, dot.radius, 0, Math.PI * 2);
                 ctx.fill();
@@ -142,7 +177,8 @@ function DotField() {
             pointer.x += (pointer.targetX - pointer.x) * follow;
             pointer.y += (pointer.targetY - pointer.y) * follow;
             pointer.level += ((pointer.inside ? 1 : 0) - pointer.level) * (1 - Math.exp(-dt / FADE_MS));
-            if (pointer.level > 0.002 || time - lastDraw >= IDLE_FRAME_MS) {
+            // Con el cursor encima o con música, a la tasa completa: si no, el latido llegaría a saltos.
+            if (pointer.level > 0.002 || isPulseActive() || time - lastDraw >= IDLE_FRAME_MS) {
                 draw(time);
                 lastDraw = time;
             }
@@ -174,6 +210,10 @@ function DotField() {
             canvas.style.width = `${width}px`;
             canvas.style.height = `${height}px`;
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            // Centro de la ruleta en el lienzo: de ahí salen las ondas con música.
+            const wheel = host.querySelector('.wheel-container')?.getBoundingClientRect();
+            const box = host.getBoundingClientRect();
+            center = wheel ? { x: wheel.left + wheel.width / 2 - box.left, y: wheel.top + wheel.height / 2 - box.top } : { x: width / 2, y: height / 2 };
             draw(performance.now());
         };
 

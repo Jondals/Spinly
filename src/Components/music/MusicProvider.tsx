@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { Notice } from '../common/StatusMessage';
 import type { AccountSession } from '../../scripts/profile';
 import type { MusicEngine } from '../../scripts/music-engine';
+import { setPulseSource } from '../../scripts/music-pulse';
 import { dictMessage, type LocalMessage } from '../../scripts/strings';
 import { isSwitchingAccount } from '../../scripts/account-data';
 import {
@@ -201,6 +202,20 @@ function MusicProvider({ library, onLibraryChange, session, children }: MusicPro
         if (!playing) return;
         void getEngine().then((engine) => engine?.onEnded(() => nextRef.current()));
     }, [playing, getEngine]);
+
+    // Mientras suena, las luces de la ruleta y el fondo laten con la canción (music-pulse.ts). Cada
+    // canción empieza su análisis de cero: su tempo y su patrón son suyos.
+    useEffect(() => {
+        if (!playing) return undefined;
+        let alive = true;
+        void getEngine().then((engine) => {
+            if (alive && engine) setPulseSource(() => engine.bands());
+        });
+        return () => {
+            alive = false;
+            setPulseSource(null);
+        };
+    }, [playing, currentId, getEngine]);
 
     const toggle = useCallback(() => {
         if (playing) {

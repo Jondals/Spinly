@@ -1,6 +1,7 @@
 // Motor de música con Web Audio. Cada canción suena en un <audio> enganchado a un grafo propio:
 // una ganancia por canción para los fundidos (entrar, salir y encadenar pistas sin cortes) y un
 // volumen general con limitador. Se carga bajo demanda: solo cuando el usuario enciende la música.
+import type { MusicBands } from './music-pulse';
 
 export interface MusicEngine {
     /** Empieza una canción (URL blob:), con fundido desde lo que sonara. false si no se puede reproducir. */
@@ -8,6 +9,8 @@ export interface MusicEngine {
     pause(): void;
     resume(): Promise<boolean>;
     setVolume(volume: number): void;
+    /** Energía por bandas de lo que suena ahora (0-1), sin contar el volumen: para las luces y el fondo. */
+    bands(): MusicBands;
     /** Se llama cuando la canción actual termina sola (no al pausar ni al cambiar). */
     onEnded(listener: () => void): void;
     dispose(): void;
@@ -33,6 +36,28 @@ export function createMusicEngine(): MusicEngine | null {
     limiter.attack.value = 0.003;
     limiter.release.value = 0.25;
     master.connect(limiter).connect(ctx.destination);
+    // Las canciones pasan por un bus común antes del volumen: el analizador mide la música tal cual,
+    // así las luces laten igual con el volumen bajo.
+    const bus = ctx.createGain();
+    bus.connect(master);
+    const analyser = ctx.createAnalyser();
+    // 2048: casillas de ~23 Hz, finas para seguir la altura de la melodía y no solo los golpes.
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.55;
+    bus.connect(analyser);
+    const spectrum = new Uint8Array(analyser.frequencyBinCount);
+    // Bandas del espectro: graves hasta ~180 Hz (bombo y bajo), medios hasta ~2 kHz (voces,
+    // acordes, melodía) y agudos hasta ~11 kHz (platos, brillo).
+    const binHz = ctx.sampleRate / analyser.fftSize;
+    const bassEnd = Math.max(2, Math.round(180 / binHz));
+    const midEnd = Math.round(2000 / binHz);
+    const highEnd = Math.min(analyser.frequencyBinCount - 1, Math.round(11000 / binHz));
+    // Altura de la melodía: centro de masas del espectro entre 200 Hz y 4 kHz en escala logarítmica
+    // (como un teclado), sin el ruido de fondo. 0 = grave, 1 = agudo.
+    const pitchFrom = Math.round(200 / binHz);
+    const pitchTo = Math.round(4000 / binHz);
+    const pitchOctaves = Math.log2(4000 / 200);
+    const NOISE_FLOOR = 90;
 
     let current: Session | null = null;
     let endedListener: (() => void) | null = null;
@@ -77,7 +102,7 @@ export function createMusicEngine(): MusicEngine | null {
             element.src = url;
             const gain = ctx.createGain();
             gain.gain.value = 0.0001;
-            gain.connect(master);
+            gain.connect(bus);
             ctx.createMediaElementSource(element).connect(gain);
             const session: Session = { element, gain, pauseTimer: 0 };
             element.addEventListener('ended', () => {
@@ -120,6 +145,27 @@ export function createMusicEngine(): MusicEngine | null {
             // Curva cuadrática: el deslizador se percibe lineal.
             const level = Math.min(Math.max(volume, 0), 1) ** 2;
             master.gain.setTargetAtTime(level, ctx.currentTime, 0.05);
+        },
+        bands() {
+            analyser.getByteFrequencyData(spectrum);
+            const average = (from: number, to: number) => {
+                let sum = 0;
+                for (let k = from; k <= to; k++) sum += spectrum[k];
+                return sum / ((to - from + 1) * 255);
+            };
+            let weight = 0;
+            let weighted = 0;
+            for (let k = pitchFrom; k <= pitchTo; k++) {
+                const w = Math.max(0, spectrum[k] - NOISE_FLOOR) ** 2;
+                weight += w;
+                weighted += w * (Math.log2((k * binHz) / 200) / pitchOctaves);
+            }
+            return {
+                bass: average(1, bassEnd),
+                mid: average(bassEnd + 1, midEnd),
+                high: average(midEnd + 1, highEnd),
+                pitch: weight > 0 ? Math.min(1, Math.max(0, weighted / weight)) : 0.5,
+            };
         },
         onEnded(listener) {
             endedListener = listener;

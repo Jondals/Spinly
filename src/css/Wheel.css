@@ -173,6 +173,17 @@
     animation-duration: 0.6s;
 }
 
+/* Con música: useMusicPulse da a cada luz su brillo en cada frame según el patrón de la canción
+   (persecución a compás, bombillas alternas o destellos) y --pulse (0-1) hace brillar el aro. */
+.wheel-container--music .wheel-light {
+    animation: none;
+}
+
+.wheel-container--music .wheel-rim {
+    filter: drop-shadow(0 0 calc(var(--pulse, 0) * 3.5px) color-mix(in srgb, var(--wheel-light-color) 70%, transparent));
+    transition: none;
+}
+
 @keyframes wheel-light {
     0%, 100% { opacity: 0.3; }
     50% { opacity: 1; }

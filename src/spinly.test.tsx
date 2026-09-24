@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import App from './App';
 import { LanguageProvider } from './Components/i18n/LanguageProvider';
 import { mergeMusicLibraries, sanitizeMusicLibrary } from './scripts/music-library';
+import { readMusic, readPulse, setPulseSource } from './scripts/music-pulse';
 import { fitImageToSector, getImageBox, getSectorAngles, normalizeDegrees, randomSegmentColor, SPIN_DURATION, WHEEL_VIEWBOX } from './scripts/wheel';
 import {
     ACTIVE_THEME_STORAGE_KEY,
@@ -131,6 +132,7 @@ jest.mock('./scripts/music-engine', () => ({
             return true;
         },
         setVolume: () => undefined,
+        bands: () => ({ bass: 0, mid: 0, high: 0, pitch: 0.5 }),
         onEnded: () => undefined,
         dispose: () => undefined,
     }),
@@ -998,6 +1000,83 @@ describe('música', () => {
         renderApp();
         await waitFor(() => expect(mockMusic.uploads).toHaveLength(1));
         expect(localStorage.getItem('spinly-music-pending')).toBeNull();
+    });
+
+    test('el pulso sube en cada golpe de graves y cae entre golpes; sin música se apaga', () => {
+        let energy = 0.2;
+        setPulseSource(() => ({ bass: energy, mid: 0.1, high: 0.05, pitch: 0.5 }));
+        // Reloj propio por delante del real: otros tests ya leyeron el pulso con performance.now().
+        let time = performance.now() + 1e6;
+        const frame = () => {
+            time += 16;
+            return readPulse(time);
+        };
+        // Un segundo de base constante: el latido se asienta.
+        for (let i = 0; i < 60; i++) frame();
+        const calm = frame();
+        energy = 0.8;
+        const hit = frame();
+        energy = 0.2;
+        for (let i = 0; i < 20; i++) frame();
+        const after = frame();
+        expect(hit).toBeGreaterThan(calm + 0.4);
+        expect(after).toBeLessThan(hit / 2);
+        setPulseSource(null);
+        for (let i = 0; i < 60; i++) frame();
+        expect(frame()).toBeLessThan(0.01);
+    });
+
+    test('la música marca los golpes, el tempo y un patrón según cómo suena', () => {
+        let time = performance.now() + 2e6;
+        // Canción sintética a 120 BPM (un golpe cada 500 ms) durante 6 s, con el reparto de bandas dado.
+        const play = (mid: number, high: number) => {
+            let clock = 0;
+            setPulseSource(() => ({ bass: clock % 500 < 60 ? 0.8 : 0.15, mid, high, pitch: 0.5 }));
+            for (let i = 0; i < 375; i++) {
+                clock += 16;
+                time += 16;
+                readMusic(time);
+            }
+            return readMusic(time);
+        };
+        const bassy = play(0.06, 0.02);
+        expect(bassy.beats).toBeGreaterThanOrEqual(10);
+        expect(bassy.beatMs).toBeGreaterThan(450);
+        expect(bassy.beatMs).toBeLessThan(550);
+        expect(bassy.pattern).toBe('rings');
+        expect(play(0.7, 0.67).pattern).toBe('sparkle');
+        expect(play(0.52, 0.04).pattern).toBe('spin');
+        setPulseSource(null);
+    });
+
+    test('el patrón rota cada cuatro compases con fundido y la melodía marca sus notas y su altura', () => {
+        let time = performance.now() + 3e6;
+        let clock = 0;
+        // 120 BPM con una melodía que entra en cada corchea (250 ms) y sube de grave a agudo en 6 s.
+        setPulseSource(() => ({
+            bass: clock % 500 < 60 ? 0.8 : 0.15,
+            mid: clock % 250 < 90 ? 0.75 : 0.3,
+            high: 0.1,
+            pitch: Math.min(1, clock / 6000),
+        }));
+        const run = (ms: number) => {
+            for (let t = 0; t < ms; t += 16) {
+                clock += 16;
+                time += 16;
+                readMusic(time);
+            }
+            return readMusic(time);
+        };
+        const start = run(2000);
+        const firstPattern = start.pattern;
+        expect(start.notes).toBeGreaterThanOrEqual(5);
+        const later = run(8600);
+        // Tras 16 golpes (y al menos 7 s) cambia a otro efecto, y el cambio empieza fundido.
+        expect(later.pattern).not.toBe(firstPattern);
+        expect(later.previousPattern).toBe(firstPattern);
+        expect(later.pitch).toBeGreaterThan(0.8);
+        expect(later.notes).toBeGreaterThan(start.notes + 20);
+        setPulseSource(null);
     });
 
     test('la playlist que llega de la cuenta o del storage se sanea y al entrar se suman las del invitado', () => {

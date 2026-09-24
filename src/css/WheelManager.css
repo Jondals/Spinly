@@ -210,15 +210,17 @@
 }
 
 /* Aparece al pasar por la tarjeta; en táctil siempre visible */
+/* 24 px y justo encima de la tarjeta, sin pisar el enlace: objetivo táctil con tamaño y separación
+   suficientes (auditoría de accesibilidad) para no pulsar uno queriendo el otro. */
 .wheelmanager-credit-close {
     position: absolute;
-    top: -0.5rem;
-    right: -0.5rem;
+    top: -28px;
+    right: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1.35rem;
-    height: 1.35rem;
+    width: 24px;
+    height: 24px;
     padding: 0;
     border: 1px solid var(--color-border-light);
     border-radius: 50%;

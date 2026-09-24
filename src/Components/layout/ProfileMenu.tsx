@@ -25,6 +25,7 @@ import {
 } from '../../scripts/profile';
 import { adoptAccountData, beginAccountSwitch, clearLocalData, endAccountSwitch, reloadApp } from '../../scripts/account-data';
 import { clearTrackFiles } from '../../scripts/music-files';
+import { replaySplashOnNextLoad } from '../../scripts/splash';
 import { isAllowedImageMime, isSupabaseConfigured, MAX_UPLOAD_BYTES, notConfiguredError } from '../../scripts/supabaseClient';
 
 /** view: perfil abierto. create / login: sin sesión. edit: nombre, foto y contraseña. protect: poner contraseña a un perfil antiguo. */
@@ -267,6 +268,7 @@ function ProfileMenu() {
             endAccountSwitch();
             return setFormError(adopted.error);
         }
+        replaySplashOnNextLoad();
         reloadApp();
     });
 
@@ -316,6 +318,7 @@ function ProfileMenu() {
         clearLocalData();
         // Las canciones de este navegador también: se espera al borrado antes de recargar.
         await clearTrackFiles();
+        replaySplashOnNextLoad();
         reloadApp();
     });
 

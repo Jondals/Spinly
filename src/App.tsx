@@ -396,6 +396,17 @@ function App() {
     useEffect(prefetchPanels, []);
     // La app ya está pintada: la pantalla de carga puede irse.
     useEffect(hideSplash, []);
+
+    // Sin el menú del clic derecho (ni el de la pulsación larga en táctil): la app no tiene nada que
+    // ofrecer ahí y rompe la sensación de app. En los campos de texto se mantiene para poder pegar.
+    useEffect(() => {
+        const onContextMenu = (event: MouseEvent) => {
+            if (event.target instanceof Element && event.target.closest('input, textarea, [contenteditable="true"]')) return;
+            event.preventDefault();
+        };
+        document.addEventListener('contextmenu', onContextMenu);
+        return () => document.removeEventListener('contextmenu', onContextMenu);
+    }, []);
     useButtonSounds();
 
     // Playlist de música: viaja con la cuenta; la reproducción la lleva MusicProvider.

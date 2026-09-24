@@ -46,6 +46,8 @@ const mockAccount = {
     calls: [] as string[],
     signInResult: null as unknown,
     reloads: 0,
+    // Lo que devuelve la nube al arrancar con sesión (null: la cuenta aún no tiene datos).
+    remote: null as unknown,
 };
 jest.mock('./scripts/profile', () => ({
     ...jest.requireActual('./scripts/profile'),
@@ -67,7 +69,7 @@ jest.mock('./scripts/profile', () => ({
 }));
 jest.mock('./scripts/account-data', () => ({
     ...jest.requireActual('./scripts/account-data'),
-    fetchAccountData: async () => ({ ok: true, data: null }),
+    fetchAccountData: async () => ({ ok: true, data: mockAccount.remote }),
     saveAccountData: async () => ({ ok: true, data: 1 }),
     adoptAccountData: async () => ({ ok: true, data: true }),
     reloadApp: () => { mockAccount.reloads += 1; },
@@ -174,6 +176,7 @@ beforeEach(() => {
     mockAccount.calls = [];
     mockAccount.signInResult = null;
     mockAccount.reloads = 0;
+    mockAccount.remote = null;
     mockServer.themes = [{ id: 't1', authorId: 'me' }, { id: 't2', authorId: 'other' }, { id: 't3', authorId: 'other' }];
     mockServer.presets = [{ id: 'p1', authorId: 'other' }, { id: 'p2', authorId: 'me' }];
     mockServer.updates = [];
@@ -585,6 +588,14 @@ describe('ruleta y editor', () => {
         expect(screen.getByText('Cada opción tiene un 33,33% de probabilidad (3 opciones).')).toBeInTheDocument();
     });
 
+    test('el clic derecho no abre el menú del navegador, salvo en los campos de texto', () => {
+        renderApp();
+        // fireEvent devuelve false cuando el evento se cancela con preventDefault.
+        expect(fireEvent.contextMenu(screen.getByRole('button', { name: 'Presets' }))).toBe(false);
+        expect(fireEvent.contextMenu(document.body)).toBe(false);
+        expect(fireEvent.contextMenu(screen.getAllByLabelText(/^Option name/)[0])).toBe(true);
+    });
+
     test('la firma se puede ocultar y sigue oculta al volver', async () => {
         const first = renderApp();
         expect(screen.getByRole('link', { name: /Developed by\s*Jondals/ })).toHaveAttribute('href', 'https://github.com/Jondals');
@@ -804,6 +815,7 @@ describe('cuenta', () => {
     test('cerrar sesión deja la app como la primera vez pero conserva el idioma', async () => {
         mockAccount.profile = { id: 'me', username: 'ana', avatar_url: null };
         mockMusic.files.set('cancion-0001', new Blob(['x']));
+        sessionStorage.setItem('spinly-splash', '1');
         localStorage.setItem('spinly-lang', 'es');
         localStorage.setItem(THEMES_STORAGE_KEY, JSON.stringify([sharedTheme('t2')]));
         localStorage.setItem('spinly-options', JSON.stringify([{ id: 'a', name: 'A', color: 'indigo' }, { id: 'b', name: 'B', color: 'coral' }]));
@@ -817,6 +829,8 @@ describe('cuenta', () => {
         expect(localStorage.getItem('spinly-lang')).toBe('es');
         expect(localStorage.getItem('spinly-music')).toBeNull();
         expect(mockMusic.files.size).toBe(0);
+        // Como la primera vez: la próxima carga vuelve a mostrar la pantalla de carga.
+        expect(sessionStorage.getItem('spinly-splash')).toBeNull();
     });
 
     test('sin sesión no hay avisos fijos: se puede descargar y compartir avisa al intentarlo', async () => {
@@ -841,6 +855,34 @@ describe('cuenta', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Themes' }));
         expect(await screen.findByText('Obsidian Flow')).toBeInTheDocument();
         expect(screen.queryByText('Neon Nights')).toBeNull();
+    });
+
+    test('al arrancar solo se aplican los datos de la nube si de verdad cambian (sin remontar por nada)', async () => {
+        const accountData = jest.requireActual('./scripts/account-data') as typeof import('./scripts/account-data');
+        accountData.setAppRemount(() => { mockAccount.reloads += 1; });
+        try {
+            const options = [{ id: 'a', name: 'A', color: 'indigo' }, { id: 'b', name: 'B', color: 'coral' }];
+            localStorage.setItem('spinly-options', JSON.stringify(options));
+            // Una primera visita sin sesión deja en storage lo que la app guarda al arrancar.
+            mockAuth.session = null;
+            renderApp().unmount();
+            mockAuth.session = { userId: 'me', isAnonymous: false };
+            // La última subida acabó con la pestaña cerrada: la nube es "más nueva" pero idéntica.
+            localStorage.setItem('spinly-account-sync', JSON.stringify({ uid: 'me', updatedAt: 1 }));
+            mockAccount.remote = accountData.sanitizeAccountData({ ...accountData.readLocalData(), music: null, updatedAt: 5 });
+            const first = renderApp();
+            await waitFor(() => expect(JSON.parse(localStorage.getItem('spinly-account-sync') ?? '{}').updatedAt).toBe(5));
+            expect(mockAccount.reloads).toBe(0);
+            first.unmount();
+
+            // Otro dispositivo cambió las opciones: esas sí se aplican.
+            mockAccount.remote = accountData.sanitizeAccountData({ ...accountData.readLocalData(), options: [...options, { id: 'c', name: 'C', color: 'teal' }], updatedAt: 9 });
+            renderApp();
+            await waitFor(() => expect(mockAccount.reloads).toBe(1));
+            expect(JSON.parse(localStorage.getItem('spinly-options') ?? '[]')).toHaveLength(3);
+        } finally {
+            accountData.setAppRemount(null);
+        }
     });
 
     test('los datos de la cuenta se sanean y al entrar se suman los del invitado sin duplicar', () => {

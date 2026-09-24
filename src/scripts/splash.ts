@@ -4,9 +4,21 @@ const SPLASH_ID = 'spinly-splash';
 // Desde el inicio de la navegación: la ruleta del logo acaba de girar y la flecha cae hacia 1,1 s.
 const MIN_VISIBLE_MS = 1150;
 const REDUCED_MOTION_MIN_MS = 300;
-// Coincide con la transición de salida de .spinly-splash--out (public/index.html): un fundido
-// lento que deja ver la app debajo, ya pintada y quieta.
-const EXIT_MS = 900;
+// Coincide con la transición de salida de .spinly-splash--out (public/index.html): un iris que se
+// cierra sobre el logo y deja ver la app, ya pintada y quieta.
+const EXIT_MS = 1300;
+// Lo anota el script de index.html: la pantalla de carga sale una vez por pestaña.
+const SEEN_KEY = 'spinly-splash';
+
+/** Entrar o salir de la cuenta es como abrir la app de nuevo: la próxima carga vuelve a mostrar
+    la pantalla de carga (una recarga normal, no). */
+export function replaySplashOnNextLoad(): void {
+    try {
+        sessionStorage.removeItem(SEEN_KEY);
+    } catch {
+        // Sin sessionStorage el script tampoco pudo anotarla: saldrá igualmente.
+    }
+}
 
 export function hideSplash(): void {
     const splash = document.getElementById(SPLASH_ID);

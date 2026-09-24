@@ -6,16 +6,17 @@ import {
     mergeGuestData,
     readLocalData,
     readSyncMarker,
-    reloadApp,
+    remountApp,
     saveAccountData,
     writeLocalData,
     writeSyncMarker,
+    type AccountData,
     type AccountSnapshot,
 } from '../scripts/account-data';
 
 const SAVE_DELAY_MS = 1500;
-// Recarga por datos de otro dispositivo: una sola vez por versión, aunque la marca local no se
-// pudiera guardar (storage lleno), para no entrar en un bucle de recargas.
+// Datos de otro dispositivo: se aplican (App se vuelve a montar) una sola vez por versión, aunque
+// la marca local no se pudiera guardar (storage lleno), para no entrar en un bucle.
 const RELOAD_GUARD_KEY = 'spinly-sync-reloaded';
 
 // Subida pendiente, a nivel de módulo: el cierre de sesión (ProfileMenu) la vacía antes de salir.
@@ -32,22 +33,31 @@ export async function flushAccountSync(): Promise<boolean> {
     return saved;
 }
 
-const reloadOnce = (version: number) => {
+/** Mismos datos de cuenta, sin contar la versión ni la fecha (el saneado fija el orden de claves).
+    Una cuenta sin música guardada equivale a una playlist vacía. */
+const sameSnapshot = (remote: AccountData, local: AccountSnapshot): boolean => {
+    const { version, updatedAt, ...data } = remote;
+    const normalize = (snapshot: AccountSnapshot) => JSON.stringify({ ...snapshot, music: snapshot.music ?? { playlist: [] } });
+    return normalize(data) === normalize(local);
+};
+
+const applyOnce = (version: number) => {
     try {
         if (sessionStorage.getItem(RELOAD_GUARD_KEY) === String(version)) return;
         sessionStorage.setItem(RELOAD_GUARD_KEY, String(version));
     } catch {
-        // Sin sessionStorage no hay forma de protegerse del bucle: mejor no recargar.
+        // Sin sessionStorage no hay forma de protegerse del bucle: mejor no aplicarlos.
         return;
     }
-    reloadApp();
+    remountApp();
 };
 
 /**
  * Mantiene la cuenta al día en la nube. Solo cuentas con contraseña: las anónimas no pueden
  * escribir en user-data (política del bucket) ni entrar desde otro dispositivo.
  * - Al empezar la sesión compara con la nube: si allí hay algo más reciente (hecho en otro
- *   dispositivo) lo aplica y recarga; si la cuenta aún no tenía datos, sube los locales.
+ *   dispositivo) lo aplica volviendo a montar App, sin recargar la página; si la cuenta aún no
+ *   tenía datos, sube los locales.
  * - Después, cada cambio se sube con un pequeño retardo, y al ocultarse la pestaña al momento.
  */
 export function useAccountSync(session: AccountSession | null, snapshot: AccountSnapshot) {
@@ -65,6 +75,13 @@ export function useAccountSync(session: AccountSession | null, snapshot: Account
             if (!alive || !remote.ok || isSwitchingAccount()) return;
             const marker = readSyncMarker();
             const synced = marker?.uid === uid;
+            // La nube tiene exactamente lo mismo que este navegador (p. ej. la última subida acabó con la
+            // pestaña ya cerrada y no llegó a anotarse): solo se pone al día la marca, sin aplicar nada.
+            if (synced && remote.data && sameSnapshot(remote.data, readLocalData())) {
+                writeSyncMarker(uid, remote.data.updatedAt);
+                if (alive) readyRef.current = uid;
+                return;
+            }
             if (!remote.data) {
                 const saved = await saveAccountData(uid, readLocalData());
                 if (alive && saved.ok) writeSyncMarker(uid, saved.data);
@@ -75,7 +92,7 @@ export function useAccountSync(session: AccountSession | null, snapshot: Account
                 writeLocalData(merged);
                 const saved = synced ? { ok: true as const, data: remote.data.updatedAt } : await saveAccountData(uid, merged);
                 if (saved.ok) writeSyncMarker(uid, saved.data);
-                reloadOnce(remote.data.updatedAt);
+                applyOnce(remote.data.updatedAt);
                 return;
             }
             if (alive) readyRef.current = uid;
@@ -89,8 +106,13 @@ export function useAccountSync(session: AccountSession | null, snapshot: Account
     useEffect(() => {
         if (!uid || readyRef.current !== uid || isSwitchingAccount()) return undefined;
         const save = async () => {
-            const saved = await saveAccountData(uid, snapshotRef.current);
-            if (saved.ok) writeSyncMarker(uid, saved.data);
+            // La marca se anota antes de subir: si la pestaña se cierra con la subida en marcha, al
+            // volver no parece que la nube tenga algo más nuevo que aplicar. Si falla, se restaura.
+            const previous = readSyncMarker();
+            const updatedAt = Date.now();
+            writeSyncMarker(uid, updatedAt);
+            const saved = await saveAccountData(uid, snapshotRef.current, updatedAt);
+            if (!saved.ok && previous) writeSyncMarker(previous.uid, previous.updatedAt);
             return saved.ok;
         };
         pendingSave = save;

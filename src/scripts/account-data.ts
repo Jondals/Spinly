@@ -259,9 +259,23 @@ export async function adoptAccountData(uid: string): Promise<ServiceResult<true>
     return { ok: true, data: true };
 }
 
-/** Entrar, salir o recibir datos de otro dispositivo: la app arranca de nuevo desde localStorage. */
+/** Entrar o salir de la cuenta: la app arranca de nuevo desde localStorage. */
 export function reloadApp(): void {
     window.location.reload();
+}
+
+// Datos nuevos de otro dispositivo: basta con volver a montar App, que lee localStorage al
+// montarse. Recargar la página se vería como un parpadeo justo al acabar la pantalla de carga.
+let remount: (() => void) | null = null;
+
+export function setAppRemount(handler: (() => void) | null): void {
+    remount = handler;
+}
+
+/** Sin raíz registrada (fuera de index.tsx) recurre a recargar. */
+export function remountApp(): void {
+    if (remount) remount();
+    else reloadApp();
 }
 
 // Durante un cambio de cuenta (entrar o salir) la página se recarga: no debe subirse nada más.

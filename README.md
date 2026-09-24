@@ -55,7 +55,7 @@ Songs you upload are stored twice: in **IndexedDB** for instant playback (a few 
 The dotted background behind the wheel is drawn on a `<canvas>`. A slow diagonal wave runs across the dots, and the ones near your cursor drift away, grow and light up in the accent color, easing in and out instead of snapping. To keep it cheap, dots of similar brightness are batched into a handful of `Path2D` fills per frame, the animation drops to 30 fps when nobody is interacting, and it pauses entirely off screen or with reduced motion enabled.
 
 ### A cursor with a little inertia
-With a mouse, the system cursor becomes a dot and a trailing ring. The ring follows with exponential smoothing that depends on elapsed time, not frame rate, so it feels the same at 60 Hz and 144 Hz, and it stretches in the direction you move. It uses `mix-blend-mode: difference`, so it stays visible over light panels, dark buttons and every wheel color. Where the system cursor means something (text fields, drag handles, the eyedropper) the custom one steps aside.
+With a mouse, the system cursor becomes a dot and a trailing ring. The ring follows with exponential smoothing that depends on elapsed time, not frame rate, so it feels the same at 60 Hz and 144 Hz, and it stretches in the direction you move. Like a system cursor, it is drawn as a white stroke with a thin dark outline, so it stays visible over light panels, dark buttons and every wheel color. Where the system cursor means something (text fields, drag handles, the eyedropper) the custom one steps aside.
 
 ### An eyedropper for every browser
 - **Chrome, Edge and Opera** use the native `EyeDropper` API, which can pick from anywhere on screen.

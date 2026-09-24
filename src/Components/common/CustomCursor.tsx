@@ -16,6 +16,12 @@ const STRETCH_AT_PX = 120;
 const RECHECK_MS = 300;
 const RIPPLE_MS = 480;
 
+/** Redondea a píxeles físicos (con escalado de pantalla, 1 px CSS no es 1 píxel real). */
+const snap = (value: number): number => {
+    const ratio = window.devicePixelRatio || 1;
+    return Math.round(value * ratio) / ratio;
+};
+
 /**
  * Cursor propio: un punto que sigue al ratón al instante y un anillo que lo persigue con una
  * estela corta, se estira con la velocidad, crece sobre lo clicable y lanza una onda al pulsar.
@@ -65,8 +71,11 @@ function CustomCursor() {
             const dy = pos.y - trail.y;
             const lag = Math.hypot(dx, dy);
             const stretch = Math.min(lag / STRETCH_AT_PX, 1) * MAX_STRETCH;
-            dot.style.transform = `translate3d(${pos.x}px, ${pos.y}px, 0)`;
-            ring.style.transform = `translate3d(${trail.x}px, ${trail.y}px, 0) rotate(${Math.atan2(dy, dx)}rad) scale(${1 + stretch}, ${1 - stretch})`;
+            // En 2D y en píxeles reales de pantalla: nítido, sin capa aparte ni medios píxeles.
+            dot.style.transform = `translate(${snap(pos.x)}px, ${snap(pos.y)}px)`;
+            const ringAt = `translate(${snap(trail.x)}px, ${snap(trail.y)}px)`;
+            // Quieto no se estira: sin rotar ni escalar, el aro se dibuja limpio.
+            ring.style.transform = stretch > 0.005 ? `${ringAt} rotate(${Math.atan2(dy, dx)}rad) scale(${1 + stretch}, ${1 - stretch})` : ringAt;
             if (lag > 0.1) frame = requestAnimationFrame(render);
             else lastTime = 0;
         };
@@ -104,7 +113,7 @@ function CustomCursor() {
             if (!active || event.pointerType === 'touch') return;
             setFlag('down', true);
             if (reducedQuery.matches || layer.classList.contains('spinly-cursor-layer--native') || typeof ripple.animate !== 'function') return;
-            const at = `translate3d(${event.clientX}px, ${event.clientY}px, 0)`;
+            const at = `translate(${snap(event.clientX)}px, ${snap(event.clientY)}px)`;
             ripple.animate(
                 [
                     { transform: `${at} scale(0.5)`, opacity: 0.6 },

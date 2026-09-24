@@ -23,7 +23,6 @@
     "build": "react-scripts build && node inline-css.cjs",
     "test": "react-scripts test",
     "test:ci": "react-scripts test --watchAll=false",
-    "test:supabase": "node supabase.check.cjs",
     "typecheck": "tsc --noEmit"
   },
   "eslintConfig": {

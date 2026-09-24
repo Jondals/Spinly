@@ -1,0 +1,13 @@
+diff --git a/checkRequiredFiles.js b/checkRequiredFiles.js
+index 9799cf6b590ec8eac3feac43e73b774b485c7030..3293818cd66d97b674c2d1e8fb0465b1e9136c31 100644
+--- a/checkRequiredFiles.js
++++ b/checkRequiredFiles.js
+@@ -16,7 +16,7 @@ function checkRequiredFiles(files) {
+   try {
+     files.forEach(filePath => {
+       currentFilePath = filePath;
+-      fs.accessSync(filePath, fs.F_OK);
++      fs.accessSync(filePath, fs.constants.F_OK);
+     });
+     return true;
+   } catch (err) {

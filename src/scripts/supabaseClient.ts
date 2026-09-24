@@ -85,6 +85,11 @@ export function supabaseErrorMessage(fallback: LocalMessage, error: unknown): Lo
     if (/database error creating anonymous user/i.test(message)) {
         return dictMessage('errors', 'usernameTakenCreate');
     }
+    if (/invalid login credentials/i.test(message)) return dictMessage('errors', 'badCredentials');
+    if (/email (logins|signups|provider) (are|is) disabled/i.test(message)) return dictMessage('errors', 'emailProviderDisabled');
+    if (err?.code === 'weak_password' || /password should (be|contain)/i.test(message)) {
+        return dictMessage('errors', 'passwordWeak', { min: MIN_PASSWORD_LENGTH });
+    }
     if (/anonymous/i.test(message) && /(sign|enable|disabled|not allowed)/i.test(message)) {
         return dictMessage('errors', 'anonDisabled');
     }
@@ -105,6 +110,12 @@ export const ALLOWED_IMAGE_MIME: readonly string[] = ['image/png', 'image/jpeg',
 export function isAllowedImageMime(type: string): boolean {
     return ALLOWED_IMAGE_MIME.includes(type);
 }
+
+/**
+ * Debe coincidir con Supabase → Authentication → Email: "Minimum password length" y
+ * "Password requirements" = minúsculas, mayúsculas, dígitos y símbolos.
+ */
+export const MIN_PASSWORD_LENGTH = 10;
 
 // Compartido por avatar (Storage) y texturas (localStorage ~5MB).
 export const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;

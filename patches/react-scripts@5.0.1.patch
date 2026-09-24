@@ -1,0 +1,39 @@
+diff --git a/config/webpackDevServer.config.js b/config/webpackDevServer.config.js
+index 522a81b9b2b2723822513390a9d7e0fc38f75066..97fdf5d199354bbe0a31dbdf21b5ad5047e1c907 100644
+--- a/config/webpackDevServer.config.js
++++ b/config/webpackDevServer.config.js
+@@ -109,7 +109,10 @@ module.exports = function (proxy, allowedHost) {
+     },
+     // `proxy` is run between `before` and `after` `webpack-dev-server` hooks
+     proxy,
+-    onBeforeSetupMiddleware(devServer) {
++    // Spinly: `setupMiddlewares` sustituye a `onBeforeSetupMiddleware` / `onAfterSetupMiddleware`,
++    // obsoletos en webpack-dev-server 4.7+. Lo registrado en `devServer.app` queda delante de los
++    // middlewares internos (antes) y lo añadido a `middlewares` queda al final (después).
++    setupMiddlewares(middlewares, devServer) {
+       // Keep `evalSourceMapMiddleware`
+       // middlewares before `redirectServedPath` otherwise will not have any effect
+       // This lets us fetch source contents from webpack for the error overlay
+@@ -119,17 +122,18 @@ module.exports = function (proxy, allowedHost) {
+         // This registers user provided middleware for proxy reasons
+         require(paths.proxySetup)(devServer.app);
+       }
+-    },
+-    onAfterSetupMiddleware(devServer) {
++
+       // Redirect to `PUBLIC_URL` or `homepage` from `package.json` if url not match
+-      devServer.app.use(redirectServedPath(paths.publicUrlOrPath));
++      middlewares.push(redirectServedPath(paths.publicUrlOrPath));
+ 
+       // This service worker file is effectively a 'no-op' that will reset any
+       // previous service worker registered for the same host:port combination.
+       // We do this in development to avoid hitting the production cache if
+       // it used the same host and port.
+       // https://github.com/facebook/create-react-app/issues/2272#issuecomment-302832432
+-      devServer.app.use(noopServiceWorkerMiddleware(paths.publicUrlOrPath));
++      middlewares.push(noopServiceWorkerMiddleware(paths.publicUrlOrPath));
++
++      return middlewares;
+     },
+   };
+ };

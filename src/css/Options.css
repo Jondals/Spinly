@@ -387,6 +387,14 @@
     }
 }
 
+/* Columna estrecha (751-1000 px): menos hueco entre controles para que se lea el nombre */
+@media (min-width: 751px) and (max-width: 1000px) {
+    .Options .container-options .option-item {
+        gap: 0.5rem;
+        padding: 0 0.6rem;
+    }
+}
+
 @media (max-width: 750px) {
     .Options {
         height: auto;

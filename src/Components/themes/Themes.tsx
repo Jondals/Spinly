@@ -15,6 +15,7 @@ import { initialView, useDraftForm, type PanelView } from '../../hooks/useDraftF
 import { useSessionUserId } from '../../hooks/useSessionUserId';
 import { deleteSharedTheme, fetchCommunityThemes, shareTheme, updateSharedTheme } from '../../scripts/community';
 import { dictMessage, seedText } from '../../scripts/strings';
+import { isSupabaseConfigured } from '../../scripts/supabaseClient';
 import { DEFAULT_THEMES, cloneTheme, ensureSegments, type WheelTheme } from '../../types/theme-types';
 import type { ThemeDraft } from '../../types/form-drafts';
 import '../../css/Themes.css';
@@ -75,7 +76,15 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
         }));
     };
 
+    // Si ya está en Mis temas (mismo id) se aplica la copia guardada, con los cambios locales
+    // que tenga, en vez de descargarlo otra vez.
     const handleDownload = (theme: WheelTheme) => {
+        const saved = savedThemes.find((item) => item.id === theme.id);
+        if (saved) {
+            handleApply(saved);
+            setNotice({ tone: 'ok', text: dictMessage('themes', 'alreadyApplied', { name: saved.name }) });
+            return;
+        }
         onSaveTheme(theme);
         setNotice({ tone: 'ok', text: dictMessage('themes', 'savedOk', { name: theme.name }) });
     };
@@ -198,6 +207,7 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
                 badgeTitle={view === 'community' ? t('common', 'communityCount', { x: downloaded, y: community.items.length }) : undefined}
             />
             <p className="presets-themes-subtitle">{t('themes', 'subtitle')}</p>
+            {!userId && isSupabaseConfigured && <p className="spinly-guest-hint">{t('common', 'guestShareHint')}</p>}
 
             <SegmentedToggle<PanelView>
                 ariaLabel={t('themes', 'viewLabel')}
@@ -225,7 +235,7 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
                     >
                         {mine.map((theme) => {
                             const actions = SEED_IDS.has(theme.id) ? {} : {
-                                onShare: () => { void handleShare(theme); },
+                                ...(userId ? { onShare: () => { void handleShare(theme); } } : {}),
                                 onEdit: () => startEdit(theme, 'local'),
                                 onDelete: () => handleDeleteLocal(theme),
                             };
@@ -289,15 +299,27 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
                                 <div className="presets-themes-card-inner">
                                     {renderDetails(theme, theme.description, theme.category)}
                                     <AuthorTag author={author} />
-                                    <button
-                                        type="button"
-                                        className="spinly-action-btn"
-                                        onClick={() => handleDownload(theme)}
-                                        aria-label={t('themes', 'downloadAria', { name: theme.name })}
-                                    >
-                                        <Icon name="download" size={14} />
-                                        {t('themes', 'download')}
-                                    </button>
+                                    {savedIds.has(theme.id) ? (
+                                        <button
+                                            type="button"
+                                            className="spinly-action-btn"
+                                            onClick={() => handleDownload(theme)}
+                                            aria-label={t('themes', 'applyDownloadedAria', { name: theme.name })}
+                                        >
+                                            <Icon name="play" size={14} />
+                                            {t('themes', 'apply')}
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            className="spinly-action-btn"
+                                            onClick={() => handleDownload(theme)}
+                                            aria-label={t('themes', 'downloadAria', { name: theme.name })}
+                                        >
+                                            <Icon name="download" size={14} />
+                                            {t('themes', 'download')}
+                                        </button>
+                                    )}
                                 </div>
                                 {actionCount > 0 && (
                                     <ItemActions itemName={theme.name} {...actions} cloud editing={form.isEditing('cloud', theme.id)} busy={cloud.blocked} />

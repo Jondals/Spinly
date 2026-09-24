@@ -5,6 +5,8 @@ import WheelEditor from './Components/editor/WheelEditor';
 import Wheel, { type WheelColorField } from './Components/wheel/Wheel';
 import { useTranslation } from './Components/i18n/LanguageProvider';
 import { useButtonSounds } from './hooks/useButtonSounds';
+import { useAccountSync } from './hooks/useAccountSync';
+import { useAccountSession } from './hooks/useSessionUserId';
 import { createDefaultOptions, relabelDefaultOptions, DEFAULT_WHEEL_LIMIT, MAX_WHEEL_OPTIONS, MIN_OPTIONS, type WheelOption } from './scripts/option-wheel';
 import {
     ACTIVE_PRESET_STORAGE_KEY,
@@ -378,6 +380,15 @@ function App() {
 
     useEffect(prefetchPanels, []);
     useButtonSounds();
+    // Con cuenta, la ruleta, los temas y los preajustes viajan con ella (useAccountSync).
+    useAccountSync(useAccountSession(), {
+        options,
+        activeTheme,
+        activePresetId,
+        wheelLimit,
+        themes: userThemes,
+        presets: userPresets,
+    });
 
     const renderPanel = (): React.ReactNode => {
         const Presets = PresetsPanel.Component;

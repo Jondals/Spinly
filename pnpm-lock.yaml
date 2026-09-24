@@ -4,6 +4,10 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  react-dev-utils@12.0.1: 44e264d809c9d194e1a8762f7bb55a96060bc9c8f2d8209b5eb0126188ce8406
+  react-scripts@5.0.1: 15cec021767fb2abf0c00d5154d5642d64c4797a53a8944a189f7b3c2eaecc2e
+
 importers:
 
   .:
@@ -46,7 +50,7 @@ importers:
         version: 19.2.8(react@19.2.8)
       react-scripts:
         specifier: 5.0.1
-        version: 5.0.1(@babel/plugin-syntax-flow@7.29.7(@babel/core@7.29.7(supports-color@8.1.1)))(@babel/plugin-transform-react-jsx@7.29.7(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/babel__core@7.20.5)(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.26))(csso@4.2.0)(debug@4.4.3(supports-color@8.1.1))(eslint@8.57.1(supports-color@8.1.1))(html-minifier-terser@6.1.0)(react@19.2.8)(supports-color@8.1.1)(type-fest@0.21.3)(typescript@4.9.5)
+        version: 5.0.1(patch_hash=15cec021767fb2abf0c00d5154d5642d64c4797a53a8944a189f7b3c2eaecc2e)(@babel/plugin-syntax-flow@7.29.7(@babel/core@7.29.7(supports-color@8.1.1)))(@babel/plugin-transform-react-jsx@7.29.7(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/babel__core@7.20.5)(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.26))(csso@4.2.0)(debug@4.4.3(supports-color@8.1.1))(eslint@8.57.1(supports-color@8.1.1))(html-minifier-terser@6.1.0)(react@19.2.8)(supports-color@8.1.1)(type-fest@0.21.3)(typescript@4.9.5)
       typescript:
         specifier: ^4.9.5
         version: 4.9.5
@@ -10902,7 +10906,7 @@ snapshots:
       regenerator-runtime: 0.13.11
       whatwg-fetch: 3.6.20
 
-  react-dev-utils@12.0.1(eslint@8.57.1(supports-color@8.1.1))(supports-color@8.1.1)(typescript@4.9.5)(webpack@5.109.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.26))(csso@4.2.0)(html-minifier-terser@6.1.0)(postcss@8.5.26)):
+  react-dev-utils@12.0.1(patch_hash=44e264d809c9d194e1a8762f7bb55a96060bc9c8f2d8209b5eb0126188ce8406)(eslint@8.57.1(supports-color@8.1.1))(supports-color@8.1.1)(typescript@4.9.5)(webpack@5.109.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.26))(csso@4.2.0)(html-minifier-terser@6.1.0)(postcss@8.5.26)):
     dependencies:
       '@babel/code-frame': 7.29.7
       address: 1.2.2
@@ -10951,7 +10955,7 @@ snapshots:
 
   react-refresh@0.11.0: {}
 
-  react-scripts@5.0.1(@babel/plugin-syntax-flow@7.29.7(@babel/core@7.29.7(supports-color@8.1.1)))(@babel/plugin-transform-react-jsx@7.29.7(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/babel__core@7.20.5)(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.26))(csso@4.2.0)(debug@4.4.3(supports-color@8.1.1))(eslint@8.57.1(supports-color@8.1.1))(html-minifier-terser@6.1.0)(react@19.2.8)(supports-color@8.1.1)(type-fest@0.21.3)(typescript@4.9.5):
+  react-scripts@5.0.1(patch_hash=15cec021767fb2abf0c00d5154d5642d64c4797a53a8944a189f7b3c2eaecc2e)(@babel/plugin-syntax-flow@7.29.7(@babel/core@7.29.7(supports-color@8.1.1)))(@babel/plugin-transform-react-jsx@7.29.7(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/babel__core@7.20.5)(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.26))(csso@4.2.0)(debug@4.4.3(supports-color@8.1.1))(eslint@8.57.1(supports-color@8.1.1))(html-minifier-terser@6.1.0)(react@19.2.8)(supports-color@8.1.1)(type-fest@0.21.3)(typescript@4.9.5):
     dependencies:
       '@babel/core': 7.29.7(supports-color@8.1.1)
       '@pmmmwh/react-refresh-webpack-plugin': 0.5.17(react-refresh@0.11.0)(type-fest@0.21.3)(webpack-dev-server@4.15.2(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)(webpack@5.109.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.26))(csso@4.2.0)(html-minifier-terser@6.1.0)(postcss@8.5.26)))(webpack@5.109.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.26))(csso@4.2.0)(html-minifier-terser@6.1.0)(postcss@8.5.26))
@@ -10987,7 +10991,7 @@ snapshots:
       prompts: 2.4.2
       react: 19.2.8
       react-app-polyfill: 3.0.0
-      react-dev-utils: 12.0.1(eslint@8.57.1(supports-color@8.1.1))(supports-color@8.1.1)(typescript@4.9.5)(webpack@5.109.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.26))(csso@4.2.0)(html-minifier-terser@6.1.0)(postcss@8.5.26))
+      react-dev-utils: 12.0.1(patch_hash=44e264d809c9d194e1a8762f7bb55a96060bc9c8f2d8209b5eb0126188ce8406)(eslint@8.57.1(supports-color@8.1.1))(supports-color@8.1.1)(typescript@4.9.5)(webpack@5.109.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.26))(csso@4.2.0)(html-minifier-terser@6.1.0)(postcss@8.5.26))
       react-refresh: 0.11.0
       resolve: 1.22.12
       resolve-url-loader: 4.0.0

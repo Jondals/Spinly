@@ -32,7 +32,49 @@ const mockServer = {
     deletes: [] as Array<{ table: string; id: string }>,
 };
 
-jest.mock('./hooks/useSessionUserId', () => ({ useSessionUserId: () => 'me' }));
+// Sesión simulada: una cuenta con contraseña por defecto; los tests de invitado la ponen a null.
+const mockAuth = { session: { userId: 'me', isAnonymous: false } as { userId: string; isAnonymous: boolean } | null };
+jest.mock('./hooks/useSessionUserId', () => ({
+    useAccountSession: () => mockAuth.session,
+    useSessionUserId: () => mockAuth.session?.userId ?? null,
+}));
+
+// Servicios de cuenta simulados: sin red. validatePassword es la real.
+const mockAccount = {
+    profile: null as { id: string; username: string; avatar_url: string | null } | null,
+    calls: [] as string[],
+    signInResult: null as unknown,
+    reloads: 0,
+};
+jest.mock('./scripts/profile', () => ({
+    ...jest.requireActual('./scripts/profile'),
+    getCurrentSession: async () => null,
+    onAuthChange: () => () => undefined,
+    fetchProfile: async () => ({ ok: true, data: mockAccount.profile }),
+    createAccount: async () => {
+        mockAccount.calls.push('createAccount');
+        return { ok: true, data: { id: 'me', username: 'ana', avatar_url: null } };
+    },
+    signInWithUsername: async () => {
+        mockAccount.calls.push('signIn');
+        return mockAccount.signInResult;
+    },
+    signOut: async () => {
+        mockAccount.calls.push('signOut');
+        return { ok: true, data: true };
+    },
+}));
+jest.mock('./scripts/account-data', () => ({
+    ...jest.requireActual('./scripts/account-data'),
+    fetchAccountData: async () => ({ ok: true, data: null }),
+    saveAccountData: async () => ({ ok: true, data: 1 }),
+    adoptAccountData: async () => ({ ok: true, data: true }),
+    reloadApp: () => { mockAccount.reloads += 1; },
+}));
+jest.mock('./scripts/supabaseClient', () => ({
+    ...jest.requireActual('./scripts/supabaseClient'),
+    isSupabaseConfigured: true,
+}));
 
 jest.mock('./scripts/community', () => ({
     fetchCommunityThemes: async () => ({
@@ -71,6 +113,11 @@ const storedActiveTheme = (): WheelTheme => JSON.parse(localStorage.getItem(ACTI
 
 beforeEach(() => {
     localStorage.clear();
+    mockAuth.session = { userId: 'me', isAnonymous: false };
+    mockAccount.profile = null;
+    mockAccount.calls = [];
+    mockAccount.signInResult = null;
+    mockAccount.reloads = 0;
     mockServer.themes = [{ id: 't1', authorId: 'me' }, { id: 't2', authorId: 'other' }, { id: 't3', authorId: 'other' }];
     mockServer.presets = [{ id: 'p1', authorId: 'other' }, { id: 'p2', authorId: 'me' }];
     mockServer.updates = [];
@@ -469,14 +516,30 @@ describe('comunidad', () => {
         await settle();
     });
 
-    test('"Usar" un preset conserva su id y no lo duplica', async () => {
+    test('un tema ya descargado no se descarga otra vez: se aplica la copia guardada, con sus cambios', async () => {
+        const local = { ...sharedTheme('t2'), name: 'Mi versión de t2', pointerColor: '#123456' };
+        localStorage.setItem(THEMES_STORAGE_KEY, JSON.stringify([local]));
+        await openCommunity('Themes');
+        expect(screen.queryByRole('button', { name: 'Download theme Shared t2' })).toBeNull();
+        fireEvent.click(await screen.findByRole('button', { name: 'Apply theme Shared t2, already in My themes' }));
+        expect(await screen.findByText('"Mi versión de t2" was already in My themes: applied without downloading it again.')).toBeInTheDocument();
+        expect(storedActiveTheme()).toMatchObject({ id: 't2', name: 'Mi versión de t2', pointerColor: '#123456' });
+        const stored = JSON.parse(localStorage.getItem(THEMES_STORAGE_KEY) ?? '[]') as WheelTheme[];
+        expect(stored).toEqual([local]);
+    });
+
+    test('"Usar" un preset conserva su id; la segunda vez usa la copia guardada sin descargarlo', async () => {
         await openCommunity('Presets');
         const use = await screen.findByRole('button', { name: 'Use preset Shared p1' });
         fireEvent.click(use);
-        fireEvent.click(use);
         expect(await screen.findByTitle('1 downloaded / 2 available')).toBeInTheDocument();
-        const stored = JSON.parse(localStorage.getItem(PRESETS_STORAGE_KEY) ?? '[]') as WheelPreset[];
-        expect(stored.filter((preset) => preset.id === 'p1')).toHaveLength(1);
+        const first = JSON.parse(localStorage.getItem(PRESETS_STORAGE_KEY) ?? '[]') as WheelPreset[];
+
+        fireEvent.click(use);
+        expect(await screen.findByText('"Shared p1" was already in My presets: loaded without downloading it again.')).toBeInTheDocument();
+        const second = JSON.parse(localStorage.getItem(PRESETS_STORAGE_KEY) ?? '[]') as WheelPreset[];
+        expect(second).toEqual(first);
+        expect(second.filter((preset) => preset.id === 'p1')).toHaveLength(1);
     });
 
     test('editar y borrar en la nube solo aparece en las filas propias', async () => {
@@ -514,5 +577,136 @@ describe('comunidad', () => {
         await waitFor(() => expect(mockServer.updates).toEqual([{ table: 'shared_presets', id: 'p2', name: 'Renombrado' }]));
         expect(JSON.parse(localStorage.getItem(PRESETS_STORAGE_KEY) ?? '[]')).toHaveLength(0);
         await settle();
+    });
+});
+
+describe('cuenta', () => {
+    const actualAccountData = jest.requireActual('./scripts/account-data') as typeof import('./scripts/account-data');
+    const openProfile = async () => {
+        fireEvent.click(screen.getByRole('button', { name: /^(Open profile|Profile of)/ }));
+        return screen.findByRole('dialog', { name: 'User profile' });
+    };
+
+    test('crear cuenta exige una contraseña segura, sin el nombre de usuario y repetida igual', async () => {
+        mockAuth.session = null;
+        renderApp();
+        const menu = await openProfile();
+        const weak = 'The password is not secure enough: it needs at least 10 characters with lowercase, uppercase, a number and a symbol, and it cannot contain your username.';
+        const submit = () => fireEvent.submit(within(menu).getByRole('button', { name: 'Create account' }));
+        const type = (pass: string, repeat = pass) => {
+            fireEvent.change(within(menu).getByLabelText('Password'), { target: { value: pass } });
+            fireEvent.change(within(menu).getByLabelText('Repeat the password'), { target: { value: repeat } });
+        };
+        fireEvent.change(within(menu).getByLabelText('Username'), { target: { value: 'marta' } });
+
+        type('suficiente1');
+        const rules = within(menu).getByRole('list', { name: 'Password requirements' });
+        expect(within(rules).getByText('An uppercase letter').parentElement).not.toHaveClass('spinly-profile-rule--ok');
+        expect(within(rules).getByText('A number').parentElement).toHaveClass('spinly-profile-rule--ok');
+        submit();
+        expect(await within(menu).findByText(weak)).toBeInTheDocument();
+
+        type('Marta#2024xx');
+        expect(within(rules).getByText(`Doesn't include "marta"`).parentElement).not.toHaveClass('spinly-profile-rule--ok');
+        submit();
+        expect(await within(menu).findByText(weak)).toBeInTheDocument();
+
+        type('Segura#2024x', 'Segura#2024y');
+        submit();
+        expect(await within(menu).findByText('The passwords do not match.')).toBeInTheDocument();
+        expect(mockAccount.calls).toEqual([]);
+
+        type('Segura#2024x');
+        submit();
+        await waitFor(() => expect(mockAccount.calls).toEqual(['createAccount']));
+    });
+
+    test('requisitos de contraseña: longitud, minúscula, mayúscula, número, símbolo y sin el nombre', () => {
+        const { passwordChecks, validatePassword } = jest.requireActual('./scripts/profile') as typeof import('./scripts/profile');
+        expect(passwordChecks('abc', 'ana')).toEqual({ length: false, lower: true, upper: false, digit: false, symbol: false, noName: true });
+        expect(Object.values(passwordChecks('Lluvia#Roja77', 'ana')).every(Boolean)).toBe(true);
+        expect(passwordChecks('Ana-Secreta#1', 'ANA').noName).toBe(false);
+        expect(validatePassword('Lluvia#Roja77', 'ana')).toBeNull();
+        expect(validatePassword('lluvia#roja77', 'ana')).not.toBeNull();
+        expect(validatePassword('A#1' + 'b'.repeat(80))).not.toBeNull();
+    });
+
+    test('un perfil sin contraseña ofrece crearla y no deja cerrar sesión (se perdería)', async () => {
+        mockAuth.session = { userId: 'me', isAnonymous: true };
+        mockAccount.profile = { id: 'me', username: 'ana', avatar_url: null };
+        renderApp();
+        await screen.findByRole('button', { name: 'Profile of ana' });
+        const menu = await openProfile();
+        expect(within(menu).getByRole('button', { name: 'Create password' })).toBeInTheDocument();
+        expect(within(menu).queryByRole('button', { name: 'Sign out' })).toBeNull();
+    });
+
+    test('credenciales incorrectas: error genérico y no se recarga nada', async () => {
+        mockAuth.session = null;
+        mockAccount.signInResult = { ok: false, error: { en: 'Wrong username or password.', es: 'Usuario o contraseña incorrectos.' } };
+        renderApp();
+        const menu = await openProfile();
+        fireEvent.click(within(menu).getByRole('tab', { name: 'Sign in' }));
+        fireEvent.change(within(menu).getByLabelText('Username'), { target: { value: 'nadie' } });
+        fireEvent.change(within(menu).getByLabelText('Password'), { target: { value: 'loquesea123' } });
+        fireEvent.submit(within(menu).getByRole('button', { name: 'Sign in' }));
+        expect(await within(menu).findByText('Wrong username or password.')).toBeInTheDocument();
+        expect(mockAccount.reloads).toBe(0);
+
+        // Al tercer fallo seguido, pausa antes de poder volver a intentarlo.
+        for (let attempt = 2; attempt <= 3; attempt++) {
+            fireEvent.change(within(menu).getByLabelText('Password'), { target: { value: 'Otra#prueba1' } });
+            fireEvent.submit(within(menu).getByRole('button', { name: 'Sign in' }));
+            await waitFor(() => expect(mockAccount.calls).toHaveLength(attempt));
+        }
+        expect(await within(menu).findByText('Too many attempts. Wait 5 s and try again.')).toBeInTheDocument();
+        expect(within(menu).getByRole('button', { name: 'Sign in' })).toBeDisabled();
+    });
+
+    test('cerrar sesión deja la app como la primera vez pero conserva el idioma', async () => {
+        mockAccount.profile = { id: 'me', username: 'ana', avatar_url: null };
+        localStorage.setItem('spinly-lang', 'es');
+        localStorage.setItem(THEMES_STORAGE_KEY, JSON.stringify([sharedTheme('t2')]));
+        localStorage.setItem('spinly-options', JSON.stringify([{ id: 'a', name: 'A', color: 'indigo' }, { id: 'b', name: 'B', color: 'coral' }]));
+        renderApp();
+        fireEvent.click(await screen.findByRole('button', { name: 'Perfil de ana' }));
+        fireEvent.click(await screen.findByRole('button', { name: 'Cerrar sesión' }));
+        await waitFor(() => expect(mockAccount.reloads).toBe(1));
+        expect(mockAccount.calls).toEqual(['signOut']);
+        expect(localStorage.getItem(THEMES_STORAGE_KEY)).toBeNull();
+        expect(localStorage.getItem('spinly-options')).toBeNull();
+        expect(localStorage.getItem('spinly-lang')).toBe('es');
+    });
+
+    test('sin sesión se puede descargar de la comunidad pero no compartir', async () => {
+        mockAuth.session = null;
+        localStorage.setItem(THEMES_STORAGE_KEY, JSON.stringify([{ ...sharedTheme('mio'), name: 'Mío' }]));
+        renderApp();
+        fireEvent.click(screen.getByRole('button', { name: 'Themes' }));
+        expect(await screen.findByText(/Sign in or create an account/)).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Share Mío with the community' })).toBeNull();
+        fireEvent.click(await screen.findByRole('tab', { name: 'Community' }));
+        expect(await screen.findByRole('button', { name: 'Download theme Shared t1' })).toBeInTheDocument();
+    });
+
+    test('los datos de la cuenta se sanean y al entrar se suman los del invitado sin duplicar', () => {
+        const clean = actualAccountData.sanitizeAccountData({
+            updatedAt: 5,
+            options: [{ name: 'A' }, { name: 'B' }, { name: 42 }],
+            activeTheme: { id: 'x', name: 'X', segments: [{ color: 'javascript:alert(1)' }] },
+            wheelLimit: 999,
+            themes: [sharedTheme('t1'), { basura: true }],
+            presets: 'no es una lista',
+        });
+        expect(clean?.options.map((option) => option.name)).toEqual(['A', 'B']);
+        expect(clean?.activeTheme?.segments[0].color).toBe('#6366f1');
+        expect(clean?.wheelLimit).toBe(25);
+        expect(clean?.themes.map((theme) => theme.id)).toEqual(['t1']);
+        expect(clean?.presets).toEqual([]);
+
+        const account = { ...clean!, themes: [sharedTheme('t1')] };
+        const guest = { ...clean!, themes: [{ ...sharedTheme('t1'), name: 'versión invitado' }, sharedTheme('t2')] };
+        const merged = actualAccountData.mergeGuestData(account, guest);
+        expect(merged.themes.map((theme) => [theme.id, theme.name])).toEqual([['t1', 'Shared t1'], ['t2', 'Shared t2']]);
     });
 });

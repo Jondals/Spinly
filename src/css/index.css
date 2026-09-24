@@ -126,21 +126,17 @@ html {
     overflow: hidden;
 }
 
-@media (max-width: 1000px) {
-    .Main {
-        grid-template-columns: minmax(0, 16rem) minmax(0, 17rem) minmax(0, 1fr);
-    }
-
-    .Options,
-    .Presets,
-    .Themes {
-        padding: 1.5rem 1rem;
-    }
-}
-
 @media (min-width: 751px) and (max-width: 1000px) {
+    .Main {
+        grid-template-columns: minmax(0, 13.5rem) minmax(0, 19rem) minmax(0, 1fr);
+    }
+
     .Wheelmanager {
         padding: 1.5rem 0.75rem 0.75rem;
+    }
+
+    .spinly-panel-title {
+        letter-spacing: 0.08em;
     }
 }
 
@@ -207,11 +203,6 @@ html {
         align-items: center;
         justify-content: center;
         gap: 1.25rem;
-    }
-
-    .wheel-container {
-        /* El radio ya está acotado por vw/vh: la ruleta nunca se corta */
-        --wheel-radius: min(34vw, 30vh, 13rem);
     }
 
     .wheel-spin-button {

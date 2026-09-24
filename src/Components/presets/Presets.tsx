@@ -19,6 +19,7 @@ import { dictMessage, seedText } from '../../scripts/strings';
 import type { WheelOption } from '../../scripts/option-wheel';
 import { timeAgo, type WheelPreset, type WheelTheme } from '../../types/theme-types';
 import type { PresetDraft } from '../../types/form-drafts';
+import { isSupabaseConfigured } from '../../scripts/supabaseClient';
 import '../../css/Presets.css';
 
 interface PresetsProps {
@@ -87,7 +88,15 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
         community.refresh();
     };
 
+    // Si ya está en Mis preajustes (mismo id) se carga la copia guardada, con los cambios
+    // locales que tenga, en vez de descargarlo otra vez.
     const handleUse = (preset: WheelPreset) => {
+        const saved = savedPresets.find((item) => item.id === preset.id);
+        if (saved) {
+            onLoadPreset(saved);
+            setNotice({ tone: 'ok', text: dictMessage('presets', 'alreadyLoaded', { name: saved.name }) });
+            return;
+        }
         onImportPreset(preset);
         setNotice({ tone: 'ok', text: dictMessage('presets', 'usedOk', { name: preset.name }) });
     };
@@ -170,6 +179,7 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
                 badgeTitle={view === 'community' ? t('common', 'communityCount', { x: downloaded, y: community.items.length }) : undefined}
             />
             <p className="presets-presets-subtitle">{t('presets', 'subtitle')}</p>
+            {!userId && isSupabaseConfigured && <p className="spinly-guest-hint">{t('common', 'guestShareHint')}</p>}
 
             <SegmentedToggle<PanelView>
                 ariaLabel={t('presets', 'viewLabel')}
@@ -199,7 +209,7 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
                             const isActive = preset.id === activePresetId;
                             const name = displayName(preset);
                             const actions = isSeed(preset.id) ? {} : {
-                                onShare: () => { void handleShare(preset); },
+                                ...(userId ? { onShare: () => { void handleShare(preset); } } : {}),
                                 onEdit: () => startEdit(preset, 'local'),
                                 onDelete: () => handleDeleteLocal(preset),
                             };

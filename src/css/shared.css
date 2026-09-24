@@ -554,6 +554,14 @@
     padding-right: 6.3rem;
 }
 
+/* Themes.tsx / Presets.tsx: invitado sin sesión */
+.spinly-guest-hint {
+    margin: 0 var(--spinly-panel-pad-x);
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: var(--font-color-muted);
+}
+
 .spinly-collapse-hint {
     margin: 0;
     font-size: 0.75rem;

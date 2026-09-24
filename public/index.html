@@ -55,11 +55,13 @@
         pointer-events: none;
       }
 
-      /* Aurora: tres manchas de los colores del logo que derivan despacio */
+      /* Aurora: tres manchas de los colores del logo que derivan despacio. Entra con un fundido:
+         al recargar, el primer frame es solo el fondo oscuro y no un fogonazo de color sin logo. */
       .spinly-splash-aurora {
         position: absolute;
         inset: 0;
         pointer-events: none;
+        animation: spinly-splash-fade 1s ease-out 0.1s both;
       }
 
       .spinly-splash-aurora span {

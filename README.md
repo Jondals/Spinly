@@ -33,7 +33,7 @@ With no backend configured it still works end to end: everything lives in the br
 
 ## 🔧 How it's built
 
-A few pieces I enjoyed solving, and how they work under the hood.
+It was fun to figure out certain things. And here's how it works:
 
 ### The wheel is plain CSS
 There is no canvas or game engine behind the wheel. Its sectors are a single `conic-gradient`, and sectors with images are SVG paths clipped to the same angles. To spin, the app **picks the winner first**, adds a random offset inside that sector plus five to seven full turns, and lets a CSS transition with a long ease-out curve do the rest. The labels are sized from the sector's chord, so long names shrink instead of spilling into the next slice.

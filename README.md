@@ -5,7 +5,7 @@
 <h1 align="center">Spinly</h1>
 
 <p align="center">
-  A prize wheel for giveaways, raffles and everyday decisions, built to feel like a small instrument.<br />
+  A prize wheel for giveaways, raffles and everyday decisions.<br />
   <a href="https://spinly-psi.vercel.app"><strong>Live demo →</strong></a>
 </p>
 

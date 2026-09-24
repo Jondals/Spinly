@@ -8,6 +8,9 @@
     <link rel="icon" type="image/webp" href="/Images/spinly-logo-128.webp" />
     <link rel="preload" as="image" type="image/webp" href="/Images/spinly-logo-64.webp" imagesrcset="/Images/spinly-logo-64.webp 64w, /Images/spinly-logo-128.webp 128w" imagesizes="(max-width: 750px) 2rem, 2.5rem" />
     <title>Spinly</title>
+    <!-- Modo claro/oscuro antes del primer pintado: sin destello del modo equivocado.
+         Su hash va en la CSP de vercel.json; inline-css.cjs falla el build si no coincide. -->
+    <script>try{"light"===localStorage.getItem("spinly-theme")&&document.documentElement.setAttribute("data-theme","light")}catch(t){}</script>
     <style> /* evita que el menu aparezca desplegado mientras carga el CSS del bundle */
       @media (max-width: 750px) {
         .Wheelmanager:not(.Wheelmanager--open) {
@@ -23,8 +26,297 @@
         }
       }
     </style>
+    <style> /* Pantalla de carga: se pinta con el HTML y la retira la app (src/scripts/splash.ts) */
+      /* will-change: la salida la anima el compositor, fluida aunque la app esté arrancando */
+      .spinly-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483000;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        background-color: #07080d;
+        color: #f4f5fa;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        will-change: opacity;
+        transition: opacity 0.9s cubic-bezier(0.45, 0, 0.2, 1), visibility 0s linear 0.9s;
+        /* Por si la app no llegara a arrancar: nunca se queda tapando la página */
+        animation: spinly-splash-failsafe 0.01s linear 8s forwards;
+      }
+
+      :root[data-theme="light"] .spinly-splash {
+        background-color: #eef1f8;
+        color: #0f172a;
+      }
+
+      .spinly-splash--out {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      /* Aurora: tres manchas de los colores del logo que derivan despacio */
+      .spinly-splash-aurora {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      .spinly-splash-aurora span {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 80vmax;
+        height: 80vmax;
+        margin: -40vmax 0 0 -40vmax;
+        border-radius: 50%;
+        will-change: transform;
+      }
+
+      .spinly-splash-aurora span:nth-child(1) {
+        background: radial-gradient(closest-side, rgba(124, 58, 237, 0.42), transparent);
+        animation: spinly-splash-drift-a 6s ease-in-out infinite alternate;
+      }
+
+      .spinly-splash-aurora span:nth-child(2) {
+        background: radial-gradient(closest-side, rgba(240, 25, 125, 0.26), transparent);
+        animation: spinly-splash-drift-b 7s ease-in-out infinite alternate;
+      }
+
+      .spinly-splash-aurora span:nth-child(3) {
+        background: radial-gradient(closest-side, rgba(34, 199, 255, 0.24), transparent);
+        animation: spinly-splash-drift-c 8s ease-in-out infinite alternate;
+      }
+
+      :root[data-theme="light"] .spinly-splash-aurora span {
+        opacity: 0.6;
+      }
+
+      .spinly-splash-stage {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.15rem;
+        will-change: transform, opacity;
+        transition:
+          transform 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+          opacity 0.6s cubic-bezier(0.45, 0, 0.2, 1);
+      }
+
+      .spinly-splash--out .spinly-splash-stage {
+        opacity: 0;
+        transform: scale(1.1);
+      }
+
+      /* Anillo que gira alrededor del logo, como el aro de la ruleta */
+      .spinly-splash-orbit {
+        position: absolute;
+        left: 50%;
+        top: 56%;
+        width: 150%;
+        aspect-ratio: 1 / 1;
+        border-radius: 50%;
+        background: conic-gradient(from 0deg, transparent 0 62%, rgba(167, 139, 250, 0.55) 86%, rgba(34, 199, 255, 0.7) 94%, transparent 100%);
+        -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
+        mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
+        transform: translate(-50%, -50%);
+        animation:
+          spinly-splash-fade 0.6s ease 0.2s both,
+          spinly-splash-orbit 2.2s linear infinite;
+      }
+
+      .spinly-splash-mark {
+        position: relative;
+        width: clamp(7rem, 30vmin, 10rem);
+      }
+
+      .spinly-splash-glow {
+        position: absolute;
+        left: 50%;
+        top: 56%;
+        width: 200%;
+        aspect-ratio: 1 / 1;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(139, 92, 246, 0.32), rgba(236, 72, 153, 0.1) 42%, transparent 68%);
+        transform: translate(-50%, -50%);
+        animation: spinly-splash-glow 1.4s ease-out both;
+      }
+
+      .spinly-splash-logo {
+        position: relative;
+        display: block;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 100 / 108;
+        overflow: visible;
+      }
+
+      /* Todo gira y escala alrededor del centro de la ruleta: el (0, 0) del viewBox */
+      .spinly-splash-logo g,
+      .spinly-splash-logo path {
+        transform-box: view-box;
+        transform-origin: 0 0;
+      }
+
+      .spinly-splash-wheel {
+        animation: spinly-splash-spin 0.95s cubic-bezier(0.16, 0.84, 0.2, 1) both;
+      }
+
+      .spinly-splash-q {
+        stroke-width: 3;
+        stroke-linejoin: round;
+        transform: translate(var(--dx), var(--dy)) rotate(var(--r));
+        animation: spinly-splash-q 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+        animation-delay: calc(var(--i) * 70ms);
+      }
+
+      .spinly-splash-hub {
+        animation: spinly-splash-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both;
+      }
+
+      .spinly-splash-pointer {
+        animation: spinly-splash-drop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.7s both;
+      }
+
+      .spinly-splash-word {
+        display: flex;
+        margin: 0;
+        font-size: clamp(1.9rem, 8vw, 2.6rem);
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        line-height: 1;
+      }
+
+      .spinly-splash-word span {
+        display: inline-block;
+        color: inherit;
+        animation: spinly-splash-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+        animation-delay: calc(0.35s + var(--i) * 45ms);
+      }
+
+      .spinly-splash-bar {
+        position: relative;
+        width: 6.5rem;
+        height: 3px;
+        overflow: hidden;
+        border-radius: 3px;
+        background: rgba(139, 144, 184, 0.2);
+        animation: spinly-splash-fade 0.4s ease 0.6s both;
+      }
+
+      .spinly-splash-bar span {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 45%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #22c7ff, #7c3aed, #f0197d);
+        animation: spinly-splash-sweep 1s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+      }
+
+      @keyframes spinly-splash-spin {
+        from { transform: rotate(-400deg); }
+        to { transform: rotate(0deg); }
+      }
+
+      @keyframes spinly-splash-q {
+        from { opacity: 0; transform: translate(0px, 0px) rotate(var(--r)) scale(0.35); }
+      }
+
+      @keyframes spinly-splash-pop {
+        from { opacity: 0; transform: scale(0); }
+      }
+
+      @keyframes spinly-splash-drop {
+        from { opacity: 0; transform: translateY(-16px); }
+      }
+
+      @keyframes spinly-splash-rise {
+        from { opacity: 0; transform: translateY(0.55em); }
+      }
+
+      @keyframes spinly-splash-fade {
+        from { opacity: 0; }
+      }
+
+      @keyframes spinly-splash-glow {
+        from { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+      }
+
+      @keyframes spinly-splash-sweep {
+        from { transform: translateX(-110%); }
+        to { transform: translateX(230%); }
+      }
+
+      @keyframes spinly-splash-orbit {
+        from { transform: translate(-50%, -50%) rotate(0deg); }
+        to { transform: translate(-50%, -50%) rotate(360deg); }
+      }
+
+      @keyframes spinly-splash-drift-a {
+        from { transform: translate(-18vmax, -10vmax) scale(1); }
+        to { transform: translate(-4vmax, 6vmax) scale(1.18); }
+      }
+
+      @keyframes spinly-splash-drift-b {
+        from { transform: translate(20vmax, -6vmax) scale(1.1); }
+        to { transform: translate(6vmax, 12vmax) scale(0.9); }
+      }
+
+      @keyframes spinly-splash-drift-c {
+        from { transform: translate(2vmax, 22vmax) scale(0.95); }
+        to { transform: translate(-14vmax, 4vmax) scale(1.15); }
+      }
+
+      @keyframes spinly-splash-failsafe {
+        to { opacity: 0; visibility: hidden; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .spinly-splash-stage *,
+        .spinly-splash-stage,
+        .spinly-splash-aurora span {
+          animation: none !important;
+          transition: none;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="spinly-splash" class="spinly-splash" aria-hidden="true">
+      <div class="spinly-splash-aurora"><span></span><span></span><span></span></div>
+      <div class="spinly-splash-stage">
+        <div class="spinly-splash-mark">
+          <span class="spinly-splash-glow"></span>
+          <span class="spinly-splash-orbit"></span>
+          <!-- El logo de Spinly en vectores: cuatro sectores que se montan girando, el centro y la flecha -->
+          <svg class="spinly-splash-logo" viewBox="-50 -58 100 108" width="144" height="156" focusable="false">
+            <defs>
+              <linearGradient id="spinly-splash-tr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f0197d" /><stop offset="1" stop-color="#ff4a5f" /></linearGradient>
+              <linearGradient id="spinly-splash-br" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a431ff" /><stop offset="1" stop-color="#5a2df3" /></linearGradient>
+              <linearGradient id="spinly-splash-bl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2455ff" /><stop offset="1" stop-color="#1fc6ff" /></linearGradient>
+              <linearGradient id="spinly-splash-tl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4b22e8" /><stop offset="1" stop-color="#7d3ff7" /></linearGradient>
+              <linearGradient id="spinly-splash-pt" x1="0" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#6c3cf6" /><stop offset="1" stop-color="#ff3ad0" /></linearGradient>
+            </defs>
+            <g class="spinly-splash-wheel">
+              <path class="spinly-splash-q" style="--i:0;--r:0deg;--dx:3.6px;--dy:-3.6px" fill="url(#spinly-splash-tr)" stroke="url(#spinly-splash-tr)" d="M0-38A38 38 0 0 1 38 0H18.5A18.5 18.5 0 0 0 0-18.5Z" />
+              <path class="spinly-splash-q" style="--i:1;--r:90deg;--dx:3.6px;--dy:3.6px" fill="url(#spinly-splash-br)" stroke="url(#spinly-splash-br)" d="M0-38A38 38 0 0 1 38 0H18.5A18.5 18.5 0 0 0 0-18.5Z" />
+              <path class="spinly-splash-q" style="--i:2;--r:180deg;--dx:-3.6px;--dy:3.6px" fill="url(#spinly-splash-bl)" stroke="url(#spinly-splash-bl)" d="M0-38A38 38 0 0 1 38 0H18.5A18.5 18.5 0 0 0 0-18.5Z" />
+              <path class="spinly-splash-q" style="--i:3;--r:270deg;--dx:-3.6px;--dy:-3.6px" fill="url(#spinly-splash-tl)" stroke="url(#spinly-splash-tl)" d="M0-38A38 38 0 0 1 38 0H18.5A18.5 18.5 0 0 0 0-18.5Z" />
+            </g>
+            <g class="spinly-splash-hub">
+              <circle r="12.5" fill="#15184a" />
+              <ellipse cx="-3.6" cy="-4.8" rx="6.2" ry="3.4" fill="#ffffff" fill-opacity="0.2" transform="rotate(-35 -3.6 -4.8)" />
+            </g>
+            <path class="spinly-splash-pointer" fill="url(#spinly-splash-pt)" d="M-9-56H9Q13.5-56 11-51.8L2.6-37.2Q0-33-2.6-37.2L-11-51.8Q-13.5-56-9-56Z" />
+          </svg>
+        </div>
+        <p class="spinly-splash-word"><span style="--i:0">S</span><span style="--i:1">p</span><span style="--i:2">i</span><span style="--i:3">n</span><span style="--i:4">l</span><span style="--i:5">y</span></p>
+        <span class="spinly-splash-bar"><span></span></span>
+      </div>
+    </div>
     <div id="root"></div>
   </body>
 </html>

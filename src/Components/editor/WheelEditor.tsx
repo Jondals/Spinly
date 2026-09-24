@@ -4,7 +4,7 @@ import Icon from '../common/Icon';
 import { useSortable } from '../../hooks/useSortable';
 import PanelHeader from '../common/PanelHeader';
 import { addOption, removeOption, updateOption, reorderOptions, DEFAULT_WHEEL_LIMIT, MAX_OPTION_LENGTH, MAX_WHEEL_OPTIONS, MIN_OPTIONS, type WheelOption } from '../../scripts/option-wheel';
-import { DEFAULT_IMAGE_FIT, DEFAULT_SEGMENT_COLOR, WHEEL_LIMIT_STORAGE_KEY, ensureSegments, type ImageFit, type WheelSegmentStyle, type WheelTheme } from '../../types/theme-types';
+import { DEFAULT_IMAGE_FIT, DEFAULT_SEGMENT_COLOR, ensureSegments, type ImageFit, type WheelSegmentStyle, type WheelTheme } from '../../types/theme-types';
 import { isAllowedImageMime, MAX_UPLOAD_BYTES } from '../../scripts/supabaseClient';
 import { fitImageToSector, randomSegmentColor } from '../../scripts/wheel';
 import { useTranslation } from '../i18n/LanguageProvider';
@@ -34,6 +34,8 @@ function WheelEditor({ options, setOptions, activeTheme, setActiveTheme, wheelLi
     const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
     const [isEditingLimit, setIsEditingLimit] = useState<boolean>(false);
     const [limitDraft, setLimitDraft] = useState<string>('');
+    // Hasta la primera tecla, lo que se escribe sustituye al límite en vez de añadirse detrás.
+    const limitFresh = useRef(true);
     const lim = Number.isFinite(wheelLimit) ? Math.min(Math.max(wheelLimit, MIN_OPTIONS), MAX_WHEEL_OPTIONS) : DEFAULT_WHEEL_LIMIT;
     const reachedLimit = options.length >= lim;
     const atMinimum = options.length <= MIN_OPTIONS;
@@ -49,16 +51,20 @@ function WheelEditor({ options, setOptions, activeTheme, setActiveTheme, wheelLi
         }
         setImageWarning(null);
         setWheelLimit(next);
-        try {
-            localStorage.setItem(WHEEL_LIMIT_STORAGE_KEY, String(next));
-        } catch {
-            // Sin acceso a storage (modo privado): el límite sigue en memoria.
-        }
     };
 
     const startLimitEdit = (): void => {
+        limitFresh.current = true;
         setLimitDraft(String(lim));
         setIsEditingLimit(true);
+    };
+
+    // Sin selección resaltada: el cursor de texto va al final y la primera cifra reemplaza el valor.
+    const handleLimitDraft = (rawValue: string): void => {
+        const digits = rawValue.replace(/\D/g, '');
+        const typedAfter = limitFresh.current && digits.length > limitDraft.length && digits.startsWith(limitDraft);
+        limitFresh.current = false;
+        setLimitDraft((typedAfter ? digits.slice(limitDraft.length) : digits).slice(0, 2));
     };
 
     const commitLimit = (rawValue: string): void => {
@@ -199,7 +205,7 @@ function WheelEditor({ options, setOptions, activeTheme, setActiveTheme, wheelLi
         <div className='Options'>
             <PanelHeader
                 className="options-title"
-                icon="wheel"
+                icon="sliders"
                 title={t('options', 'title')}
                 badgeTitle={t('options', 'limitTitle', { lim, max: MAX_WHEEL_OPTIONS })}
                 badge={(
@@ -207,12 +213,16 @@ function WheelEditor({ options, setOptions, activeTheme, setActiveTheme, wheelLi
                         {options.length} / {isEditingLimit ? (
                             <input
                                 className="options-limit-inline"
-                                type="number"
-                                min={options.length}
-                                max={MAX_WHEEL_OPTIONS}
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={limitDraft}
                                 autoFocus
-                                onChange={(e) => setLimitDraft(e.target.value)}
+                                onFocus={(e) => {
+                                    const end = e.currentTarget.value.length;
+                                    e.currentTarget.setSelectionRange(end, end);
+                                }}
+                                onChange={(e) => handleLimitDraft(e.target.value)}
                                 onBlur={(e) => commitLimit(e.target.value)}
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter') commitLimit((e.target as HTMLInputElement).value);

@@ -7,7 +7,12 @@ export function authorName(author: CommunityAuthor, fallback: string): string {
     return author.username || fallback;
 }
 
-function AuthorTag({ author }: { author: CommunityAuthor }) {
+interface AuthorTagProps {
+    author: CommunityAuthor;
+}
+
+/** Etiqueta con la foto y el nombre de quien compartió el elemento. */
+function AuthorTag({ author }: AuthorTagProps) {
     const { t } = useTranslation();
     const name = authorName(author, t('common', 'unknownUser'));
     return (

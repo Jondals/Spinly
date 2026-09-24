@@ -1,12 +1,26 @@
 import { useEffect, useSyncExternalStore, type RefObject } from 'react';
-import { isSoundEnabled, playTick, setSoundEnabled, subscribeSound } from '../scripts/sound';
+import { getSoundVolume, isSoundEnabled, playTick, setSoundEnabled, setSoundVolume, subscribeSound } from '../scripts/sound';
 
 const MIN_TICK_GAP_MS = 28;
 
 /** Preferencia de sonido (activado por defecto), compartida por la ruleta y los botones. */
 export function useSoundPreference() {
     const enabled = useSyncExternalStore(subscribeSound, isSoundEnabled, () => true);
-    return { enabled, toggle: () => setSoundEnabled(!enabled) };
+    const volume = useSyncExternalStore(subscribeSound, getSoundVolume, () => 1);
+    return {
+        enabled,
+        volume,
+        toggle: () => setSoundEnabled(!enabled),
+        /** Deslizador de escritorio: a 0 los apaga (sin perder el volumen anterior), por encima los enciende. */
+        setVolume: (next: number) => {
+            if (next <= 0) {
+                setSoundEnabled(false);
+                return;
+            }
+            setSoundVolume(next);
+            setSoundEnabled(true);
+        },
+    };
 }
 
 /** Ángulo real del disco a mitad de la transición CSS, leído de su matriz de transformación. */

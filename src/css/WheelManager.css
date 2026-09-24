@@ -25,9 +25,12 @@
     display: none;
 }
 
+/* Hueco fijo antes de la firma: su margin-top: auto se queda en 0 cuando el menú no cabe
+   (reproductor abierto en móvil) y la X de ocultarla pisaría lo de encima. */
 .wheelmanager-body {
     display: flex;
     flex-direction: column;
+    padding-bottom: 1.75rem;
 }
 
 .button-menu {
@@ -43,7 +46,6 @@
     color: var(--font-color-light);
     background-color: transparent;
     border: 1px solid transparent;
-    border-left: 3px solid transparent;
     border-radius: 0.6rem;
     cursor: pointer;
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
@@ -70,24 +72,24 @@
 
 .button-menu:hover .button-menu-icon,
 .button-menu--active .button-menu-icon {
-    color: var(--color-focus);
+    color: var(--color-focus-text);
 }
 
+/* El menú tiene su propio tono de hover, más suave que el del panel */
 .button-menu:hover {
-    background-color: var(--color-hover);
+    background-color: var(--menu-hover-bg);
     color: var(--font-color);
 }
 
-.button-menu--active {
-    background-color: var(--bg-transparence);
-    border-left-color: var(--color-focus);
+.button-menu--active,
+.button-menu--active:hover {
+    background-color: var(--menu-active-bg);
+    border-color: var(--menu-active-border);
+    box-shadow: inset 3px 0 0 var(--menu-indicator), var(--card-shadow);
     color: var(--font-color);
     font-weight: 600;
 }
 
-.button-menu--active:hover {
-    background-color: var(--bg-transparence);
-}
 
 /* En escritorio el idioma está en la cabecera */
 .wheelmanager-lang {
@@ -99,6 +101,183 @@
     color: var(--font-color-muted);
     font-size: 0.8rem;
     font-weight: 600;
+}
+
+/* Firma al pie (margin-top: auto la baja al fondo del menú): tarjeta enlazada a GitHub con un
+   destello que recorre el borde. La X la oculta en este dispositivo. */
+@property --credit-angle {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 0deg;
+}
+
+.wheelmanager-credit {
+    position: relative;
+    margin-top: auto;
+    animation: credit-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.15s backwards;
+    transition: opacity 0.26s ease, transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wheelmanager-credit--closing {
+    opacity: 0;
+    transform: translateY(0.6rem) scale(0.96);
+}
+
+/* Tres capas de fondo: relleno, destello cónico que gira y el borde normal debajo */
+.wheelmanager-credit-link {
+    --credit-fill: var(--bg-card-color);
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid transparent;
+    border-radius: var(--spinly-card-radius);
+    background:
+        linear-gradient(var(--credit-fill), var(--credit-fill)) padding-box,
+        conic-gradient(from var(--credit-angle), transparent 0% 70%, var(--color-focus-light) 86%, transparent 100%) border-box,
+        linear-gradient(var(--color-border), var(--color-border)) border-box;
+    box-shadow: var(--card-shadow);
+    text-decoration: none;
+    animation: credit-beam 6s linear infinite;
+    transition: transform 0.15s ease;
+}
+
+.wheelmanager-credit-link:hover,
+.wheelmanager-credit-link:focus-visible {
+    --credit-fill: var(--menu-hover-bg);
+    transform: translateY(-1px);
+}
+
+.wheelmanager-credit-link:focus-visible {
+    outline: 2px solid var(--color-focus-light);
+    outline-offset: 2px;
+}
+
+.wheelmanager-credit-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 2.1rem;
+    height: 2.1rem;
+    border-radius: 50%;
+    background: var(--bg-transparence);
+    border: 1px solid var(--color-border-light);
+    color: var(--font-color);
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wheelmanager-credit-link:hover .wheelmanager-credit-mark {
+    transform: rotate(-8deg) scale(1.06);
+}
+
+.wheelmanager-credit-mark svg {
+    display: block;
+}
+
+.wheelmanager-credit-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+    line-height: 1.2;
+}
+
+.wheelmanager-credit-label {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--font-color-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.wheelmanager-credit-name {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--font-color);
+}
+
+.wheelmanager-credit-arrow {
+    flex-shrink: 0;
+    color: var(--font-color-muted);
+    transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.wheelmanager-credit-link:hover .wheelmanager-credit-arrow {
+    color: var(--font-color);
+    transform: translate(2px, -2px);
+}
+
+/* Aparece al pasar por la tarjeta; en táctil siempre visible */
+.wheelmanager-credit-close {
+    position: absolute;
+    top: -0.5rem;
+    right: -0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    padding: 0;
+    border: 1px solid var(--color-border-light);
+    border-radius: 50%;
+    background: var(--bg-card-color);
+    color: var(--font-color-muted);
+    box-shadow: var(--card-shadow);
+    cursor: pointer;
+    opacity: 0;
+    transform: scale(0.8);
+    transition: opacity 0.15s ease, transform 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.wheelmanager-credit:hover .wheelmanager-credit-close,
+.wheelmanager-credit-close:focus-visible {
+    opacity: 1;
+    transform: none;
+}
+
+.wheelmanager-credit-close:hover {
+    color: var(--font-color);
+    border-color: var(--color-focus-light);
+}
+
+.wheelmanager-credit-close:focus-visible {
+    outline: 2px solid var(--color-focus-light);
+    outline-offset: 1px;
+}
+
+.wheelmanager-credit-close svg {
+    display: block;
+    width: 0.65rem;
+    height: 0.65rem;
+}
+
+@media (hover: none) {
+    .wheelmanager-credit-close {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* Los iconos dibujan con currentColor: la regla global `* { color }` los pintaría del color de texto */
+.wheelmanager-credit svg * {
+    color: inherit;
+}
+
+@keyframes credit-beam {
+    to { --credit-angle: 360deg; }
+}
+
+@keyframes credit-in {
+    from { opacity: 0; transform: translateY(0.75rem); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .wheelmanager-credit,
+    .wheelmanager-credit-link {
+        animation: none;
+    }
 }
 
 /* Móvil: drawer lateral desde la derecha */

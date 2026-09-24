@@ -3,10 +3,12 @@
 // (un clic o pulsar Espacio), como exigen los navegadores.
 
 const SOUND_KEY = 'spinly-sound';
+const SOUND_VOLUME_KEY = 'spinly-sound-volume';
 
 let context: AudioContext | null = null;
-// Solo se usa si localStorage no está disponible (modo privado estricto).
+// Solo se usan si localStorage no está disponible (modo privado estricto).
 let memoryEnabled = true;
+let memoryVolume = 1;
 const listeners = new Set<() => void>();
 
 /** Activado por defecto. Se lee de storage en cada llamada: no hay copia que desincronizar. */
@@ -24,6 +26,27 @@ export function setSoundEnabled(enabled: boolean): void {
         localStorage.setItem(SOUND_KEY, enabled ? 'on' : 'off');
     } catch {
         // Sin acceso a storage: la preferencia se mantiene en memoria.
+    }
+    listeners.forEach((listener) => listener());
+}
+
+/** Volumen de los efectos, de 0 a 1 (1 por defecto). Apagarlos no lo pierde: se recupera al encender. */
+export function getSoundVolume(): number {
+    try {
+        const raw = localStorage.getItem(SOUND_VOLUME_KEY);
+        const volume = Number(raw);
+        return raw !== null && Number.isFinite(volume) ? Math.min(Math.max(volume, 0), 1) : 1;
+    } catch {
+        return memoryVolume;
+    }
+}
+
+export function setSoundVolume(volume: number): void {
+    memoryVolume = Math.min(Math.max(volume, 0), 1);
+    try {
+        localStorage.setItem(SOUND_VOLUME_KEY, String(Math.round(memoryVolume * 100) / 100));
+    } catch {
+        // Sin acceso a storage: el volumen se mantiene en memoria.
     }
     listeners.forEach((listener) => listener());
 }
@@ -54,11 +77,13 @@ function tone(ctx: AudioContext, { frequency, to, start, duration, volume, type 
 }) {
     const oscillator = ctx.createOscillator();
     const gain = ctx.createGain();
+    // Curva cuadrática: el deslizador se percibe lineal. Nunca 0: las rampas exponenciales no lo admiten.
+    const level = Math.max(volume * getSoundVolume() ** 2, 0.0002);
     oscillator.type = type;
     oscillator.frequency.setValueAtTime(frequency, start);
     if (to) oscillator.frequency.exponentialRampToValueAtTime(to, start + duration);
     gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(volume, start + 0.005);
+    gain.gain.exponentialRampToValueAtTime(level, start + 0.005);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
     oscillator.connect(gain).connect(ctx.destination);
     oscillator.start(start);

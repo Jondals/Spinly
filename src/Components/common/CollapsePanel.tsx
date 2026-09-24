@@ -11,6 +11,8 @@ interface CollapsePanelProps {
     submitDisabled?: boolean;
     onSubmit: () => void;
     onClose: () => void;
+    /** En el sitio de la tarjeta que se edita: se monta ya abierto y entra con un fundido. */
+    inline?: boolean;
     children: ReactNode;
 }
 
@@ -18,11 +20,11 @@ interface CollapsePanelProps {
 const EXPAND_MS = 260;
 
 /**
- * Formulario en acordeón bajo las tarjetas. Cerrado queda montado pero `inert` (sin foco
- * ni lector de pantalla) para poder animar también el plegado. Enter en un campo de una
- * línea envía el formulario.
+ * Formulario en acordeón bajo las tarjetas (crear) o en el sitio de una tarjeta (editar,
+ * `inline`). Cerrado queda montado pero `inert` (sin foco ni lector de pantalla) para poder
+ * animar también el plegado. Enter en un campo de una línea envía el formulario.
  */
-function CollapsePanel({ id, open, title, hint, submitLabel, submitDisabled = false, onSubmit, onClose, children }: CollapsePanelProps) {
+function CollapsePanel({ id, open, title, hint, submitLabel, submitDisabled = false, onSubmit, onClose, inline = false, children }: CollapsePanelProps) {
     const { t } = useTranslation();
     const rootRef = useRef<HTMLDivElement>(null);
 
@@ -53,7 +55,7 @@ function CollapsePanel({ id, open, title, hint, submitLabel, submitDisabled = fa
         <div
             id={id}
             ref={rootRef}
-            className={`spinly-collapse${open ? ' spinly-collapse--open' : ''}`}
+            className={`spinly-collapse${open ? ' spinly-collapse--open' : ''}${inline ? ' spinly-collapse--inline' : ''}`}
             aria-hidden={!open}
             inert={!open}
             onKeyDown={handleKeyDown}

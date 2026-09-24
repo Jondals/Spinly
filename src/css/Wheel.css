@@ -1,4 +1,7 @@
+/* isolation: la trama de puntos (DotField, z-index -1) queda sobre el fondo y bajo el contenido */
 .Wheel {
+    position: relative;
+    isolation: isolate;
     background-color: var(--bg-wheel-color);
     display: flex;
     flex-direction: column;
@@ -6,7 +9,7 @@
     justify-content: center;
     /* safe: si no cabe (ventanas muy bajas) se desplaza en vez de recortar la flecha */
     justify-content: safe center;
-    gap: 2rem;
+    gap: 2.75rem;
     width: 100%;
     height: 100%;
     min-width: 0;
@@ -18,11 +21,21 @@
     container-type: inline-size;
 }
 
+/* Trama animada de fondo: la dibuja DotField.tsx a la medida del panel */
+.wheel-dots {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: -1;
+    display: block;
+    pointer-events: none;
+}
+
 /* Todo el tamaño de la ruleta se deriva de este radio. En escritorio lo limita también el
-   alto: cabecera (5rem) + flecha, botón de girar y aviso (~12rem) deben caber sin recortes. */
+   alto: cabecera (5rem) + flecha, separación, botón de girar y aviso (~13.5rem) deben caber. */
 .wheel-container {
-    --wheel-radius: max(6rem, min(30vmin, 13rem, calc((100vh - 17rem) / 2)));
-    --wheel-radius: max(6rem, min(30vmin, 13rem, calc((100dvh - 17rem) / 2), 44cqi));
+    --wheel-radius: max(6rem, min(34vmin, 15rem, calc((100vh - 18.5rem) / 2)));
+    --wheel-radius: max(6rem, min(34vmin, 15rem, calc((100dvh - 18.5rem) / 2), 44cqi));
     position: relative;
     width: calc(var(--wheel-radius) * 2);
     max-width: 100%;
@@ -30,6 +43,14 @@
     height: auto;
     border-radius: 50%;
     box-shadow: 0 18px 40px -14px rgba(0, 0, 0, 0.55);
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Columna estrecha: los controles de audio van bajo la leyenda (Music.css) y restan ~3rem de alto */
+@container (max-width: 33rem) {
+    .wheel-container {
+        --wheel-radius: max(6rem, min(34vmin, 15rem, calc((100dvh - 21.5rem) / 2), 44cqi));
+    }
 }
 
 /* Botón invisible sobre la flecha: tocarla abre el selector de color */
@@ -71,6 +92,7 @@
     height: 100%;
     overflow: visible;
     pointer-events: none;
+    transition: filter 0.35s ease;
 }
 
 .wheel-rim-stop-top {
@@ -103,11 +125,36 @@
     border-radius: 50%;
     background: transparent;
     cursor: pointer;
+    transition: box-shadow 0.35s ease;
 }
 
 .wheel-lights-btn:focus-visible {
     outline: 2px solid var(--color-focus-light);
     outline-offset: 4px;
+}
+
+/* Como la flecha, la ruleta avisa de que se puede tocar: crece un poco y el aro y las luces
+   brillan con el color de las luces. También mientras su selector está abierto. */
+@media (hover: hover) {
+    .wheel-container:has(.wheel-lights-btn:hover) {
+        transform: scale(1.006);
+    }
+
+    .wheel-lights-btn:hover {
+        box-shadow: 0 0 22px -10px color-mix(in srgb, var(--wheel-light-color) 35%, transparent);
+    }
+
+    .wheel-lights-btn:hover ~ .wheel-rim {
+        filter: drop-shadow(0 0 2.5px color-mix(in srgb, var(--wheel-light-color) 40%, transparent));
+    }
+}
+
+.wheel-lights-btn[aria-expanded="true"] {
+    box-shadow: 0 0 22px -10px color-mix(in srgb, var(--wheel-light-color) 35%, transparent);
+}
+
+.wheel-lights-btn[aria-expanded="true"] ~ .wheel-rim {
+    filter: drop-shadow(0 0 2.5px color-mix(in srgb, var(--wheel-light-color) 40%, transparent));
 }
 
 .wheel-hub {
@@ -354,25 +401,6 @@
     color: var(--font-color-light);
 }
 
-.wheel-sound-btn {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.2rem;
-    border: none;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--font-color-muted);
-    cursor: pointer;
-}
-
-.wheel-sound-btn:hover {
-    color: var(--font-color-light);
-}
-
-.wheel-sound-btn:focus-visible {
-    outline: 2px solid var(--color-focus-light);
-}
-
 .wheel-overlay {
     position: fixed;
     inset: 0;
@@ -509,7 +537,7 @@ button.wheel-overlay-spin.spinly-btn-primary {
 /* Ventanas bajas de escritorio: menos aire entre ruleta y botón para que quepa todo */
 @media (min-width: 751px) and (max-height: 640px) {
     .Wheel {
-        gap: 1.1rem;
+        gap: 1.5rem;
     }
 
     .wheel-spin-zone {
@@ -523,7 +551,7 @@ button.wheel-overlay-spin.spinly-btn-primary {
 
 @media (max-width: 750px) {
     .Wheel {
-        gap: 1.25rem;
+        gap: 1.75rem;
         width: 100%;
         height: auto;
         min-height: 60vh;
@@ -558,6 +586,10 @@ button.wheel-overlay-spin.spinly-btn-primary {
 }
 
 @media (prefers-reduced-motion: reduce) {
+    .wheel-container {
+        transition: none;
+    }
+
     .wheel-disc {
         transition-duration: 0.01ms !important;
     }

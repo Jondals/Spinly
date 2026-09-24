@@ -11,8 +11,15 @@
 
 .presets-presets-subtitle {
     font-size: 0.8rem;
+    line-height: 1.45;
     color: var(--font-color-muted);
     margin: 0 var(--spinly-panel-pad-x);
+    /* Dos líneas como mucho */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
 }
 
 .presets-presets-empty {
@@ -63,15 +70,31 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    min-height: 1.5rem;
+    min-height: 1.7rem;
     padding-right: 0;
+}
+
+/* Botones de acción en la misma fila que la cabecera de la tarjeta */
+.presets-presets-card .spinly-card-actions {
+    top: 1rem;
+    right: 1rem;
+}
+
+/* Comunidad: autor a la izquierda, número de opciones a la derecha */
+.presets-presets-card-top--community {
+    justify-content: space-between;
+    margin-bottom: 0.4rem;
+}
+
+.presets-presets-card-top--community .presets-presets-card-badge {
+    flex-shrink: 0;
 }
 
 .presets-presets-card-badge {
     display: inline-flex;
     align-items: center;
     padding: 0.15rem 0.5rem;
-    border-radius: var(--radius-sm);
+    border-radius: var(--spinly-chip-radius);
     background-color: var(--bg-transparence);
     border: 1px solid var(--color-border);
     color: var(--font-color-muted);
@@ -89,6 +112,72 @@
     text-overflow: ellipsis;
 }
 
+/* Nombre y etiquetas a la izquierda, miniatura de la ruleta a la derecha */
+.presets-presets-card-body {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    min-width: 0;
+}
+
+.presets-presets-card-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    flex: 1;
+    min-width: 0;
+}
+
+/* WheelPreview.tsx: sectores con conic-gradient, aro, centro y flecha */
+.presets-presets-preview {
+    position: relative;
+    flex-shrink: 0;
+    width: 3.6rem;
+    height: 3.6rem;
+    margin-top: 0.3rem;
+    border-radius: 50%;
+    border: 3px solid var(--wheel-rim-bottom);
+    box-shadow: 0 0 0 1px var(--wheel-rim-top), 0 6px 14px -6px rgba(0, 0, 0, 0.6);
+    background-color: var(--wheel-color-dark);
+}
+
+.presets-presets-preview--lg {
+    width: 5.25rem;
+    height: 5.25rem;
+    border-width: 4px;
+}
+
+.presets-presets-preview--lg::before {
+    top: -0.5rem;
+    width: 0.65rem;
+    height: 0.55rem;
+}
+
+.presets-presets-preview-hub {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 22%;
+    height: 22%;
+    border-radius: 50%;
+    background: var(--wheel-center-color);
+    border: 1.5px solid var(--wheel-rim-bottom);
+    transform: translate(-50%, -50%);
+}
+
+.presets-presets-preview::before {
+    content: "";
+    position: absolute;
+    top: -0.38rem;
+    left: 50%;
+    width: 0.5rem;
+    height: 0.42rem;
+    background: var(--preview-pointer);
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
+    transform: translateX(-50%);
+}
+
 .presets-presets-card-name {
     font-size: 1.15rem;
     font-weight: 700;
@@ -97,7 +186,7 @@
     overflow-wrap: anywhere;
 }
 
-/* Una sola fila: OptionChips.tsx decide cuántos chips caben */
+/* Una sola fila: TagChips.tsx decide cuántos chips caben */
 .presets-presets-chips {
     position: relative;
     display: flex;
@@ -126,8 +215,8 @@
     flex: 0 1 auto;
     min-width: 0;
     max-width: 100%;
-    padding: 0.2rem 0.6rem;
-    border-radius: 999px;
+    padding: 0.2rem 0.55rem;
+    border-radius: var(--spinly-chip-radius);
     background-color: var(--bg-transparence);
     border: 1px solid var(--color-border);
     color: var(--font-color);
@@ -183,7 +272,7 @@
     color: var(--font-color-muted);
     font-size: 0.85rem;
     font-weight: 600;
-    cursor: default;
+    cursor: inherit;
     user-select: none;
 }
 

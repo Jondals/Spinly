@@ -16,7 +16,7 @@ function scrollParent(element: HTMLElement | null): HTMLElement | null {
  * el HTML5 drag and drop no existe en móvil) y con flechas desde el asa. El asa lleva
  * `touch-action: none` para que el dedo arrastre la fila en vez de desplazar la página.
  */
-export function useSortable(onMove: (from: number, to: number) => void) {
+export function useSortable(onMove: (from: number, to: number) => void, rowClass = 'option-item') {
     const [dragIndex, setDragIndex] = useState<number | null>(null);
     const [overIndex, setOverIndex] = useState<number | null>(null);
     const [offsetY, setOffsetY] = useState(0);
@@ -86,9 +86,9 @@ export function useSortable(onMove: (from: number, to: number) => void) {
     /** Clases y estilo de la fila: la arrastrada sigue al puntero; la de destino marca dónde caerá. */
     const itemState = (index: number): { className: string; style?: CSSProperties } => {
         if (dragIndex === null) return { className: '' };
-        if (index === dragIndex) return { className: ' option-item--dragging', style: { transform: `translateY(${offsetY}px)` } };
+        if (index === dragIndex) return { className: ` ${rowClass}--dragging`, style: { transform: `translateY(${offsetY}px)` } };
         if (index !== overIndex) return { className: '' };
-        return { className: overIndex < dragIndex ? ' option-item--drop-before' : ' option-item--drop-after' };
+        return { className: overIndex < dragIndex ? ` ${rowClass}--drop-before` : ` ${rowClass}--drop-after` };
     };
 
     return { handleProps, itemRef, itemState, isDragging: dragIndex !== null };

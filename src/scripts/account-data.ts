@@ -6,8 +6,16 @@ import { getSupabase, notConfiguredError, supabaseErrorMessage, type ServiceResu
 import { dictMessage } from './strings';
 import { MAX_WHEEL_OPTIONS, MIN_OPTIONS, type WheelOption } from './option-wheel';
 import {
+    MUSIC_PENDING_KEY,
+    MUSIC_STORAGE_KEY,
+    mergeMusicLibraries,
+    sanitizeMusicLibrary,
+    type MusicLibrary,
+} from './music-library';
+import {
     ACTIVE_PRESET_STORAGE_KEY,
     ACTIVE_THEME_STORAGE_KEY,
+    HIDDEN_DEFAULTS_STORAGE_KEY,
     OPTIONS_STORAGE_KEY,
     PRESETS_STORAGE_KEY,
     THEMES_STORAGE_KEY,
@@ -28,12 +36,15 @@ export type AccountData = {
     wheelLimit: number | null;
     themes: WheelTheme[];
     presets: WheelPreset[];
+    /** Playlist de música. null en cuentas guardadas antes de que existiera. */
+    music: MusicLibrary | null;
 };
 
 /** Lo que se sincroniza: sin updatedAt ni versión. */
 export type AccountSnapshot = Omit<AccountData, 'version' | 'updatedAt'>;
 
-const BUCKET = 'user-data';
+export const USER_DATA_BUCKET = 'user-data';
+const BUCKET = USER_DATA_BUCKET;
 // Coincide con file_size_limit del bucket: mejor un aviso claro que un error del servidor.
 const MAX_ACCOUNT_BYTES = 10 * 1024 * 1024;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -47,8 +58,14 @@ const DATA_KEYS = [
     PRESETS_STORAGE_KEY,
     ACTIVE_PRESET_STORAGE_KEY,
     WHEEL_LIMIT_STORAGE_KEY,
+    HIDDEN_DEFAULTS_STORAGE_KEY,
+    MUSIC_STORAGE_KEY,
+    MUSIC_PENDING_KEY,
     SYNC_KEY,
 ];
+
+/** uid con forma de uid de Supabase: las rutas de la nube solo se construyen con uno así. */
+export const isAccountUid = (uid: string): boolean => UUID.test(uid);
 
 // La ruta sale siempre del uid de la sesión, nunca de datos del usuario.
 const objectPath = (uid: string): string | null => (UUID.test(uid) ? `${uid}/spinly.json` : null);
@@ -87,6 +104,7 @@ export function sanitizeAccountData(raw: unknown): AccountData | null {
         wheelLimit: cleanLimit(d.wheelLimit),
         themes: listOf(d.themes, 'savedThemes', sanitizeTheme).filter((theme) => !theme.id.startsWith('preset-')),
         presets: listOf(d.presets, 'savedPresets', sanitizePreset).filter((preset) => !preset.id.startsWith('default-preset-')),
+        music: sanitizeMusicLibrary(d.music),
     };
 }
 
@@ -105,6 +123,7 @@ export function readLocalData(): AccountSnapshot {
         wheelLimit: get(WHEEL_LIMIT_STORAGE_KEY),
         themes: parse(get(THEMES_STORAGE_KEY)),
         presets: parse(get(PRESETS_STORAGE_KEY)),
+        music: parse(get(MUSIC_STORAGE_KEY)),
     });
     const { version, updatedAt, ...snapshot } = clean as AccountData;
     return snapshot;
@@ -118,6 +137,8 @@ export function writeLocalData(data: AccountSnapshot): void {
         [WHEEL_LIMIT_STORAGE_KEY, data.wheelLimit !== null ? String(data.wheelLimit) : null],
         [THEMES_STORAGE_KEY, JSON.stringify(data.themes)],
         [PRESETS_STORAGE_KEY, JSON.stringify(data.presets)],
+        // Sin lista en la cuenta (anterior a la música): este navegador vuelve a la de por defecto.
+        [MUSIC_STORAGE_KEY, data.music ? JSON.stringify(data.music) : null],
     ];
     for (const [key, value] of entries) {
         try {
@@ -166,10 +187,12 @@ export function writeSyncMarker(uid: string, updatedAt: number): void {
 export function mergeGuestData(account: AccountSnapshot, guest: AccountSnapshot): AccountSnapshot {
     const themeIds = new Set(account.themes.map((theme) => theme.id));
     const presetIds = new Set(account.presets.map((preset) => preset.id));
+    const music = account.music && guest.music ? mergeMusicLibraries(account.music, guest.music) : account.music ?? guest.music;
     return {
         ...account,
         themes: [...account.themes, ...guest.themes.filter((theme) => !themeIds.has(theme.id))],
         presets: [...account.presets, ...guest.presets.filter((preset) => !presetIds.has(preset.id))],
+        music,
     };
 }
 

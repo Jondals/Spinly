@@ -138,14 +138,14 @@
         align-items: center;
         justify-content: center;
         background: transparent;
-        border: 1px solid var(--color-border);
+        border: 1px solid transparent;
         border-radius: 50%;
         cursor: pointer;
         transition: border-color 0.15s ease, background-color 0.15s ease;
     }
 
     .spinly-profile-button:hover {
-        border-color: var(--color-focus);
+        border-color: var(--color-border-light);
         background-color: var(--color-hover);
     }
 
@@ -153,6 +153,12 @@
         width: 2.2rem;
         height: 2.2rem;
         border: none;
+    }
+
+    /* Sin foto: solo el icono, como el resto de botones de la cabecera */
+    .spinly-profile-button .spinly-avatar--placeholder {
+        background: transparent;
+        color: var(--font-color);
     }
 
     .spinly-profile-menu {
@@ -256,7 +262,7 @@
     .spinly-profile-sync svg {
         flex-shrink: 0;
         margin-top: 0.1rem;
-        color: var(--color-focus);
+        color: var(--color-focus-text);
     }
 
     .spinly-profile-divider {
@@ -488,6 +494,10 @@
         gap: 0.5rem;
     }
 
+    .spinly-profile-form .spinly-profile-actions {
+        margin-top: 0.5rem;
+    }
+
     .spinly-profile-actions .spinly-action-btn svg {
         display: block;
     }
@@ -530,6 +540,22 @@
         /* En móvil el idioma se elige dentro del drawer */
         .spinly-lang--header {
             display: none;
+        }
+
+        /* El perfil ya no es el último botón (el menú va a su derecha): su panel cuelga de la
+           cabecera y ocupa el ancho de la pantalla con sus mismos márgenes, en vez de colgar del
+           botón y salirse por la izquierda. */
+        .spinly-profile {
+            position: static;
+        }
+
+        .spinly-profile-menu {
+            left: 1rem;
+            right: 1rem;
+            width: auto;
+            max-height: calc(100vh - 5.5rem);
+            max-height: calc(100dvh - 5.5rem);
+            transform-origin: top center;
         }
     }
 }

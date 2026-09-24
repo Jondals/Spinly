@@ -2,6 +2,10 @@ import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from 
 import '../../css/Wheel.css';
 import { SPIN_DURATION, describeSector, getImageBox, getWheelBackground, spinWheel, getLabelTransform, getOptionProbabilities, isLightColor, WHEEL_VIEWBOX } from '../../scripts/wheel';
 import Icon from '../common/Icon';
+import DotField from './DotField';
+import AudioControls from '../music/AudioControls';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { MOBILE_QUERY } from '../../scripts/layout';
 import Tooltip from '../common/Tooltip';
 import type { WheelTheme } from '../../types/theme-types';
 import type { WheelOption } from '../../scripts/option-wheel';
@@ -59,6 +63,7 @@ function Wheel({ options, activeTheme, onColorChange }: WheelProps) {
     const lightsRef = useRef<HTMLButtonElement>(null);
     const [picker, setPicker] = useState<{ field: WheelColorField; anchor: HTMLElement; color: string } | null>(null);
     const sound = useSoundPreference();
+    const isMobile = useMediaQuery(MOBILE_QUERY);
 
     useWheelColors(activeTheme);
     useSpinTicks(discRef, spinning, options.length, sound.enabled);
@@ -132,8 +137,12 @@ function Wheel({ options, activeTheme, onColorChange }: WheelProps) {
 
     // Reparto equitativo: una frase. Con pesos distintos: la lista completa.
     const probabilities = getOptionProbabilities(options);
-    const formatPct = (probability: number): string =>
-        new Intl.NumberFormat(lang, { maximumFractionDigits: 2 }).format(probability * 100);
+    // Hasta dos decimales, sin ceros sobrantes. Sin Intl.NumberFormat: crearlo cuesta ~6 ms en el
+    // primer render y aquí solo cambia el separador decimal.
+    const formatPct = (probability: number): string => {
+        const rounded = String(Math.round(probability * 10000) / 100);
+        return lang === 'es' ? rounded.replace('.', ',') : rounded;
+    };
     const allEqual = probabilities.every((item) => Math.abs(item.probability - (probabilities[0]?.probability ?? 0)) < 1e-9);
     const oddsContent: React.ReactNode = probabilities.length === 0
         ? t('wheel', 'oddsEmpty')
@@ -159,6 +168,7 @@ function Wheel({ options, activeTheme, onColorChange }: WheelProps) {
 
     return (
         <div className="Wheel">
+            <DotField />
             {showResult && winner && (
                 <Suspense fallback={null}>
                     <WinnerOverlay winner={winner} onClose={closeResult} onSpinAgain={handleSpinAgain} />
@@ -274,19 +284,10 @@ function Wheel({ options, activeTheme, onColorChange }: WheelProps) {
                         <Icon name="shieldCheck" className="wheel-spin-hint-icon" />
                         <span className="wheel-spin-hint-text">{t('wheel', 'certified')}</span>
                     </Tooltip>
-                    <span className="wheel-spin-hint-sep" aria-hidden="true">·</span>
-                    <button
-                        type="button"
-                        className="wheel-sound-btn"
-                        onClick={sound.toggle}
-                        aria-pressed={sound.enabled}
-                        aria-label={t('wheel', 'sound')}
-                        title={t('wheel', 'sound')}
-                    >
-                        <Icon name={sound.enabled ? 'soundOn' : 'soundOff'} className="wheel-spin-hint-icon" />
-                    </button>
                 </div>
             </div>
+            {/* Escritorio: música y sonidos abajo a la derecha. En móvil van en el menú. */}
+            {!isMobile && <AudioControls variant="dock" />}
         </div>
     );
 }

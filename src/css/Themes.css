@@ -11,8 +11,15 @@
 
 .presets-themes-subtitle {
     font-size: 0.8rem;
+    line-height: 1.45;
     color: var(--font-color-muted);
     margin: 0 var(--spinly-panel-pad-x);
+    /* Dos líneas como mucho */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
 }
 
 .presets-themes-grid {
@@ -43,22 +50,34 @@
     background: transparent;
     color: inherit;
     cursor: pointer;
-    padding: 0.75rem;
+    padding: 1.1rem;
     display: flex;
     flex-direction: column;
-    gap: 0.45rem;
+    gap: 0.7rem;
     font: inherit;
     text-align: left;
 }
 
+/* Título a la izquierda; autor (comunidad) o tick (tema activo) a la derecha. Mide lo mismo que
+   los botones de acción, que se alinean con esta fila (abajo): tick, título y botones a una altura. */
 .presets-themes-card-head {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    justify-content: space-between;
+    gap: 0.6rem;
+    min-width: 0;
+    min-height: 1.7rem;
+}
+
+.presets-themes-card .spinly-card-actions {
+    top: 1.1rem;
+    right: 1.1rem;
 }
 
 .presets-themes-card-name {
-    font-size: 0.9rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-size: 1.05rem;
     font-weight: 700;
     color: var(--font-color);
 }
@@ -66,7 +85,7 @@
 .presets-themes-active-check {
     margin-left: auto;
     font-size: 0.85rem;
-    color: var(--color-focus);
+    color: var(--color-focus-text);
 }
 
 .presets-themes-card-desc {
@@ -77,31 +96,33 @@
 
 .presets-themes-palette {
     display: flex;
-    gap: 0.25rem;
-    margin: 0.25rem 0;
+    gap: 0.55rem;
+    margin: 0.2rem 0;
 }
 
 .presets-themes-palette-swatch {
     flex: 1;
-    height: 0.7rem;
-    border-radius: 0.2rem;
-    border: 1px solid var(--color-border-dark);
+    height: 0.8rem;
+    border-radius: 999px;
 }
 
+/* Estilo a la izquierda y categoría a la derecha */
 .presets-themes-card-footer {
     display: flex;
     justify-content: space-between;
-    margin-top: 0.2rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
 }
 
 .presets-themes-tag {
-    font-size: 0.58rem;
+    font-size: 0.66rem;
     font-weight: 700;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
-    font-family: var(--font-family-alternative, monospace);
-    padding: 0.15rem 0.5rem;
-    border-radius: 999px;
+    font-family: var(--font-family);
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--spinly-chip-radius);
     background: var(--bg-transparence);
     color: var(--font-color-muted);
     white-space: nowrap;
@@ -112,12 +133,23 @@
 }
 
 .presets-themes-tag--category {
-    color: var(--color-focus);
+    color: var(--color-focus-text);
 }
 
 /* En la comunidad la tarjeta no es clicable: la acción es "Descargar" */
+.presets-themes-card:not(.presets-themes-card--community):hover {
+    background-color: var(--bg-card-hover-color);
+    border-color: var(--color-border-light);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px -10px rgba(0, 0, 0, 0.6);
+}
+
+.presets-themes-card--active:hover {
+    border-color: var(--color-focus-light);
+}
+
 .presets-themes-card--community .presets-themes-card-inner {
-    cursor: default;
+    cursor: inherit;
     text-align: left;
 }
 

@@ -3,6 +3,10 @@ import Header from './Components/layout/Header';
 import WheelManager, { type WheelSectionId } from './Components/layout/WheelManager';
 import WheelEditor from './Components/editor/WheelEditor';
 import Wheel, { type WheelColorField } from './Components/wheel/Wheel';
+import CustomCursor from './Components/common/CustomCursor';
+import { hideSplash } from './scripts/splash';
+import MusicProvider from './Components/music/MusicProvider';
+import { readMusicLibrary, writeMusicLibrary, type MusicLibrary } from './scripts/music-library';
 import { useTranslation } from './Components/i18n/LanguageProvider';
 import { useButtonSounds } from './hooks/useButtonSounds';
 import { useAccountSync } from './hooks/useAccountSync';
@@ -13,10 +17,10 @@ import {
     ACTIVE_THEME_STORAGE_KEY,
     DEFAULT_PRESETS,
     DEFAULT_THEMES,
+    HIDDEN_DEFAULTS_STORAGE_KEY,
     OPTIONS_STORAGE_KEY,
     PRESETS_STORAGE_KEY,
     THEMES_STORAGE_KEY,
-    WHEEL_LIMIT_STORAGE_KEY,
     clonePreset,
     cloneTheme,
     ensureSegments,
@@ -155,7 +159,25 @@ function App() {
         }
         return [];
         });
-    const savedThemes: WheelTheme[] = [...DEFAULT_THEMES, ...userThemes];
+    // Los temas y preajustes de ejemplo se pueden borrar: se recuerda cuáles para no mostrarlos.
+    const [hiddenDefaults, setHiddenDefaults] = useState<string[]>(() => {
+        try {
+            const raw: unknown = JSON.parse(localStorage.getItem(HIDDEN_DEFAULTS_STORAGE_KEY) ?? '[]');
+            return Array.isArray(raw) ? raw.filter((id): id is string => typeof id === 'string') : [];
+        } catch {
+            return [];
+        }
+    });
+    useEffect(() => {
+        try {
+            localStorage.setItem(HIDDEN_DEFAULTS_STORAGE_KEY, JSON.stringify(hiddenDefaults));
+        } catch {
+            // Sin acceso a storage: se olvida al recargar.
+        }
+    }, [hiddenDefaults]);
+    const hideDefault = (id: string) => setHiddenDefaults((prev) => (prev.includes(id) ? prev : [...prev, id]));
+
+    const savedThemes: WheelTheme[] = [...DEFAULT_THEMES.filter((theme) => !hiddenDefaults.includes(theme.id)), ...userThemes];
 
     const [userPresets, setUserPresets] = useState<WheelPreset[]>(() => {
         if (typeof window === 'undefined') return [];
@@ -181,7 +203,7 @@ function App() {
         }
         return [];
     });
-    const savedPresets: WheelPreset[] = [...DEFAULT_PRESETS, ...userPresets];
+    const savedPresets: WheelPreset[] = [...DEFAULT_PRESETS.filter((preset) => !hiddenDefaults.includes(preset.id)), ...userPresets];
 
     const [activePresetId, setActivePresetId] = useState<string | null>(() => {
         if (typeof window === 'undefined') return null;
@@ -194,18 +216,9 @@ function App() {
         return null;
     });
 
-    // Nunca por debajo de las opciones que ya hay: una ruleta guardada con más de 14 sigue editable.
-    const [wheelLimit, setWheelLimit] = useState<number>(() => {
-        let limit = DEFAULT_WHEEL_LIMIT;
-        try {
-            const stored = localStorage.getItem(WHEEL_LIMIT_STORAGE_KEY);
-            const n = stored ? Number(stored) : NaN;
-            if (Number.isFinite(n)) limit = Math.min(Math.max(Math.round(n), MIN_OPTIONS), MAX_WHEEL_OPTIONS);
-        } catch {
-            // Sin acceso a storage (modo privado): el estado sigue en memoria.
-        }
-        return Math.max(limit, options.length);
-    });
+    // Siempre 14 al abrir (ampliable hasta 25 en el editor, solo para esta visita). Nunca por
+    // debajo de las opciones que ya hay: una ruleta guardada con más de 14 sigue editable.
+    const [wheelLimit, setWheelLimit] = useState<number>(() => Math.max(DEFAULT_WHEEL_LIMIT, options.length));
 
     // Un preset con más opciones que el límite lo sube lo justo, sin persistirlo.
     useEffect(() => {
@@ -286,7 +299,8 @@ function App() {
     };
 
     const handleDeleteTheme = (id: string) => {
-        setUserThemes((prev) => prev.filter((t) => t.id !== id));
+        if (DEFAULT_THEMES.some((theme) => theme.id === id)) hideDefault(id);
+        else setUserThemes((prev) => prev.filter((t) => t.id !== id));
     };
 
     // Expande la paleta al número de opciones; los nombres no se tocan.
@@ -331,7 +345,8 @@ function App() {
 
     const handleDeletePreset = (id: string) => {
         if (id === activePresetId) setActivePresetId(null);
-        setUserPresets((prev) => prev.filter((p) => p.id !== id));
+        if (DEFAULT_PRESETS.some((preset) => preset.id === id)) hideDefault(id);
+        else setUserPresets((prev) => prev.filter((p) => p.id !== id));
     };
 
     // Mismo id: nombre y tags del formulario, opciones y tema actuales de la ruleta.
@@ -379,15 +394,26 @@ function App() {
     const closeMenu = () => setIsMenuOpen(false);
 
     useEffect(prefetchPanels, []);
+    // La app ya está pintada: la pantalla de carga puede irse.
+    useEffect(hideSplash, []);
     useButtonSounds();
-    // Con cuenta, la ruleta, los temas y los preajustes viajan con ella (useAccountSync).
-    useAccountSync(useAccountSession(), {
+
+    // Playlist de música: viaja con la cuenta; la reproducción la lleva MusicProvider.
+    const [musicLibrary, setMusicLibrary] = useState<MusicLibrary>(readMusicLibrary);
+    useEffect(() => {
+        writeMusicLibrary(musicLibrary);
+    }, [musicLibrary]);
+
+    // Con cuenta, la ruleta, los temas, los preajustes y la música viajan con ella (useAccountSync).
+    const session = useAccountSession();
+    useAccountSync(session, {
         options,
         activeTheme,
         activePresetId,
         wheelLimit,
         themes: userThemes,
         presets: userPresets,
+        music: musicLibrary,
     });
 
     const renderPanel = (): React.ReactNode => {
@@ -438,36 +464,39 @@ function App() {
     };
 
     return (
-        <div className="App">
-            <Header isMenuOpen={isMenuOpen} onToggleMenu={toggleMenu} />
-            <main className={`Main Main--${activeSection}`}>
-                <WheelManager
-                    activeSection={activeSection}
-                    onSectionChange={handleSectionChange}
-                    isOpen={isMenuOpen}
-                    isAnimated={isMenuAnimated}
-                    onClose={closeMenu}
-                />
-                <div className="spinly-panel">
-                    <Suspense fallback={null}>
-                        {renderPanel()}
-                    </Suspense>
-                </div>
-                {/* Siempre montada: cambiar de sección no reinicia la ruleta */}
-                <Wheel options={options} activeTheme={activeTheme} onColorChange={handleWheelColor} />
-            </main>
+        <MusicProvider library={musicLibrary} onLibraryChange={setMusicLibrary} session={session}>
+            <div className="App">
+                <Header isMenuOpen={isMenuOpen} onToggleMenu={toggleMenu} />
+                <main className={`Main Main--${activeSection}`}>
+                    <WheelManager
+                        activeSection={activeSection}
+                        onSectionChange={handleSectionChange}
+                        isOpen={isMenuOpen}
+                        isAnimated={isMenuAnimated}
+                        onClose={closeMenu}
+                    />
+                    <div className="spinly-panel">
+                        <Suspense fallback={null}>
+                            {renderPanel()}
+                        </Suspense>
+                    </div>
+                    {/* Siempre montada: cambiar de sección no reinicia la ruleta */}
+                    <Wheel options={options} activeTheme={activeTheme} onColorChange={handleWheelColor} />
+                </main>
 
-            {storageWarning && (
-                <div className="spinly-storage-warning" role="alert">
-                    <span>{t('common', 'noSpace', { what: t('common', storageWarning) })}</span>
-                    <button
-                        type="button"
-                        onClick={() => setStorageWarning(null)}
-                        aria-label={t('common', 'dismissStorage')}
-                    >✕</button>
-                </div>
-            )}
-        </div>
+                {storageWarning && (
+                    <div className="spinly-storage-warning" role="alert">
+                        <span>{t('common', 'noSpace', { what: t('common', storageWarning) })}</span>
+                        <button
+                            type="button"
+                            onClick={() => setStorageWarning(null)}
+                            aria-label={t('common', 'dismissStorage')}
+                        >✕</button>
+                    </div>
+                )}
+                <CustomCursor />
+            </div>
+        </MusicProvider>
     );
 }
 

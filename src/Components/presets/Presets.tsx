@@ -5,10 +5,12 @@ import CreateRow from '../common/CreateRow';
 import Icon from '../common/Icon';
 import ItemActions, { countItemActions } from '../common/ItemActions';
 import ItemList from '../common/ItemList';
+import SwapItem from '../common/SwapItem';
 import PanelHeader from '../common/PanelHeader';
 import SegmentedToggle from '../common/SegmentedToggle';
 import StatusMessage, { type Notice } from '../common/StatusMessage';
-import OptionChips from './OptionChips';
+import TagChips from './TagChips';
+import WheelPreview from './WheelPreview';
 import { useTranslation } from '../i18n/LanguageProvider';
 import { useCloudCooldown } from '../../hooks/useCloudCooldown';
 import { useCommunity } from '../../hooks/useCommunity';
@@ -19,7 +21,6 @@ import { dictMessage, seedText } from '../../scripts/strings';
 import type { WheelOption } from '../../scripts/option-wheel';
 import { timeAgo, type WheelPreset, type WheelTheme } from '../../types/theme-types';
 import type { PresetDraft } from '../../types/form-drafts';
-import { isSupabaseConfigured } from '../../scripts/supabaseClient';
 import '../../css/Presets.css';
 
 interface PresetsProps {
@@ -168,10 +169,44 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
         <span className="presets-presets-card-badge">{t('presets', 'optionsCount', { n: preset.options.length })}</span>
     );
 
+    // Crear va bajo la lista; editar sustituye a la tarjeta que se edita, en su sitio.
+    const formPanel = (inline: boolean) => (
+        <CollapsePanel
+            id={inline ? `${FORM_ID}-edit` : FORM_ID}
+            open={inline || (form.open && mode === 'create')}
+            inline={inline}
+            title={formTitle}
+            hint={mode !== 'create' ? t('presets', 'editHint') : undefined}
+            submitLabel={submitLabel}
+            submitDisabled={!canSubmit || (mode === 'cloud' && cloud.blocked)}
+            onSubmit={() => { void handleSubmit(); }}
+            onClose={form.close}
+        >
+            <input
+                type="text"
+                className="spinly-field-input"
+                value={shownDraft.name}
+                onChange={(event) => setDraft((prev) => (prev ? { ...prev, name: event.target.value } : prev))}
+                placeholder={t('presets', 'namePh')}
+                aria-label={t('presets', 'namePh')}
+                maxLength={40}
+            />
+            <input
+                type="text"
+                className="spinly-field-input"
+                value={shownDraft.tags}
+                onChange={(event) => setDraft((prev) => (prev ? { ...prev, tags: event.target.value } : prev))}
+                placeholder={t('presets', 'tagsPh')}
+                aria-label={t('presets', 'tagsPh')}
+                maxLength={80}
+            />
+        </CollapsePanel>
+    );
+
     return (
         <div className="Presets presets-presets">
             <PanelHeader
-                icon="presets"
+                icon="bookmark"
                 title={t('presets', 'title')}
                 badge={view === 'mine'
                     ? t('presets', 'savedCount', { n: savedPresets.length })
@@ -179,7 +214,6 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
                 badgeTitle={view === 'community' ? t('common', 'communityCount', { x: downloaded, y: community.items.length }) : undefined}
             />
             <p className="presets-presets-subtitle">{t('presets', 'subtitle')}</p>
-            {!userId && isSupabaseConfigured && <p className="spinly-guest-hint">{t('common', 'guestShareHint')}</p>}
 
             <SegmentedToggle<PanelView>
                 ariaLabel={t('presets', 'viewLabel')}
@@ -206,25 +240,29 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
                         emptyClassName="presets-presets-empty"
                     >
                         {mine.map((preset) => {
+                            if (form.isEditing('local', preset.id)) return <SwapItem key={preset.id} swapped className="spinly-inline-edit">{formPanel(true)}</SwapItem>;
                             const isActive = preset.id === activePresetId;
                             const name = displayName(preset);
-                            const actions = isSeed(preset.id) ? {} : {
-                                ...(userId ? { onShare: () => { void handleShare(preset); } } : {}),
+                            const actions = isSeed(preset.id) ? { onDelete: () => handleDeleteLocal(preset) } : {
+                                onShare: () => { void handleShare(preset); },
                                 onEdit: () => startEdit(preset, 'local'),
                                 onDelete: () => handleDeleteLocal(preset),
                             };
                             const actionCount = countItemActions(actions);
                             return (
-                                <li key={preset.id} className={cardClass('presets-presets-card', actionCount, isActive ? ' presets-presets-card--active' : '')}>
+                                <SwapItem key={preset.id} swapped={false} className={cardClass('presets-presets-card', actionCount, isActive ? ' presets-presets-card--active' : '')}>
                                     <div className="presets-presets-card-inner">
                                         <div className="presets-presets-card-top">
                                             {optionsBadge(preset)}
-                                            <span className="presets-presets-meta">
-                                                {[`· ${timeAgo(preset.updatedAt, lang)}`, ...(preset.tags ?? []).map((tag) => `· ${tag}`)].join(' ')}
-                                            </span>
+                                            <span className="presets-presets-meta">· {timeAgo(preset.updatedAt, lang)}</span>
                                         </div>
-                                        <span className="presets-presets-card-name">{name}</span>
-                                        <OptionChips options={preset.options} />
+                                        <div className="presets-presets-card-body">
+                                            <div className="presets-presets-card-text">
+                                                <span className="presets-presets-card-name">{name}</span>
+                                                <TagChips tags={preset.tags ?? []} />
+                                            </div>
+                                            <WheelPreview preset={preset} />
+                                        </div>
                                         <div className="presets-presets-card-actions">
                                             {isActive ? (
                                                 <span className="presets-presets-loaded">✓ {t('presets', 'loaded')}</span>
@@ -244,7 +282,7 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
                                     {actionCount > 0 && (
                                         <ItemActions itemName={name} {...actions} editing={form.isEditing('local', preset.id)} busy={cloud.blocked} />
                                     )}
-                                </li>
+                                </SwapItem>
                             );
                         })}
                     </ItemList>
@@ -277,6 +315,7 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
                     error={community.error ? tm(community.error) : null}
                 >
                     {shared.map(({ preset, author, authorId }) => {
+                        if (form.isEditing('cloud', preset.id)) return <SwapItem key={preset.id} swapped className="spinly-inline-edit">{formPanel(true)}</SwapItem>;
                         // Solo decide qué se muestra; la autorización real la impone RLS.
                         const actions = userId && authorId === userId ? {
                             onEdit: () => startEdit(preset, 'cloud'),
@@ -284,12 +323,19 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
                         } : {};
                         const actionCount = countItemActions(actions);
                         return (
-                            <li key={preset.id} className={cardClass('presets-presets-card presets-presets-card--community', actionCount)}>
+                            <SwapItem key={preset.id} swapped={false} className={cardClass('presets-presets-card presets-presets-card--community', actionCount)}>
                                 <div className="presets-presets-card-inner">
-                                    <div className="presets-presets-card-top">{optionsBadge(preset)}</div>
-                                    <span className="presets-presets-card-name">{preset.name}</span>
-                                    <OptionChips options={preset.options} />
-                                    <AuthorTag author={author} />
+                                    <div className="presets-presets-card-top presets-presets-card-top--community">
+                                        <AuthorTag author={author} />
+                                        {optionsBadge(preset)}
+                                    </div>
+                                    <div className="presets-presets-card-body">
+                                        <div className="presets-presets-card-text">
+                                            <span className="presets-presets-card-name">{preset.name}</span>
+                                            <TagChips tags={preset.tags ?? []} />
+                                        </div>
+                                        <WheelPreview preset={preset} large />
+                                    </div>
                                     <div className="presets-presets-card-actions">
                                         <button
                                             type="button"
@@ -305,41 +351,13 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
                                 {actionCount > 0 && (
                                     <ItemActions itemName={preset.name} {...actions} cloud editing={form.isEditing('cloud', preset.id)} busy={cloud.blocked} />
                                 )}
-                            </li>
+                            </SwapItem>
                         );
                     })}
                 </ItemList>
             )}
 
-            <CollapsePanel
-                id={FORM_ID}
-                open={form.open}
-                title={formTitle}
-                hint={mode !== 'create' ? t('presets', 'editHint') : undefined}
-                submitLabel={submitLabel}
-                submitDisabled={!canSubmit || (mode === 'cloud' && cloud.blocked)}
-                onSubmit={() => { void handleSubmit(); }}
-                onClose={form.close}
-            >
-                <input
-                    type="text"
-                    className="spinly-field-input"
-                    value={shownDraft.name}
-                    onChange={(event) => setDraft((prev) => (prev ? { ...prev, name: event.target.value } : prev))}
-                    placeholder={t('presets', 'namePh')}
-                    aria-label={t('presets', 'namePh')}
-                    maxLength={40}
-                />
-                <input
-                    type="text"
-                    className="spinly-field-input"
-                    value={shownDraft.tags}
-                    onChange={(event) => setDraft((prev) => (prev ? { ...prev, tags: event.target.value } : prev))}
-                    placeholder={t('presets', 'tagsPh')}
-                    aria-label={t('presets', 'tagsPh')}
-                    maxLength={80}
-                />
-            </CollapsePanel>
+            {formPanel(false)}
         </div>
     );
 }

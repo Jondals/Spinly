@@ -85,7 +85,7 @@ export function useAccountSync(session: AccountSession | null, snapshot: Account
         };
     }, [uid]);
 
-    const { options, activeTheme, activePresetId, wheelLimit, themes, presets } = snapshot;
+    const { options, activeTheme, activePresetId, wheelLimit, themes, presets, music } = snapshot;
     useEffect(() => {
         if (!uid || readyRef.current !== uid || isSwitchingAccount()) return undefined;
         const save = async () => {
@@ -96,7 +96,7 @@ export function useAccountSync(session: AccountSession | null, snapshot: Account
         pendingSave = save;
         const timer = window.setTimeout(() => { void flushAccountSync(); }, SAVE_DELAY_MS);
         return () => window.clearTimeout(timer);
-    }, [uid, options, activeTheme, activePresetId, wheelLimit, themes, presets]);
+    }, [uid, options, activeTheme, activePresetId, wheelLimit, themes, presets, music]);
 
     // Al ocultar la pestaña (cambiar de app, cerrar) no se espera al retardo.
     useEffect(() => {

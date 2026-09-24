@@ -18,34 +18,59 @@ html {
 }
 
 :root[data-theme="light"] {
-    --bg-color: #f0f0f4;
+    /* Tres niveles bien separados: lienzo y menú pizarra, panel algo tintado y tarjetas blancas */
+    --bg-color: #e8edf4;
     --bg-header-color: #ffffff;
-    --bg-wheelmanager-color: #ffffff;
-    --bg-options-color: #ffffff;
-    --bg-wheel-color: #f6f6f9;
-    --bg-transparence: #e8e8fb;
+    --bg-wheelmanager-color: #dfe5ee;
+    --bg-options-color: #f0f3f8;
+    --bg-wheel-color: #e8edf4;
+    --bg-transparence: #e6ebf2;
     --bg-card-color: #ffffff;
-    --bg-card-hover-color: #f4f4f8;
-    --bg-input-color: #f6f6f9;
+    --bg-card-hover-color: #f7f9fc;
+    --bg-input-color: #ffffff;
 
-    --font-color: #14141a;
-    --font-color-light: #4a4956;
-    --font-color-muted: #686675;
-    --font-color-disabled: #b8b6c2;
+    /* Carbón y slate: contraste de lectura alto */
+    --font-color: #0f172a;
+    --font-color-light: #1e293b;
+    --font-color-muted: #475569;
+    --font-color-disabled: #8391a6;
 
-    --color-border: #cdcdda;
-    --color-border-light: #dcdce6;
-    --color-border-dark: #a9a9ba;
+    --color-border: #d2d9e4;
+    --color-border-light: #b8c3d2;
+    --color-border-dark: #94a3b8;
 
-    --color-hover: #eeeef4;
-    --color-active: #e4e4ee;
-    --color-focus: #6366f1;
-    --color-focus-light: #818cf8;
-    /* Acento sobre --bg-transparence (badges) con contraste AA */
-    --color-focus-text: #4f46e5;
-    --color-primary: #6366f1;
-    --color-primary-light: #818cf8;
-    --color-remove: #ef4444;
+    --color-hover: #e3e8f0;
+    --color-active: #cbd5e1;
+    /* Acento índigo del logo: selección, foco e insignias */
+    --color-focus: #4f46e5;
+    --color-focus-light: #6366f1;
+    --color-focus-text: #4338ca;
+    --color-primary: #0f172a;
+    --color-primary-light: #334155;
+    --color-remove: #dc2626;
+
+    /* Botón principal: carbón mate con texto blanco */
+    --button-primary-bg: #0f172a;
+    --button-primary-hover: #1e293b;
+    --button-primary-fg: #ffffff;
+
+    /* Menú: el activo se eleva en una tarjeta blanca con indicador índigo */
+    --menu-hover-bg: #eaeef4;
+    --menu-active-bg: #ffffff;
+    --menu-active-border: #cfd7e2;
+    --menu-indicator: #4f46e5;
+
+    /* Selector de pestañas: carril gris y pestaña activa blanca */
+    --seg-bg: #e3e8f0;
+    --seg-indicator: #ffffff;
+    --seg-shadow: 0 1px 2px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(15, 23, 42, 0.05);
+
+    --badge-bg: #eef0fe;
+    --badge-border: #c7cbf7;
+
+    --card-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 2px 6px rgba(15, 23, 42, 0.05);
+    --wheel-dots: #b9c3d1;
+    --wheel-dots-glow: #6366f1;
 
     --wheel-color-dark: #e6e6ee;
     --wheel-center-color: #ffffff;
@@ -56,35 +81,61 @@ html {
 }
 
 :root {
-    --bg-color: #000000;
-    --bg-header-color: #13131b;
-    --bg-wheelmanager-color: #121214;
-    --bg-options-color: #1f1f27;
-    --bg-wheel-color: #0d0d10;
-    --bg-transparence: #26263c;
-    --bg-card-color: #121214;
-    --bg-card-hover-color: #18181c;
-    --bg-input-color: #0d0d10;
+    /* Columnas: menú (#0C0D12), panel (#0E0F16) y ruleta (#090A0F) */
+    --bg-color: #090a0f;
+    --bg-header-color: #0c0d12;
+    --bg-wheelmanager-color: #0c0d12;
+    --bg-options-color: #0e0f16;
+    --bg-wheel-color: #090a0f;
+    /* Hover y activo del menú; también etiquetas e insignias */
+    --bg-transparence: #1e202e;
+    /* Botones, campos y contenedores */
+    --bg-card-color: #141620;
+    --bg-card-hover-color: #1a1c29;
+    --bg-input-color: #141620;
 
-    --font-color: #ffffff;
-    --font-color-light: #bab7c9;
-    --font-color-muted: #8b899a;
-    --font-color-disabled: #4f4e59;
+    --font-color: #f4f5fa;
+    --font-color-light: #c5c8d8;
+    --font-color-muted: #8a8ea6;
+    --font-color-disabled: #4b4e63;
     --font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --font-family-alternative: monospace;
+    /* Etiquetas, insignias y títulos de panel también en sans, como la maqueta */
+    --font-family-alternative: var(--font-family);
 
-    --color-border: #2a2a35;
-    --color-border-light: #343440;
-    --color-border-dark: #1c1c23;
+    --color-border: #22243a;
+    --color-border-light: #2d3048;
+    --color-border-dark: #181a27;
 
-    --color-hover: #24242d;
-    --color-active: #2b2b35;
-    --color-focus: #6366f1;
-    --color-focus-light: #818cf8;
-    --color-focus-text: #818cf8;
-    --color-primary: #6366f1;
-    --color-primary-light: #818cf8;
+    /* Hover del panel central y pestaña activa */
+    --color-hover: #262838;
+    --color-active: #2c2f42;
+    --color-focus: #3a3d58;
+    --color-focus-light: #8b90b8;
+    --color-focus-text: #b4b8e2;
+    --color-primary: #3a3d58;
+    --color-primary-light: #6c7196;
     --color-remove: #ef4444;
+
+    --menu-hover-bg: #1e202e;
+    --menu-active-bg: #1e202e;
+    --menu-active-border: #2d3048;
+    --menu-indicator: transparent;
+
+    --card-shadow: none;
+    --wheel-dots: #262838;
+
+    --seg-bg: var(--bg-card-color);
+    --seg-indicator: var(--color-hover);
+    --seg-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+
+    --badge-bg: var(--bg-transparence);
+    --badge-border: var(--color-focus);
+    --wheel-dots-glow: #8b90b8;
+
+    /* Botón principal: gris claro suave, no blanco puro, para no deslumbrar sobre el fondo oscuro */
+    --button-primary-bg: #cdd0dc;
+    --button-primary-hover: #dadde7;
+    --button-primary-fg: #0c0d12;
 
     --wheel-color-primary: #6366f1;
     --wheel-color-secondary: #a78bfa;
@@ -122,13 +173,14 @@ html {
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: minmax(0, 20rem) minmax(0, 20rem) minmax(0, 1fr);
+    /* Menú estrecho, panel más ancho y la ruleta con el resto */
+    grid-template-columns: minmax(0, 15rem) minmax(0, 23rem) minmax(0, 1fr);
     overflow: hidden;
 }
 
 @media (min-width: 751px) and (max-width: 1000px) {
     .Main {
-        grid-template-columns: minmax(0, 13.5rem) minmax(0, 19rem) minmax(0, 1fr);
+        grid-template-columns: minmax(0, 12.5rem) minmax(0, 19.5rem) minmax(0, 1fr);
     }
 
     .Wheelmanager {
@@ -202,7 +254,7 @@ html {
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 1.25rem;
+        gap: 1.75rem;
     }
 
     .wheel-spin-button {

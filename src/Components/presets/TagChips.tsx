@@ -1,26 +1,25 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import type { WheelOption } from '../../scripts/option-wheel';
 import { useTranslation } from '../i18n/LanguageProvider';
 
-interface OptionChipsProps {
-    options: WheelOption[];
+interface TagChipsProps {
+    tags: string[];
 }
 
 // Sin medidas reales (primer pintado o entorno sin layout).
 const fallbackCount = (total: number): number => (total <= 4 ? total : 3);
 
 /**
- * Chips en una sola fila: se muestran los que caben, medidos en una capa invisible, y el
- * resto se agrupa en "+N". Se recalcula con ResizeObserver al cambiar el ancho.
+ * Etiquetas de un preajuste en una sola fila: se muestran las que caben, medidas en una capa
+ * invisible, y el resto se agrupa en "+N". Se recalcula con ResizeObserver al cambiar el ancho.
  */
-function OptionChips({ options }: OptionChipsProps) {
+function TagChips({ tags }: TagChipsProps) {
     const { t } = useTranslation();
     const rowRef = useRef<HTMLDivElement>(null);
     const measureRef = useRef<HTMLDivElement>(null);
-    const [visible, setVisible] = useState(() => fallbackCount(options.length));
-    const total = options.length;
+    const [visible, setVisible] = useState(() => fallbackCount(tags.length));
+    const total = tags.length;
     const moreSample = t('presets', 'more', { n: total });
-    const namesKey = options.map((option) => option.name).join('\u0000');
+    const tagsKey = tags.join('\u0000');
 
     useLayoutEffect(() => {
         const row = rowRef.current;
@@ -49,7 +48,7 @@ function OptionChips({ options }: OptionChipsProps) {
                 used += gap + width;
                 count += 1;
             }
-            // Siempre al menos uno; si no cabe se recorta con ellipsis.
+            // Siempre al menos una; si no cabe se recorta con ellipsis.
             setVisible(Math.max(1, count));
         };
 
@@ -58,21 +57,22 @@ function OptionChips({ options }: OptionChipsProps) {
         const observer = new ResizeObserver(compute);
         observer.observe(row);
         return () => observer.disconnect();
-    }, [namesKey, moreSample, total]);
+    }, [tagsKey, moreSample, total]);
 
+    if (total === 0) return null;
     const hidden = total - visible;
 
     return (
         <div className="presets-presets-chips" ref={rowRef}>
-            {options.slice(0, visible).map((option) => (
-                <span key={option.id} className="presets-presets-chip">{option.name}</span>
+            {tags.slice(0, visible).map((tag, index) => (
+                <span key={`${index}-${tag}`} className="presets-presets-chip">{tag}</span>
             ))}
             {hidden > 0 && (
                 <span className="presets-presets-chip presets-presets-chip--more">{t('presets', 'more', { n: hidden })}</span>
             )}
             <div className="presets-presets-chips-measure" ref={measureRef} aria-hidden="true">
-                {options.map((option) => (
-                    <span key={option.id} className="presets-presets-chip">{option.name}</span>
+                {tags.map((tag, index) => (
+                    <span key={`${index}-${tag}`} className="presets-presets-chip">{tag}</span>
                 ))}
                 <span className="presets-presets-chip presets-presets-chip--more">{moreSample}</span>
             </div>
@@ -80,4 +80,4 @@ function OptionChips({ options }: OptionChipsProps) {
     );
 }
 
-export default OptionChips;
+export default TagChips;

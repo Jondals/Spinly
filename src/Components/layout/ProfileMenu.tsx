@@ -24,6 +24,7 @@ import {
     type SpinlyProfile,
 } from '../../scripts/profile';
 import { adoptAccountData, beginAccountSwitch, clearLocalData, endAccountSwitch, reloadApp } from '../../scripts/account-data';
+import { clearTrackFiles } from '../../scripts/music-files';
 import { isAllowedImageMime, isSupabaseConfigured, MAX_UPLOAD_BYTES, notConfiguredError } from '../../scripts/supabaseClient';
 
 /** view: perfil abierto. create / login: sin sesión. edit: nombre, foto y contraseña. protect: poner contraseña a un perfil antiguo. */
@@ -313,6 +314,8 @@ function ProfileMenu() {
             return setFormError(result.error);
         }
         clearLocalData();
+        // Las canciones de este navegador también: se espera al borrado antes de recargar.
+        await clearTrackFiles();
         reloadApp();
     });
 
@@ -455,7 +458,6 @@ function ProfileMenu() {
                                         value={draftName}
                                         onChange={(event) => setDraftName(event.target.value)}
                                         maxLength={MAX_USERNAME_LENGTH}
-                                        placeholder={t('header', 'usernamePh')}
                                         autoComplete={formMode === 'edit' ? 'off' : 'username'}
                                         autoCapitalize="off"
                                         spellCheck={false}

@@ -5,6 +5,7 @@ import CreateRow from '../common/CreateRow';
 import Icon from '../common/Icon';
 import ItemActions, { countItemActions } from '../common/ItemActions';
 import ItemList from '../common/ItemList';
+import SwapItem from '../common/SwapItem';
 import PanelHeader from '../common/PanelHeader';
 import SegmentedToggle from '../common/SegmentedToggle';
 import StatusMessage, { type Notice } from '../common/StatusMessage';
@@ -13,9 +14,8 @@ import { useCloudCooldown } from '../../hooks/useCloudCooldown';
 import { useCommunity } from '../../hooks/useCommunity';
 import { initialView, useDraftForm, type PanelView } from '../../hooks/useDraftForm';
 import { useSessionUserId } from '../../hooks/useSessionUserId';
-import { deleteSharedTheme, fetchCommunityThemes, shareTheme, updateSharedTheme } from '../../scripts/community';
+import { deleteSharedTheme, fetchCommunityThemes, shareTheme, updateSharedTheme, type CommunityAuthor } from '../../scripts/community';
 import { dictMessage, seedText } from '../../scripts/strings';
-import { isSupabaseConfigured } from '../../scripts/supabaseClient';
 import { DEFAULT_THEMES, cloneTheme, ensureSegments, type WheelTheme } from '../../types/theme-types';
 import type { ThemeDraft } from '../../types/form-drafts';
 import '../../css/Themes.css';
@@ -177,10 +177,11 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
 
     const isActiveTheme = (theme: WheelTheme) => view === 'mine' && activeTheme?.id === theme.id;
 
-    const renderDetails = (theme: WheelTheme, description?: string, category?: string) => (
+    const renderDetails = (theme: WheelTheme, description?: string, category?: string, author?: CommunityAuthor) => (
         <>
             <div className="presets-themes-card-head">
                 <span className="presets-themes-card-name">{theme.name}</span>
+                {author && <AuthorTag author={author} />}
                 {isActiveTheme(theme) && <span className="presets-themes-active-check" aria-label={t('themes', 'active')}>✓</span>}
             </div>
             {description && <span className="presets-themes-card-desc">{description}</span>}
@@ -196,10 +197,40 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
         </>
     );
 
+    // Crear va bajo la lista; editar sustituye a la tarjeta que se edita, en su sitio.
+    const formPanel = (inline: boolean) => (
+        <CollapsePanel
+            id={inline ? `${FORM_ID}-edit` : FORM_ID}
+            open={inline || (form.open && mode === 'create')}
+            inline={inline}
+            title={formTitle}
+            hint={mode !== 'create' ? t('themes', 'editHint') : undefined}
+            submitLabel={submitLabel}
+            submitDisabled={!activeTheme || (mode === 'cloud' && cloud.blocked)}
+            onSubmit={() => { void handleSubmit(); }}
+            onClose={form.close}
+        >
+            <input type="text" className="spinly-field-input" value={shownDraft.name}
+                onChange={(event) => updateField('name', event.target.value)}
+                placeholder={t('themes', 'namePh')} aria-label={t('themes', 'namePh')} maxLength={32} />
+            <textarea className="spinly-field-input spinly-field-input--textarea" value={shownDraft.description}
+                onChange={(event) => updateField('description', event.target.value)}
+                placeholder={t('themes', 'descPh')} aria-label={t('themes', 'descPh')} maxLength={120} rows={2} />
+            <div className="spinly-field-row">
+                <input type="text" className="spinly-field-input" value={shownDraft.styleTag}
+                    onChange={(event) => updateField('styleTag', event.target.value)}
+                    placeholder={t('themes', 'stylePh')} aria-label={t('themes', 'stylePh')} maxLength={24} />
+                <input type="text" className="spinly-field-input" value={shownDraft.category}
+                    onChange={(event) => updateField('category', event.target.value)}
+                    placeholder={t('themes', 'catPh')} aria-label={t('themes', 'catPh')} maxLength={24} />
+            </div>
+        </CollapsePanel>
+    );
+
     return (
         <div className="Themes presets-themes">
             <PanelHeader
-                icon="themes"
+                icon="palette"
                 title={t('themes', 'title')}
                 badge={view === 'mine'
                     ? t('themes', 'savedCount', { n: savedThemes.length })
@@ -207,7 +238,6 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
                 badgeTitle={view === 'community' ? t('common', 'communityCount', { x: downloaded, y: community.items.length }) : undefined}
             />
             <p className="presets-themes-subtitle">{t('themes', 'subtitle')}</p>
-            {!userId && isSupabaseConfigured && <p className="spinly-guest-hint">{t('common', 'guestShareHint')}</p>}
 
             <SegmentedToggle<PanelView>
                 ariaLabel={t('themes', 'viewLabel')}
@@ -234,14 +264,15 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
                         emptyClassName="presets-themes-empty"
                     >
                         {mine.map((theme) => {
-                            const actions = SEED_IDS.has(theme.id) ? {} : {
-                                ...(userId ? { onShare: () => { void handleShare(theme); } } : {}),
+                            if (form.isEditing('local', theme.id)) return <SwapItem key={theme.id} swapped className="spinly-inline-edit">{formPanel(true)}</SwapItem>;
+                            const actions = SEED_IDS.has(theme.id) ? { onDelete: () => handleDeleteLocal(theme) } : {
+                                onShare: () => { void handleShare(theme); },
                                 onEdit: () => startEdit(theme, 'local'),
                                 onDelete: () => handleDeleteLocal(theme),
                             };
                             const actionCount = countItemActions(actions);
                             return (
-                                <li key={theme.id} className={cardClass('presets-themes-card', actionCount, isActiveTheme(theme) ? ' presets-themes-card--active' : '')}>
+                                <SwapItem key={theme.id} swapped={false} className={cardClass('presets-themes-card', actionCount, isActiveTheme(theme) ? ' presets-themes-card--active' : '')}>
                                     <button
                                         type="button"
                                         className="presets-themes-card-inner"
@@ -253,7 +284,7 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
                                     {actionCount > 0 && (
                                         <ItemActions itemName={theme.name} {...actions} editing={form.isEditing('local', theme.id)} busy={cloud.blocked} />
                                     )}
-                                </li>
+                                </SwapItem>
                             );
                         })}
                     </ItemList>
@@ -288,6 +319,7 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
                     error={community.error ? tm(community.error) : null}
                 >
                     {shared.map(({ theme, author, authorId }) => {
+                        if (form.isEditing('cloud', theme.id)) return <SwapItem key={theme.id} swapped className="spinly-inline-edit">{formPanel(true)}</SwapItem>;
                         // Solo decide qué se muestra; la autorización real la impone RLS.
                         const actions = userId && authorId === userId ? {
                             onEdit: () => startEdit(theme, 'cloud'),
@@ -295,10 +327,9 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
                         } : {};
                         const actionCount = countItemActions(actions);
                         return (
-                            <li key={theme.id} className={cardClass('presets-themes-card presets-themes-card--community', actionCount)}>
+                            <SwapItem key={theme.id} swapped={false} className={cardClass('presets-themes-card presets-themes-card--community', actionCount)}>
                                 <div className="presets-themes-card-inner">
-                                    {renderDetails(theme, theme.description, theme.category)}
-                                    <AuthorTag author={author} />
+                                    {renderDetails(theme, theme.description, theme.category, author)}
                                     {savedIds.has(theme.id) ? (
                                         <button
                                             type="button"
@@ -324,37 +355,13 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
                                 {actionCount > 0 && (
                                     <ItemActions itemName={theme.name} {...actions} cloud editing={form.isEditing('cloud', theme.id)} busy={cloud.blocked} />
                                 )}
-                            </li>
+                            </SwapItem>
                         );
                     })}
                 </ItemList>
             )}
 
-            <CollapsePanel
-                id={FORM_ID}
-                open={form.open}
-                title={formTitle}
-                hint={mode !== 'create' ? t('themes', 'editHint') : undefined}
-                submitLabel={submitLabel}
-                submitDisabled={!activeTheme || (mode === 'cloud' && cloud.blocked)}
-                onSubmit={() => { void handleSubmit(); }}
-                onClose={form.close}
-            >
-                <input type="text" className="spinly-field-input" value={shownDraft.name}
-                    onChange={(event) => updateField('name', event.target.value)}
-                    placeholder={t('themes', 'namePh')} aria-label={t('themes', 'namePh')} maxLength={32} />
-                <textarea className="spinly-field-input spinly-field-input--textarea" value={shownDraft.description}
-                    onChange={(event) => updateField('description', event.target.value)}
-                    placeholder={t('themes', 'descPh')} aria-label={t('themes', 'descPh')} maxLength={120} rows={2} />
-                <div className="spinly-field-row">
-                    <input type="text" className="spinly-field-input" value={shownDraft.styleTag}
-                        onChange={(event) => updateField('styleTag', event.target.value)}
-                        placeholder={t('themes', 'stylePh')} aria-label={t('themes', 'stylePh')} maxLength={24} />
-                    <input type="text" className="spinly-field-input" value={shownDraft.category}
-                        onChange={(event) => updateField('category', event.target.value)}
-                        placeholder={t('themes', 'catPh')} aria-label={t('themes', 'catPh')} maxLength={24} />
-                </div>
-            </CollapsePanel>
+            {formPanel(false)}
         </div>
     );
 }

@@ -97,6 +97,9 @@ export const WHEEL_LIMIT_STORAGE_KEY = 'spinly-wheel-limit';
 
 export const OPTIONS_STORAGE_KEY = 'spinly-options';
 
+/** Ids de los temas y preajustes de ejemplo que el usuario ha borrado. */
+export const HIDDEN_DEFAULTS_STORAGE_KEY = 'spinly-hidden-defaults';
+
 export const DEFAULT_SEGMENT_COLOR = '#6366f1';
 
 const seg = (color: string, backgroundImage?: string): WheelSegmentStyle => (

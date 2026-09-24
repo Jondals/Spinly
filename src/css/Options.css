@@ -18,16 +18,28 @@
     overflow: hidden;
 
     .options-title {
-        .options-limit-value {
-            padding: 0;
+        /* Misma caja que .options-limit-inline: al editar no se mueve nada */
+        .options-limit-value,
+        .options-limit-inline {
+            display: inline-block;
+            box-sizing: content-box;
+            width: 2.4ch;
+            height: 1.2em;
+            padding: 0.05rem 0.2rem;
             margin: 0;
-            border: 0;
-            background: transparent;
-            color: inherit;
+            border: 1px solid transparent;
+            border-radius: 0.25rem;
             font: inherit;
             font-size: inherit;
+            line-height: 1.2em;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        .options-limit-value {
+            background: transparent;
+            color: inherit;
             cursor: pointer;
-            border-radius: 0.2rem;
             text-decoration: underline dotted;
             text-underline-offset: 0.15rem;
         }
@@ -36,26 +48,14 @@
             color: var(--font-color);
         }
 
+        /* Al editar solo cambia el subrayado: de punteado a una línea, con el cursor de texto */
         .options-limit-inline {
-            width: 2.5rem;
-            padding: 0;
-            margin: 0;
-            border: 0;
-            border-bottom: 1px solid var(--color-focus);
             outline: 0;
+            border-radius: 0;
             background: transparent;
-            color: inherit;
-            font: inherit;
-            font-size: inherit;
-            text-align: center;
-            appearance: textfield;
-            -moz-appearance: textfield;
-        }
-
-        .options-limit-inline::-webkit-outer-spin-button,
-        .options-limit-inline::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
+            color: var(--font-color);
+            caret-color: var(--font-color);
+            box-shadow: inset 0 -1px 0 var(--color-focus-light);
         }
     }
 
@@ -78,7 +78,7 @@
         .option-item {
             display: flex;
             align-items: center;
-            cursor: default;
+            cursor: inherit;
             transition: opacity 0.15s ease, border-color 0.15s ease;
             gap: 0.85rem;
             height: 3.25rem;
@@ -385,6 +385,13 @@
             }
         }
     }
+}
+
+/* Modo claro: sobre el panel tintado, el botón de añadir se eleva como una tarjeta blanca */
+:root[data-theme="light"] .Options .options-bottom .add-option-button:not(:hover, :disabled) {
+    background-color: var(--bg-card-color);
+    border-color: var(--color-border-light);
+    box-shadow: var(--card-shadow);
 }
 
 /* Columna estrecha (751-1000 px): menos hueco entre controles para que se lea el nombre */

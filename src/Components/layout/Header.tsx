@@ -28,7 +28,16 @@ function Header({ isMenuOpen, onToggleMenu }: HeaderProps) {
             <h1>Spinly</h1>
 
             <div className="spinly-actions">
-                {/* Solo en móvil, donde el gestor es un drawer */}
+                {/* En móvil el idioma se elige dentro del drawer */}
+                <LanguageSwitch variant="button" className="spinly-lang--header" />
+
+                <button type="button" className="spinly-theme" onClick={toggleScheme} aria-label={t('header', 'toggleTheme')}>
+                    <Icon name={scheme === 'dark' ? 'sun' : 'moon'} size={32} />
+                </button>
+
+                <ProfileMenu />
+
+                {/* Solo en móvil, donde el gestor es un drawer: el último, en el borde derecho */}
                 <button
                     type="button"
                     className={`spinly-menu-button ${isMenuOpen ? 'spinly-menu-button--open' : ''}`}
@@ -41,15 +50,6 @@ function Header({ isMenuOpen, onToggleMenu }: HeaderProps) {
                     <span className="hamburger-line" aria-hidden="true" />
                     <span className="hamburger-line" aria-hidden="true" />
                 </button>
-
-                {/* En móvil el idioma se elige dentro del drawer */}
-                <LanguageSwitch variant="button" className="spinly-lang--header" />
-
-                <button type="button" className="spinly-theme" onClick={toggleScheme} aria-label={t('header', 'toggleTheme')}>
-                    <Icon name={scheme === 'dark' ? 'sun' : 'moon'} size={32} />
-                </button>
-
-                <ProfileMenu />
             </div>
         </header>
     );

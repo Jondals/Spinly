@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import App from './App';
 import { LanguageProvider } from './Components/i18n/LanguageProvider';
+import { mergeMusicLibraries, sanitizeMusicLibrary } from './scripts/music-library';
 import { fitImageToSector, getImageBox, getSectorAngles, normalizeDegrees, randomSegmentColor, SPIN_DURATION, WHEEL_VIEWBOX } from './scripts/wheel';
 import {
     ACTIVE_THEME_STORAGE_KEY,
@@ -107,12 +108,67 @@ jest.mock('./scripts/community', () => ({
     },
 }));
 
+// Música simulada: jsdom no tiene Web Audio ni IndexedDB. Registra lo que suena y lo que se sube.
+const mockMusic = {
+    played: [] as string[],
+    files: new Map<string, Blob>(),
+    cloud: new Map<string, Blob>(),
+    uploads: [] as string[],
+    cloudDeletes: [] as string[],
+};
+jest.mock('./scripts/music-engine', () => ({
+    createMusicEngine: () => ({
+        playBuiltin: (id: string) => { mockMusic.played.push(`builtin:${id}`); },
+        playFile: async () => {
+            mockMusic.played.push('file');
+            return true;
+        },
+        pause: () => { mockMusic.played.push('pause'); },
+        resume: async () => {
+            mockMusic.played.push('resume');
+            return true;
+        },
+        setVolume: () => undefined,
+        onEnded: () => undefined,
+        dispose: () => undefined,
+    }),
+}));
+jest.mock('./scripts/music-files', () => ({
+    readTrackFile: async (id: string) => mockMusic.files.get(id) ?? null,
+    saveTrackFile: async (id: string, file: Blob) => {
+        mockMusic.files.set(id, file);
+        return true;
+    },
+    deleteTrackFile: async (id: string) => { mockMusic.files.delete(id); },
+    clearTrackFiles: async () => { mockMusic.files.clear(); },
+    uploadTrackFile: async (_uid: string, id: string, file: Blob) => {
+        mockMusic.uploads.push(id);
+        mockMusic.cloud.set(id, file);
+        return { ok: true, data: true };
+    },
+    downloadTrackFile: async (_uid: string, id: string) => {
+        const file = mockMusic.cloud.get(id);
+        return file ? { ok: true, data: file } : { ok: false, error: { en: 'missing', es: 'falta' } };
+    },
+    deleteCloudTrackFile: async (_uid: string, id: string) => {
+        mockMusic.cloudDeletes.push(id);
+        return { ok: true, data: true };
+    },
+}));
+
 const renderApp = () => render(<LanguageProvider><App /></LanguageProvider>);
 
 const storedActiveTheme = (): WheelTheme => JSON.parse(localStorage.getItem(ACTIVE_THEME_STORAGE_KEY) ?? 'null');
 
 beforeEach(() => {
     localStorage.clear();
+    // Cerrar sesión marca el cambio de cuenta y lo deshace la recarga, que aquí es simulada.
+    (jest.requireActual('./scripts/account-data') as typeof import('./scripts/account-data')).endAccountSwitch();
+    mockMusic.played = [];
+    mockMusic.files.clear();
+    mockMusic.cloud.clear();
+    mockMusic.uploads = [];
+    mockMusic.cloudDeletes = [];
     mockAuth.session = { userId: 'me', isAnonymous: false };
     mockAccount.profile = null;
     mockAccount.calls = [];
@@ -372,6 +428,40 @@ describe('ruleta y editor', () => {
         fireEvent.keyDown(input, { key: 'Enter' });
         expect(limitButton()).toHaveTextContent('25');
         expect(screen.getByRole('button', { name: 'Add option' })).toBeEnabled();
+
+        // Solo dos cifras en el campo.
+        fireEvent.click(limitButton());
+        const field = screen.getByLabelText('Option limit (max 25)');
+        fireEvent.change(field, { target: { value: '1a23' } });
+        expect(field).toHaveValue('12');
+        fireEvent.keyDown(field, { key: 'Escape' });
+    });
+
+    test('al editar el límite la primera cifra sustituye al valor; después se escribe detrás', () => {
+        renderApp();
+        fireEvent.click(screen.getByTitle('Click to edit the limit'));
+        const field = screen.getByLabelText('Option limit (max 25)');
+        expect(field).toHaveValue('14');
+        // El cursor está al final: lo tecleado llega detrás de "14" y se queda solo la cifra nueva.
+        fireEvent.change(field, { target: { value: '142' } });
+        expect(field).toHaveValue('2');
+        fireEvent.change(field, { target: { value: '20' } });
+        expect(field).toHaveValue('20');
+        fireEvent.keyDown(field, { key: 'Enter' });
+        expect(screen.getByTitle('Click to edit the limit')).toHaveTextContent('20');
+    });
+
+    test('el límite vuelve a 14 en cada visita, salvo que la ruleta ya tenga más opciones', () => {
+        const first = renderApp();
+        fireEvent.click(screen.getByTitle('Click to edit the limit'));
+        const input = screen.getByLabelText('Option limit (max 25)');
+        fireEvent.change(input, { target: { value: '20' } });
+        fireEvent.keyDown(input, { key: 'Enter' });
+        expect(screen.getByTitle('Click to edit the limit')).toHaveTextContent('20');
+        first.unmount();
+
+        renderApp();
+        expect(screen.getByTitle('Click to edit the limit')).toHaveTextContent('14');
     });
 
     test('los colores de flecha y luces se guardan en temas y presets', async () => {
@@ -403,13 +493,21 @@ describe('ruleta y editor', () => {
         expect(storedActiveTheme()).toMatchObject({ pointerColor: '#22d3ee', lightColor: '#f472b6' });
     });
 
-    test('el sonido se puede silenciar y la preferencia se recuerda', () => {
+    test('el volumen de los efectos se regula en la playlist: a 0 los apaga y se recuerda', async () => {
         renderApp();
-        const toggle = screen.getByRole('button', { name: 'Wheel sounds' });
-        expect(toggle).toHaveAttribute('aria-pressed', 'true');
-        fireEvent.click(toggle);
-        expect(toggle).toHaveAttribute('aria-pressed', 'false');
+        // En escritorio no hay botón de silenciar: el volumen vive en el mezclador de la playlist.
+        expect(screen.queryByRole('button', { name: 'Sounds' })).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: 'Open playlist' }));
+        const slider = await screen.findByRole('slider', { name: 'Sound effects volume' });
+        expect(slider).toHaveValue('1');
+        fireEvent.change(slider, { target: { value: '0.4' } });
+        expect(localStorage.getItem('spinly-sound-volume')).toBe('0.4');
+        fireEvent.change(slider, { target: { value: '0' } });
         expect(localStorage.getItem('spinly-sound')).toBe('off');
+        // Apagados no pierden el volumen: al subirlo de nuevo vuelven a sonar.
+        expect(localStorage.getItem('spinly-sound-volume')).toBe('0.4');
+        fireEvent.change(slider, { target: { value: '0.7' } });
+        expect(localStorage.getItem('spinly-sound')).toBe('on');
     });
 
     test('los botones suenan salvo con el sonido silenciado, también si cambian su icono', async () => {
@@ -443,7 +541,8 @@ describe('ruleta y editor', () => {
             expect(played.length).toBeGreaterThan(0);
             fireEvent.click(screen.getByRole('button', { name: 'Switch to English' }));
 
-            fireEvent.click(screen.getByRole('button', { name: 'Wheel sounds' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Open playlist' }));
+            fireEvent.change(await screen.findByRole('slider', { name: 'Sound effects volume' }), { target: { value: '0' } });
             played.length = 0;
             fireEvent.click(screen.getByRole('button', { name: 'Wheel Editor' }));
             expect(played).toHaveLength(0);
@@ -476,6 +575,25 @@ describe('ruleta y editor', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Wheel Editor' }));
         expect(container.querySelectorAll('.option-item--has-img')).toHaveLength(1);
+    });
+
+    test('la probabilidad se muestra con dos decimales como mucho y el separador de cada idioma', () => {
+        renderApp();
+        fireEvent.click(screen.getByRole('button', { name: 'Remove option 4' }));
+        expect(screen.getByText('Each option has a 33.33% chance (3 options).')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Cambiar a español' }));
+        expect(screen.getByText('Cada opción tiene un 33,33% de probabilidad (3 opciones).')).toBeInTheDocument();
+    });
+
+    test('la firma se puede ocultar y sigue oculta al volver', async () => {
+        const first = renderApp();
+        expect(screen.getByRole('link', { name: /Developed by\s*Jondals/ })).toHaveAttribute('href', 'https://github.com/Jondals');
+        fireEvent.click(screen.getByRole('button', { name: 'Hide credit' }));
+        await waitFor(() => expect(screen.queryByRole('link', { name: /Jondals/ })).not.toBeInTheDocument());
+        first.unmount();
+
+        renderApp();
+        expect(screen.queryByRole('link', { name: /Jondals/ })).not.toBeInTheDocument();
     });
 });
 
@@ -521,8 +639,8 @@ describe('comunidad', () => {
         localStorage.setItem(THEMES_STORAGE_KEY, JSON.stringify([local]));
         await openCommunity('Themes');
         expect(screen.queryByRole('button', { name: 'Download theme Shared t2' })).toBeNull();
-        fireEvent.click(await screen.findByRole('button', { name: 'Apply theme Shared t2, already in My themes' }));
-        expect(await screen.findByText('"Mi versión de t2" was already in My themes: applied without downloading it again.')).toBeInTheDocument();
+        fireEvent.click(await screen.findByRole('button', { name: 'Apply theme Shared t2, already downloaded' }));
+        expect(await screen.findByText('"Mi versión de t2" was already downloaded.')).toBeInTheDocument();
         expect(storedActiveTheme()).toMatchObject({ id: 't2', name: 'Mi versión de t2', pointerColor: '#123456' });
         const stored = JSON.parse(localStorage.getItem(THEMES_STORAGE_KEY) ?? '[]') as WheelTheme[];
         expect(stored).toEqual([local]);
@@ -536,7 +654,7 @@ describe('comunidad', () => {
         const first = JSON.parse(localStorage.getItem(PRESETS_STORAGE_KEY) ?? '[]') as WheelPreset[];
 
         fireEvent.click(use);
-        expect(await screen.findByText('"Shared p1" was already in My presets: loaded without downloading it again.')).toBeInTheDocument();
+        expect(await screen.findByText('"Shared p1" was already downloaded.')).toBeInTheDocument();
         const second = JSON.parse(localStorage.getItem(PRESETS_STORAGE_KEY) ?? '[]') as WheelPreset[];
         expect(second).toEqual(first);
         expect(second.filter((preset) => preset.id === 'p1')).toHaveLength(1);
@@ -563,12 +681,32 @@ describe('comunidad', () => {
         await settle();
     });
 
-    test('editar en la nube reutiliza el formulario y actualiza la misma fila', async () => {
+    test('las tarjetas de preajuste muestran sus etiquetas, no sus opciones', async () => {
+        const preset: WheelPreset = {
+            ...sharedPreset('rgb'),
+            name: 'RGB',
+            tags: ['red', 'green', 'blue'],
+            options: [{ id: 'a', name: 'Rojo', color: 'indigo' }, { id: 'b', name: 'Verde', color: 'indigo' }],
+        };
+        localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify([preset]));
+        renderApp();
+        fireEvent.click(screen.getByRole('button', { name: 'Presets' }));
+        const card = (await screen.findByText('RGB')).closest('li') as HTMLElement;
+        const chips = Array.from(card.querySelectorAll('.presets-presets-chips > .presets-presets-chip')).map((chip) => chip.textContent);
+        expect(chips).toEqual(['red', 'green', 'blue']);
+        expect(within(card).queryByText('Rojo')).toBeNull();
+    });
+
+    test('editar en la nube abre el formulario en el sitio de la tarjeta y actualiza la misma fila', async () => {
         const { container } = await openCommunity('Presets');
         fireEvent.click(await screen.findByRole('button', { name: 'Edit Shared p2 in the cloud' }));
 
-        const panel = container.querySelector('#presets-form') as HTMLElement;
+        // La tarjeta editada se sustituye por el formulario, dentro de la lista y no al final.
+        const panel = container.querySelector('#presets-form-edit') as HTMLElement;
         expect(panel).toHaveClass('spinly-collapse--open');
+        expect(panel.closest('.presets-presets-grid')).not.toBeNull();
+        expect(container.querySelector('#presets-form')).not.toHaveClass('spinly-collapse--open');
+        expect(screen.queryByRole('button', { name: 'Use preset Shared p2' })).toBeNull();
         const name = within(panel).getByPlaceholderText('Preset name') as HTMLInputElement;
         expect(name.value).toBe('Shared p2');
 
@@ -665,6 +803,7 @@ describe('cuenta', () => {
 
     test('cerrar sesión deja la app como la primera vez pero conserva el idioma', async () => {
         mockAccount.profile = { id: 'me', username: 'ana', avatar_url: null };
+        mockMusic.files.set('cancion-0001', new Blob(['x']));
         localStorage.setItem('spinly-lang', 'es');
         localStorage.setItem(THEMES_STORAGE_KEY, JSON.stringify([sharedTheme('t2')]));
         localStorage.setItem('spinly-options', JSON.stringify([{ id: 'a', name: 'A', color: 'indigo' }, { id: 'b', name: 'B', color: 'coral' }]));
@@ -676,17 +815,32 @@ describe('cuenta', () => {
         expect(localStorage.getItem(THEMES_STORAGE_KEY)).toBeNull();
         expect(localStorage.getItem('spinly-options')).toBeNull();
         expect(localStorage.getItem('spinly-lang')).toBe('es');
+        expect(localStorage.getItem('spinly-music')).toBeNull();
+        expect(mockMusic.files.size).toBe(0);
     });
 
-    test('sin sesión se puede descargar de la comunidad pero no compartir', async () => {
+    test('sin sesión no hay avisos fijos: se puede descargar y compartir avisa al intentarlo', async () => {
         mockAuth.session = null;
         localStorage.setItem(THEMES_STORAGE_KEY, JSON.stringify([{ ...sharedTheme('mio'), name: 'Mío' }]));
         renderApp();
         fireEvent.click(screen.getByRole('button', { name: 'Themes' }));
-        expect(await screen.findByText(/Sign in or create an account/)).toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: 'Share Mío with the community' })).toBeNull();
+        expect(await screen.findByRole('button', { name: 'Share Mío with the community' })).toBeInTheDocument();
+        expect(screen.queryByText(/Sign in/)).toBeNull();
         fireEvent.click(await screen.findByRole('tab', { name: 'Community' }));
         expect(await screen.findByRole('button', { name: 'Download theme Shared t1' })).toBeInTheDocument();
+    });
+
+    test('los temas y preajustes de ejemplo se pueden borrar y no vuelven al recargar', async () => {
+        const first = renderApp();
+        fireEvent.click(screen.getByRole('button', { name: 'Themes' }));
+        fireEvent.click(await screen.findByRole('button', { name: 'Delete Neon Nights' }));
+        await waitFor(() => expect(screen.queryByText('Neon Nights')).toBeNull());
+        first.unmount();
+
+        renderApp();
+        fireEvent.click(screen.getByRole('button', { name: 'Themes' }));
+        expect(await screen.findByText('Obsidian Flow')).toBeInTheDocument();
+        expect(screen.queryByText('Neon Nights')).toBeNull();
     });
 
     test('los datos de la cuenta se sanean y al entrar se suman los del invitado sin duplicar', () => {
@@ -708,5 +862,122 @@ describe('cuenta', () => {
         const guest = { ...clean!, themes: [{ ...sharedTheme('t1'), name: 'versión invitado' }, sharedTheme('t2')] };
         const merged = actualAccountData.mergeGuestData(account, guest);
         expect(merged.themes.map((theme) => [theme.id, theme.name])).toEqual([['t1', 'Shared t1'], ['t2', 'Shared t2']]);
+    });
+});
+
+describe('música', () => {
+    const song = (name: string, type = 'audio/mpeg') => new File(['audio'], name, { type });
+
+    // El panel se carga bajo demanda: se espera a que esté pintado, no solo el diálogo.
+    const openPlaylist = async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Open playlist' }));
+        const panel = await screen.findByRole('dialog', { name: 'Playlist' });
+        await within(panel).findByRole('button', { name: 'Upload songs' });
+        return panel;
+    };
+
+    const upload = async (panel: HTMLElement, ...files: File[]) => {
+        fireEvent.change(within(panel).getByLabelText('Upload songs'), { target: { files } });
+        await within(panel).findByRole('button', { name: `Play ${files[files.length - 1].name.replace(/\.[^.]+$/, '')}` });
+    };
+
+    let canPlay: jest.SpyInstance;
+    beforeEach(() => {
+        canPlay = jest.spyOn(HTMLMediaElement.prototype, 'canPlayType').mockReturnValue('maybe');
+    });
+    afterEach(() => canPlay.mockRestore());
+
+    test('sin canciones de serie: la playlist empieza vacía y el botón de música lleva a subirlas', async () => {
+        renderApp();
+        fireEvent.click(screen.getByRole('button', { name: 'Open playlist' }));
+        const panel = await screen.findByRole('dialog', { name: 'Playlist' });
+        expect(await within(panel).findByText(/Your playlist is empty/)).toBeInTheDocument();
+        expect(within(panel).getByRole('button', { name: 'Play' })).toBeDisabled();
+        expect(mockMusic.played).toEqual([]);
+    });
+
+    test('subir canciones: se validan, entran en la playlist, se guardan en la cuenta y se pueden quitar', async () => {
+        renderApp();
+        const panel = await openPlaylist();
+        const big = new File(['x'], 'Enorme.mp3', { type: 'audio/mpeg' });
+        Object.defineProperty(big, 'size', { value: 11 * 1024 * 1024 });
+        fireEvent.change(within(panel).getByLabelText('Upload songs'), { target: { files: [song('notas.txt', 'text/plain'), big] } });
+        expect(await within(panel).findByText('"Enorme" is over 10 MB.')).toBeInTheDocument();
+        expect(mockMusic.files.size).toBe(0);
+
+        await upload(panel, song('Mi canción.mp3', ''));
+        await waitFor(() => expect(mockMusic.uploads).toHaveLength(1));
+        const [id] = mockMusic.uploads;
+        expect(JSON.parse(localStorage.getItem('spinly-music') ?? '{}').playlist).toEqual([{ id, name: 'Mi canción', mime: 'audio/mpeg', size: 5 }]);
+        expect(localStorage.getItem('spinly-music-pending')).toBeNull();
+
+        fireEvent.click(within(panel).getByRole('button', { name: 'Remove Mi canción from the playlist' }));
+        await waitFor(() => expect(mockMusic.cloudDeletes).toEqual([id]));
+        expect(mockMusic.files.has(id)).toBe(false);
+        expect(await within(panel).findByText(/Your playlist is empty/)).toBeInTheDocument();
+    });
+
+    test('reproducir: encender, pausar y reanudar, pasar de canción y reordenar', async () => {
+        renderApp();
+        const panel = await openPlaylist();
+        await upload(panel, song('Uno.mp3'), song('Dos.ogg', 'audio/ogg'), song('Tres.wav', 'audio/wav'));
+
+        fireEvent.click(screen.getByRole('button', { name: 'Play music' }));
+        await waitFor(() => expect(mockMusic.played).toEqual(['file']));
+        expect(within(panel).getByRole('button', { name: 'Play Uno' })).toHaveAttribute('aria-current', 'true');
+        expect(localStorage.getItem('spinly-music-on')).toBe('on');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Pause music' }));
+        expect(mockMusic.played).toEqual(['file', 'pause']);
+        expect(localStorage.getItem('spinly-music-on')).toBe('off');
+        // Volver a encenderla reanuda la misma canción en vez de empezar otra.
+        fireEvent.click(screen.getByRole('button', { name: 'Play music' }));
+        await waitFor(() => expect(mockMusic.played).toEqual(['file', 'pause', 'resume']));
+
+        fireEvent.click(within(panel).getByRole('button', { name: 'Next track' }));
+        await waitFor(() => expect(within(panel).getByRole('button', { name: 'Play Dos' })).toHaveAttribute('aria-current', 'true'));
+
+        fireEvent.keyDown(within(panel).getByRole('button', { name: /^Move Tres/ }), { key: 'ArrowUp' });
+        expect(within(panel).getAllByRole('button', { name: /^Play [A-Z]/ }).map((button) => button.getAttribute('aria-label'))).toEqual(['Play Uno', 'Play Tres', 'Play Dos']);
+        expect(JSON.parse(localStorage.getItem('spinly-music') ?? '{}').playlist.map((track: { name: string }) => track.name)).toEqual(['Uno', 'Tres', 'Dos']);
+    });
+
+    test('sin sesión la canción se queda en el dispositivo y se sube al entrar en la cuenta', async () => {
+        mockAuth.session = null;
+        const first = renderApp();
+        const panel = await openPlaylist();
+        await upload(panel, song('Invitado.ogg', 'audio/ogg'));
+        expect(await within(panel).findByText(/"Invitado" added\. It is saved on this device/)).toBeInTheDocument();
+        expect(mockMusic.uploads).toEqual([]);
+        expect(JSON.parse(localStorage.getItem('spinly-music-pending') ?? '[]')).toHaveLength(1);
+        first.unmount();
+
+        mockAuth.session = { userId: 'me', isAnonymous: false };
+        renderApp();
+        await waitFor(() => expect(mockMusic.uploads).toHaveLength(1));
+        expect(localStorage.getItem('spinly-music-pending')).toBeNull();
+    });
+
+    test('la playlist que llega de la cuenta o del storage se sanea y al entrar se suman las del invitado', () => {
+        const track = (id: string, name = 'Canción') => ({ id, name, mime: 'audio/mpeg', size: 1000 });
+        const clean = sanitizeMusicLibrary({
+            playlist: [
+                // Las pistas de serie de versiones anteriores ya no existen.
+                { kind: 'builtin', builtin: 'neon', id: 'builtin-neon' },
+                track('../../otra-carpeta'),
+                { ...track('cancion-0001'), kind: 'upload' },
+                track('cancion-0001', 'duplicada'),
+                { ...track('cancion-0002'), mime: 'text/html' },
+                { ...track('cancion-0003'), size: 50 * 1024 * 1024 },
+            ],
+        });
+        expect(clean?.playlist).toEqual([track('cancion-0001')]);
+        expect(sanitizeMusicLibrary('basura')).toBeNull();
+
+        const guest = sanitizeMusicLibrary({ playlist: [track('cancion-0001', 'del invitado'), track('cancion-0009', 'Nueva')] });
+        const merged = mergeMusicLibraries(clean!, guest!);
+        expect(merged.playlist.map((item) => [item.id, item.name])).toEqual([['cancion-0001', 'Canción'], ['cancion-0009', 'Nueva']]);
+        const accountData = jest.requireActual('./scripts/account-data') as typeof import('./scripts/account-data');
+        expect(accountData.sanitizeAccountData({ music: clean })?.music).toEqual(clean);
     });
 });

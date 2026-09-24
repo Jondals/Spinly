@@ -11,34 +11,34 @@ type IconDef = {     /** stroke: iconos de línea (currentColor). fill: sólidos
 const defineIcons = <T extends Record<string, IconDef>>(icons: T): T => icons;
 
 const ICONS = defineIcons({
-    wheel: {
+    // Editor de ruleta: ajustes de las opciones.
+    sliders: {
         body: (
             <>
-                <circle cx="12" cy="12" r="9" />
-                <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                <path d="M12 3v8.5M12 12l7.8 4.5M12 12L4.2 7.5" />
+                <path d="M20 7h-9M14 17H5" />
+                <circle cx="17" cy="17" r="3" />
+                <circle cx="7" cy="7" r="3" />
             </>
         ),
+        strokeWidth: 1.75,
     },
-    presets: {
-        body: (
-            <>
-                <rect x="3" y="4" width="18" height="4" rx="1" />
-                <rect x="3" y="10" width="18" height="4" rx="1" />
-                <rect x="3" y="16" width="18" height="4" rx="1" />
-            </>
-        ),
+    // Preajustes: configuraciones guardadas.
+    bookmark: {
+        body: <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z" />,
+        strokeWidth: 1.75,
     },
-    themes: {
+    // Temas: el aspecto visual.
+    palette: {
         body: (
             <>
-                <circle cx="12" cy="12" r="9" />
-                <circle cx="8" cy="10" r="1" fill="currentColor" stroke="none" />
-                <circle cx="12" cy="8" r="1" fill="currentColor" stroke="none" />
-                <circle cx="16" cy="10" r="1" fill="currentColor" stroke="none" />
-                <path d="M12 21a9 9 0 0 1 0-18 9 9 0 0 1 5 1.5c1.5.8 1 3-.6 3H14a4 4 0 0 0 0 8h1c1.5 0 2 1.6 1 2.7A8.6 8.6 0 0 1 12 21Z" />
+                <path d="M12 22a10 10 0 1 1 10-10c0 2.8-2.2 4.5-4.5 4.5H15a2 2 0 0 0-1.5 3.3c.4.5.5 1.2.1 1.7-.4.3-1 .5-1.6.5Z" />
+                <circle cx="13.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+                <circle cx="17.5" cy="10.5" r="1" fill="currentColor" stroke="none" />
+                <circle cx="8.5" cy="7.5" r="1" fill="currentColor" stroke="none" />
+                <circle cx="6.5" cy="12.5" r="1" fill="currentColor" stroke="none" />
             </>
         ),
+        strokeWidth: 1.75,
     },
     plus: { body: <path d="M12 5v14M5 12h14" />, strokeWidth: 2.5 },
     search: { body: <><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></> },
@@ -140,6 +140,23 @@ const ICONS = defineIcons({
             </>
         ),
     },
+    github: {
+        body: (
+            <>
+                <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
+                <path d="M9 18c-4.51 2-5-2-7-2" />
+            </>
+        ),
+        strokeWidth: 1.75,
+    },
+    arrowUpRight: { body: <path d="M7 7h10v10M7 17 17 7" /> },
+    music: { body: <><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></> },
+    listMusic: { body: <><path d="M21 15V6" /><circle cx="18.5" cy="15.5" r="2.5" /><path d="M12 12H3M16 6H3M12 18H3" /></> },
+    pause: { body: <><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></> },
+    skipBack: { body: <><path d="M19 20 9 12l10-8v16Z" /><path d="M5 19V5" /></> },
+    skipForward: { body: <><path d="m5 4 10 8-10 8V4Z" /><path d="M19 5v14" /></> },
+    upload: { body: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" /> },
+    chevronUp: { body: <path d="m18 15-6-6-6 6" /> },
     cloud: {
         body: <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />,
     },
@@ -168,16 +185,26 @@ const ICONS = defineIcons({
         ),
     },
     sun: {
-        paint: 'fill',
-        body: <path d="M12 19a1 1 0 0 1 .993.883L13 20v1a1 1 0 0 1-1.993.117L11 21v-1a1 1 0 0 1 1-1m6.313-2.09.094.083.7.7a1 1 0 0 1-1.32 1.497l-.094-.083-.7-.7a1 1 0 0 1 1.218-1.567zm-11.306.083a1 1 0 0 1 .083 1.32l-.083.094-.7.7a1 1 0 0 1-1.497-1.32l.083-.094.7-.7a1 1 0 0 1 1.414 0M4 11a1 1 0 0 1 .117 1.993L4 13H3a1 1 0 0 1-.117-1.993L3 11zm17 0a1 1 0 0 1 .117 1.993L21 13h-1a1 1 0 0 1-.117-1.993L20 11zM6.213 4.81l.094.083.7.7a1 1 0 0 1-1.32 1.497l-.094-.083-.7-.7A1 1 0 0 1 6.11 4.74zm12.894.083a1 1 0 0 1 .083 1.32l-.083.094-.7.7a1 1 0 0 1-1.497-1.32l.083-.094.7-.7a1 1 0 0 1 1.414 0M12 2a1 1 0 0 1 .993.883L13 3v1a1 1 0 0 1-1.993.117L11 4V3a1 1 0 0 1 1-1m0 5a5 5 0 1 1-4.995 5.217L7 12l.005-.217A5 5 0 0 1 12 7" />,
+        body: (
+            <>
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+            </>
+        ),
+        strokeWidth: 1.75,
     },
     moon: {
-        paint: 'fill',
-        body: <path d="M12 1.992a10 10 0 1 0 9.236 13.838c.341-.82-.476-1.644-1.298-1.31a6.5 6.5 0 0 1-6.864-10.787l.077-.08c.551-.63.113-1.653-.758-1.653h-.266l-.068-.006z" />,
+        body: <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />,
+        strokeWidth: 1.75,
     },
     user: {
-        paint: 'fill',
-        body: <path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0 1.8c-3.6 0-7.2 1.8-7.2 4.2v1.5h14.4v-1.5c0-2.4-3.6-4.2-7.2-4.2Z" />,
+        body: (
+            <>
+                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+            </>
+        ),
+        strokeWidth: 1.75,
     },
     flagEs: {
         paint: 'own',

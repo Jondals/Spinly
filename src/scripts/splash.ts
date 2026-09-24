@@ -13,6 +13,11 @@ export function hideSplash(): void {
     // StrictMode monta dos veces en desarrollo: la salida solo se programa una.
     if (!splash || splash.dataset.leaving) return;
     splash.dataset.leaving = 'true';
+    // Recarga o cambio de cuenta: el script de index.html ya la ocultó, solo queda quitarla.
+    if (document.documentElement.classList.contains('spinly-splash-seen')) {
+        splash.remove();
+        return;
+    }
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
     const wait = Math.max(0, (reduced ? REDUCED_MOTION_MIN_MS : MIN_VISIBLE_MS) - performance.now());
     window.setTimeout(() => {

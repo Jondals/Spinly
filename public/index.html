@@ -8,9 +8,10 @@
     <link rel="icon" type="image/webp" href="/Images/spinly-logo-128.webp" />
     <link rel="preload" as="image" type="image/webp" href="/Images/spinly-logo-64.webp" imagesrcset="/Images/spinly-logo-64.webp 64w, /Images/spinly-logo-128.webp 128w" imagesizes="(max-width: 750px) 2rem, 2.5rem" />
     <title>Spinly</title>
-    <!-- Modo claro/oscuro antes del primer pintado: sin destello del modo equivocado.
+    <!-- Antes del primer pintado: el modo claro/oscuro (sin destello del modo equivocado) y si esta
+         pestaña ya vio la pantalla de carga (recargar o cambiar de cuenta no la repite).
          Su hash va en la CSP de vercel.json; inline-css.cjs falla el build si no coincide. -->
-    <script>try{"light"===localStorage.getItem("spinly-theme")&&document.documentElement.setAttribute("data-theme","light")}catch(t){}</script>
+    <script>try{var d=document.documentElement;"light"===localStorage.getItem("spinly-theme")&&d.setAttribute("data-theme","light"),sessionStorage.getItem("spinly-splash")?d.classList.add("spinly-splash-seen"):sessionStorage.setItem("spinly-splash","1")}catch(t){}</script>
     <style> /* evita que el menu aparezca desplegado mientras carga el CSS del bundle */
       @media (max-width: 750px) {
         .Wheelmanager:not(.Wheelmanager--open) {
@@ -47,6 +48,11 @@
       :root[data-theme="light"] .spinly-splash {
         background-color: #eef1f8;
         color: #0f172a;
+      }
+
+      /* Ya vista en esta pestaña: la app aparece directamente */
+      .spinly-splash-seen .spinly-splash {
+        display: none;
       }
 
       .spinly-splash--out {

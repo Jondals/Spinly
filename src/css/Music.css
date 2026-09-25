@@ -700,6 +700,12 @@
     animation-delay: -0.6s;
 }
 
+/* Con la música sonando, music-visuals.ts mueve las barras y el disco al tiempo de la canción */
+.spinly-music-synced .spinly-eq span,
+.spinly-music-synced .spinly-music-disc--spinning {
+    animation: none;
+}
+
 @keyframes spinly-eq {
     from { transform: scaleY(0.25); }
     to { transform: scaleY(1); }

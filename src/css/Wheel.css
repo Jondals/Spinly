@@ -180,8 +180,27 @@
 }
 
 .wheel-container--music .wheel-rim {
-    filter: drop-shadow(0 0 calc(var(--pulse, 0) * 3.5px) color-mix(in srgb, var(--wheel-light-color) 70%, transparent));
+    filter:
+        drop-shadow(0 0 calc(1px + var(--pulse, 0) * 5px) color-mix(in srgb, var(--wheel-light-color) 80%, transparent))
+        drop-shadow(0 0 calc(var(--pulse, 0) * 14px) color-mix(in srgb, var(--wheel-light-color) 45%, transparent));
     transition: none;
+}
+
+/* Halo de cada luz del aro (degradado radial, sin filtros por luz): apagado salvo con música */
+.wheel-light-halo {
+    fill: url(#wheel-light-halo);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.wheel-light-halo-core {
+    stop-color: var(--wheel-light-color);
+    stop-opacity: 0.85;
+}
+
+.wheel-light-halo-edge {
+    stop-color: var(--wheel-light-color);
+    stop-opacity: 0;
 }
 
 @keyframes wheel-light {

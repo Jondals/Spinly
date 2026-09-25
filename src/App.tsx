@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useState, useEffect, type ComponentType } from 'react';
+import React, { lazy, startTransition, Suspense, useState, useEffect, type ComponentType } from 'react';
 import Header from './Components/layout/Header';
 import WheelManager, { type WheelSectionId } from './Components/layout/WheelManager';
 import WheelEditor from './Components/editor/WheelEditor';
@@ -88,11 +88,34 @@ function prefetchPanels(): () => void {
     return () => clearTimeout(id);
 }
 
+/**
+ * Con la pantalla de carga delante, la app se monta en dos pasos: primero la cabecera y la ruleta y,
+ * tras pintarlas, el menú, el panel y el cursor. Montarlo todo junto era una sola tarea larga (sobre
+ * todo de layout) que bloqueaba el hilo principal; así son dos cortas y la pantalla de carga lo tapa.
+ * Sin pantalla de carga delante (al volver a montar tras cambiar de cuenta, o en los tests), todo a la vez.
+ */
+function useStagedMount(): boolean {
+    const [ready, setReady] = useState(() => !document.getElementById('spinly-splash'));
+    useEffect(() => {
+        if (ready) return undefined;
+        let timer = 0;
+        const frame = requestAnimationFrame(() => {
+            timer = window.setTimeout(() => startTransition(() => setReady(true)), 0);
+        });
+        return () => {
+            cancelAnimationFrame(frame);
+            window.clearTimeout(timer);
+        };
+    }, [ready]);
+    return ready;
+}
+
 // "Option"/"Opción": identifica las opciones con nombre por defecto que el usuario no ha editado.
 const DEFAULT_OPTION_LABELS = Object.values(STRINGS.options.defaultName);
 
 function App() {
     const { lang, t } = useTranslation();
+    const ready = useStagedMount();
     // La ruleta vuelve tal como se dejó; las 4 opciones por defecto solo aparecen la primera vez.
     const [options, setOptions] = useState<WheelOption[]>(() => {
         try {
@@ -479,17 +502,24 @@ function App() {
             <div className="App">
                 <Header isMenuOpen={isMenuOpen} onToggleMenu={toggleMenu} />
                 <main className={`Main Main--${activeSection}`}>
-                    <WheelManager
-                        activeSection={activeSection}
-                        onSectionChange={handleSectionChange}
-                        isOpen={isMenuOpen}
-                        isAnimated={isMenuAnimated}
-                        onClose={closeMenu}
-                    />
+                    {ready ? (
+                        <WheelManager
+                            activeSection={activeSection}
+                            onSectionChange={handleSectionChange}
+                            isOpen={isMenuOpen}
+                            isAnimated={isMenuAnimated}
+                            onClose={closeMenu}
+                        />
+                    ) : (
+                        // Reserva su columna del grid: la ruleta no cambia de sitio al llegar el menú.
+                        <div className="Wheelmanager" aria-hidden="true" />
+                    )}
                     <div className="spinly-panel">
-                        <Suspense fallback={null}>
-                            {renderPanel()}
-                        </Suspense>
+                        {ready && (
+                            <Suspense fallback={null}>
+                                {renderPanel()}
+                            </Suspense>
+                        )}
                     </div>
                     {/* Siempre montada: cambiar de sección no reinicia la ruleta */}
                     <Wheel options={options} activeTheme={activeTheme} onColorChange={handleWheelColor} />
@@ -505,7 +535,7 @@ function App() {
                         >✕</button>
                     </div>
                 )}
-                <CustomCursor />
+                {ready && <CustomCursor />}
             </div>
         </MusicProvider>
     );

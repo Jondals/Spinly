@@ -3,7 +3,7 @@
 // volumen general con limitador. Se carga bajo demanda: solo cuando el usuario enciende la música.
 // También da a music-pulse.ts el reloj de la canción y lo que mide el analizador, y analiza el pulso
 // de cada canción entera.
-import { OnsetMeter, type BeatGrid } from './beat-analysis';
+import { BeatTracker, OnsetMeter, type BeatGrid } from './beat-analysis';
 import { analyzeInWorker } from './beat-client';
 import type { MusicBands, MusicClock } from './music-pulse';
 
@@ -15,8 +15,8 @@ export interface MusicEngine {
     setVolume(volume: number): void;
     /** Energía por bandas de lo que suena ahora (0-1), sin contar el volumen: para las luces y el fondo. */
     bands(): MusicBands;
-    /** Fuerza de ataque de lo que mide ahora el analizador. */
-    onset(): number;
+    /** Seguidor del pulso en tiempo real (ver PulseSource.live en music-pulse.ts). */
+    live(analysis: number, at: number): { beat: number; period: number } | null;
     /** Tiempo de la canción que se oye ahora y el que mide el analizador; null si no suena. */
     clock(): MusicClock | null;
     /** Rejilla de pulso de un archivo de audio completo (null si no se puede decodificar o analizar). */
@@ -37,6 +37,8 @@ interface Session {
     pauseTimer: number;
     /** Reloj del audio menos tiempo de la canción (s), suavizado; null hasta la primera lectura. */
     offset: number | null;
+    /** Seguidor del pulso en tiempo real de esta canción. */
+    tracker: BeatTracker;
 }
 
 export function createMusicEngine(): MusicEngine | null {
@@ -120,7 +122,7 @@ export function createMusicEngine(): MusicEngine | null {
             gain.gain.value = 0.0001;
             gain.connect(bus);
             ctx.createMediaElementSource(element).connect(gain);
-            const session: Session = { element, gain, pauseTimer: 0, offset: null };
+            const session: Session = { element, gain, pauseTimer: 0, offset: null, tracker: new BeatTracker() };
             element.addEventListener('ended', () => {
                 if (current === session && !disposed) endedListener?.();
             });
@@ -183,9 +185,13 @@ export function createMusicEngine(): MusicEngine | null {
                 pitch: weight > 0 ? Math.min(1, Math.max(0, weighted / weight)) : 0.5,
             };
         },
-        onset() {
+        live(analysis, at) {
+            const session = current;
+            if (!session) return null;
             analyser.getFloatFrequencyData(decibels);
-            return meter.measure(decibels);
+            session.tracker.push(analysis, meter.measure(decibels));
+            const predicted = session.tracker.beatAt(at);
+            return predicted && predicted.beat >= 0 ? predicted : null;
         },
         clock() {
             const session = current;

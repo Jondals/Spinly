@@ -231,6 +231,9 @@ html {
         grid-template-areas:
             "wheel"
             "panel";
+        /* La fila de la ruleta mide lo suyo y el espacio que sobre va al panel: la ruleta no se mueve
+           cuando el panel se monta (un paso después, ver useStagedMount en App.tsx) ni cambia de alto. */
+        grid-template-rows: auto 1fr;
         min-height: calc(100vh - 4rem);
         min-height: calc(100dvh - 4rem);
         overflow: hidden;

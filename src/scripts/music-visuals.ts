@@ -2,10 +2,10 @@
 // la primera vez que suena una canción: quien no pone música no descarga nada de esto.
 import { readMusic, type MusicFrame, type MusicPattern } from './music-pulse';
 
-// Todo se mide en tiempos, no en milisegundos: con una canción rápida las luces van rápidas y con
-// una lenta, despacio. La vuelta avanza 3 luces por tiempo; en canciones muy rápidas, 2 (si no, se
-// emborrona) y en muy lentas, 4.
-const chaseSteps = (beatMs: number): number => (beatMs < 380 ? 2 : beatMs > 750 ? 4 : 3);
+// Todo se mide en tiempos de la canción, no en milisegundos: cada animación va a su BPM, como un
+// visualizador. Con una canción rápida todo va rápido y con una lenta, despacio, siempre a compás.
+// La vuelta avanza 3 luces por tiempo: una vuelta de 24 luces cada dos compases.
+const CHASE_STEPS_PER_BEAT = 3;
 // Cometas: tres, una vuelta completa por compás.
 const COMETS = 3;
 // Radio de las luces del aro en Wheel.tsx (viewBox de 100).
@@ -39,7 +39,7 @@ function patternLevel(pattern: MusicPattern, frame: MusicFrame, i: number, n: nu
         case 'bloom': {
             // La flor: cuatro pétalos que en cada tiempo nacen como puntos y se abren hasta llenar el
             // aro mientras se apagan; cada tiempo giran medio pétalo, y el que abre compás, más fuerte.
-            const open = easeOut(progress);
+            const open = easeOut(Math.min(1, progress / 0.6));
             const turn = (beats * Math.PI) / BLOOM_RIM_PETALS;
             const petal = 0.5 + 0.5 * Math.cos(BLOOM_RIM_PETALS * ((i / n) * Math.PI * 2 - turn));
             return petal ** (1 + 10 * (1 - open)) * (0.35 + pulse * 0.65);
@@ -60,6 +60,27 @@ function patternLevel(pattern: MusicPattern, frame: MusicFrame, i: number, n: nu
             const on = frame.downbeat || i % 2 === beats % 2;
             return on ? (1 - progress) ** 0.7 * (0.35 + pulse * 0.65) : 0;
         }
+        case 'equalizer': {
+            // Vúmetro: el aro se llena desde abajo por los dos lados hasta la altura del latido.
+            const height = 1 - ringDistance(i, 0, n) / (n / 2);
+            const fill = 0.15 + 0.85 * pulse;
+            return height <= fill ? 0.35 + 0.65 * pulse * (1 - (fill - height) * 0.5) : 0;
+        }
+        case 'fireworks': {
+            // Dos chispazos por tiempo en sitios al azar del aro, que se abren y se apagan.
+            const open = easeOut(progress);
+            let level = 0;
+            for (let k = 0; k < 2; k++) {
+                const at = Math.floor(hash(k + 7, beats) * n);
+                level = Math.max(level, Math.max(0, 1 - ringDistance(i, at, n) / (1 + open * 4)));
+            }
+            return level * (1 - progress);
+        }
+        case 'tunnel': {
+            // Tres ondas de luz que avanzan por el aro un tercio de vuelta por compás.
+            const wave = 0.5 + 0.5 * Math.cos(Math.PI * 2 * ((i / n) * 3 - (beats + progress) / 4));
+            return wave ** 3 * (0.35 + pulse * 0.65);
+        }
         case 'sparkle': {
             // Destellos: en cada golpe se enciende un tercio al azar y titilan con los agudos.
             const flash = hash(i, beats) < 0.34 ? 1 - progress : 0;
@@ -68,7 +89,7 @@ function patternLevel(pattern: MusicPattern, frame: MusicFrame, i: number, n: nu
         case 'spin':
         default: {
             // La vuelta: dos cabezas opuestas dan la vuelta al aro a compás, con una estela.
-            const head = (beats + easeOut(progress)) * chaseSteps(beatMs);
+            const head = (beats + easeOut(progress)) * CHASE_STEPS_PER_BEAT;
             const distance = Math.min(ringDistance(i, head, n), ringDistance(i, head + n / 2, n));
             return Math.max(0, 1 - distance / 3.5) * (0.4 + pulse * 0.6);
         }
@@ -90,16 +111,42 @@ export function lightLevel(frame: MusicFrame, i: number, n: number): number {
 export function startWheelLights(element: HTMLElement): () => void {
     const rim = Array.from(element.querySelectorAll<SVGElement>('.wheel-light--rim'));
     const hub = Array.from(element.querySelectorAll<SVGElement>('.wheel-light--hub'));
+    const halos = Array.from(element.querySelectorAll<SVGElement>('.wheel-light-halo'));
+    // Los iconos del reproductor (barras de ecualizador y disco) también van al tiempo de la canción
+    // mientras suena: se buscan en cada frame porque se montan y desmontan al abrir los menús.
+    let player: HTMLElement[] = [];
+    const syncPlayer = (music: MusicFrame) => {
+        const current = Array.from(document.querySelectorAll<HTMLElement>('.spinly-eq span, .spinly-music-disc--spinning'));
+        player.forEach((node) => { if (!current.includes(node)) node.style.removeProperty('transform'); });
+        player = current;
+        const levels = [music.pulse, music.melody, music.sparkle];
+        let bar = 0;
+        for (const node of player) {
+            if (node.classList.contains('spinly-music-disc--spinning')) {
+                // Una vuelta por compás.
+                const turn = ((music.beats + Math.min(1, music.sinceBeat / music.beatMs)) / 4) * 360;
+                node.style.transform = `rotate(${(turn % 360).toFixed(1)}deg)`;
+            } else {
+                node.style.transform = `scaleY(${(0.25 + 0.75 * levels[bar % 3]).toFixed(3)})`;
+                bar += 1;
+            }
+        }
+    };
+    document.documentElement.classList.add('spinly-music-synced');
     let frame = 0;
     const tick = (time: number) => {
         const music = readMusic(time);
         element.style.setProperty('--pulse', Math.max(music.pulse, music.melody * 0.5).toFixed(3));
         element.dataset.musicPattern = music.pattern;
+        syncPlayer(music);
         rim.forEach((light, i) => {
             const level = lightLevel(music, i, rim.length);
             light.style.opacity = level.toFixed(3);
             // Encendida también crece un poco: se lee como una bombilla que se enciende.
             light.setAttribute('r', (RIM_RADIUS + level * 0.4).toFixed(3));
+            // El halo solo se nota con la luz bien encendida: sin él, el aro se vería lavado.
+            const halo = halos[i];
+            if (halo) halo.style.opacity = (level ** 1.6).toFixed(3);
         });
         // El centro late con cada tiempo y respira con la melodía.
         const hubLevel = Math.max(0.3 + music.pulse * 0.7, music.melody).toFixed(3);
@@ -111,9 +158,11 @@ export function startWheelLights(element: HTMLElement): () => void {
     frame = requestAnimationFrame(tick);
     return () => {
         cancelAnimationFrame(frame);
+        player.forEach((node) => node.style.removeProperty('transform'));
+        document.documentElement.classList.remove('spinly-music-synced');
         element.style.removeProperty('--pulse');
         delete element.dataset.musicPattern;
-        [...rim, ...hub].forEach((light) => light.style.removeProperty('opacity'));
+        [...rim, ...hub, ...halos].forEach((light) => light.style.removeProperty('opacity'));
         rim.forEach((light) => light.setAttribute('r', String(RIM_RADIUS)));
     };
 }
@@ -123,7 +172,7 @@ export function startWheelLights(element: HTMLElement): () => void {
 const RING_REACH = 380;
 const RING_WIDTH = 70;
 // Largo máximo de los pétalos desde el borde de la ruleta (px) y grosor de su contorno.
-const BLOOM_REACH = 240;
+const BLOOM_REACH = 330;
 const BLOOM_EDGE = 30;
 // Cometas: distancia de sus órbitas al borde de la ruleta, grosor y largo de la estela (radianes).
 const COMET_ORBITS = [70, 140, 210];
@@ -134,6 +183,18 @@ const RAYS = 8;
 const RAY_REACH = 320;
 const RAY_WIDTH = 16;
 const TAU = Math.PI * 2;
+// Ecualizador circular: barras, largo máximo (px) y grosor.
+const EQ_BARS = 32;
+const EQ_REACH = 260;
+const EQ_WIDTH = 12;
+// Fuegos artificiales: por tiempo, radio máximo de cada estallido (px) y grosor de su anillo.
+const FIREWORKS = 3;
+const FIREWORK_RADIUS = 120;
+const FIREWORK_WIDTH = 16;
+// Túnel: separación entre anillos (px, un anillo por tiempo), cuántos y grosor.
+const TUNNEL_SPACING = 95;
+const TUNNEL_RINGS = 5;
+const TUNNEL_WIDTH = 18;
 
 /** Pseudoaleatorio estable por punto y golpe: el mismo golpe enciende siempre los mismos puntos. */
 const dotHash = (ix: number, iy: number, beat: number): number => {
@@ -148,13 +209,20 @@ export type WheelArea = { x: number; y: number; radius: number };
  * Cuánto enciende cada efecto el punto (x, y):
  * rings: un anillo sale de la ruleta en cada golpe · spin: tres brazos en espiral giran desde la
  * ruleta · sparkle: destellos al azar, más cuantos más agudos · bloom: una flor que se abre desde
- * la ruleta en cada tiempo · comets: cometas en órbita · rays: rayos desde la ruleta.
+ * la ruleta en cada tiempo · comets: cometas en órbita · rays: rayos desde la ruleta · equalizer:
+ * ecualizador circular · fireworks: fuegos artificiales · tunnel: anillos que caen hacia la ruleta.
  */
 export function patternLift(pattern: MusicPattern, music: MusicFrame, x: number, y: number, ix: number, iy: number, wave: number, center: WheelArea): number {
     const { pulse, sinceBeat, beatMs, beats, sparkle } = music;
     switch (pattern) {
         case 'bloom':
             return bloomLift(music, x - center.x, y - center.y, center.radius, wave);
+        case 'equalizer':
+            return equalizerLift(music, x - center.x, y - center.y, center.radius);
+        case 'fireworks':
+            return fireworksLift(music, x - center.x, y - center.y, center.radius);
+        case 'tunnel':
+            return tunnelLift(music, x - center.x, y - center.y, center.radius);
         case 'comets':
             return cometLift(music, x - center.x, y - center.y, center.radius);
         case 'rays':
@@ -167,7 +235,7 @@ export function patternLift(pattern: MusicPattern, music: MusicFrame, x: number,
         }
         case 'sparkle': {
             const chosen = dotHash(ix, iy, beats) < 0.08 + sparkle * 0.3;
-            return chosen ? Math.max(0, 1 - sinceBeat / Math.min(450, beatMs * 0.9)) : pulse * 0.1;
+            return chosen ? Math.max(0, 1 - sinceBeat / (beatMs * 0.9)) : pulse * 0.1;
         }
         case 'spin':
         default: {
@@ -189,8 +257,8 @@ export function patternLift(pattern: MusicPattern, music: MusicFrame, x: number,
  * capa de pétalos por dentro.
  */
 function bloomLift(music: MusicFrame, dx: number, dy: number, base: number, wave: number): number {
-    // Se abre durante algo más de un tiempo: se ve la nueva flor salir mientras la anterior se va.
-    const progress = Math.min(1, music.sinceBeat / (music.beatMs * 1.2));
+    // Cada flor dura exactamente un tiempo: nace con él y se ha ido cuando llega el siguiente.
+    const progress = Math.min(1, music.sinceBeat / music.beatMs);
     if (progress >= 1) return music.pulse * 0.1;
     const open = easeOut(progress);
     const d = Math.hypot(dx, dy);
@@ -248,4 +316,60 @@ function rayLift(music: MusicFrame, dx: number, dy: number, base: number): numbe
     const offAxis = Math.abs(angle - Math.round(angle / step) * step) * (d + base);
     if (offAxis > RAY_WIDTH) return 0;
     return (1 - progress) ** 0.6 * (0.35 + 0.65 * (d / Math.max(length, 1))) * (1 - offAxis / RAY_WIDTH);
+}
+
+/**
+ * Ecualizador circular: barras alrededor de la ruleta que en cada tiempo saltan a una altura distinta
+ * (más en el primero del compás) y caen hasta el siguiente, con la punta más brillante.
+ */
+function equalizerLift(music: MusicFrame, dx: number, dy: number, base: number): number {
+    const progress = Math.min(1, music.sinceBeat / music.beatMs);
+    const d = Math.hypot(dx, dy) - base;
+    if (d < 0) return 0;
+    const step = TAU / EQ_BARS;
+    const angle = Math.atan2(dy, dx);
+    const bar = Math.round(angle / step);
+    const offAxis = Math.abs(angle - bar * step) * (d + base);
+    if (offAxis > EQ_WIDTH) return 0;
+    const peak = (0.25 + 0.75 * dotHash(bar, 5, music.beats)) * (music.downbeat ? 1 : 0.8);
+    const length = EQ_REACH * peak * (1 - 0.7 * progress);
+    if (d > length) return 0;
+    return (0.35 + 0.65 * (d / Math.max(length, 1))) * (1 - offAxis / EQ_WIDTH);
+}
+
+/**
+ * Fuegos artificiales: en cada tiempo estallan tres alrededor de la ruleta, en sitios al azar; cada
+ * uno es un anillo de chispas que se abre y se apaga, con un destello en el centro al empezar.
+ */
+function fireworksLift(music: MusicFrame, dx: number, dy: number, base: number): number {
+    const progress = Math.min(1, music.sinceBeat / music.beatMs);
+    if (progress >= 1) return 0;
+    const radius = FIREWORK_RADIUS * easeOut(progress) * (music.downbeat ? 1.25 : 1);
+    let lift = 0;
+    for (let k = 0; k < FIREWORKS; k++) {
+        const angle = dotHash(k, 11, music.beats) * TAU;
+        const distance = base + 90 + dotHash(k, 13, music.beats) * 220;
+        const d = Math.hypot(dx - Math.cos(angle) * distance, dy - Math.sin(angle) * distance);
+        const ring = Math.max(0, 1 - Math.abs(d - radius) / FIREWORK_WIDTH);
+        const flash = progress < 0.2 ? Math.max(0, 1 - d / 40) * (1 - progress / 0.2) : 0;
+        lift = Math.max(lift, ring, flash);
+    }
+    return lift * (1 - progress);
+}
+
+/**
+ * Túnel: anillos que nacen lejos y caen hacia la ruleta a un anillo por tiempo, cada vez más
+ * brillantes al acercarse; el latido los hace destellar.
+ */
+function tunnelLift(music: MusicFrame, dx: number, dy: number, base: number): number {
+    const phase = Math.min(1, music.sinceBeat / music.beatMs);
+    const d = Math.hypot(dx, dy) - base;
+    if (d < 0) return 0;
+    let lift = 0;
+    for (let k = 0; k < TUNNEL_RINGS; k++) {
+        const radius = (k + 1 - phase) * TUNNEL_SPACING;
+        const ring = Math.max(0, 1 - Math.abs(d - radius) / TUNNEL_WIDTH);
+        lift = Math.max(lift, ring * (0.4 + 0.6 * (1 - radius / (TUNNEL_RINGS * TUNNEL_SPACING))));
+    }
+    return lift * (0.55 + 0.45 * music.pulse);
 }

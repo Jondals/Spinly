@@ -211,9 +211,17 @@ function Wheel({ options, activeTheme, onColorChange }: WheelProps) {
                             <stop offset="0" className="wheel-rim-stop-top" />
                             <stop offset="1" className="wheel-rim-stop-bottom" />
                         </linearGradient>
+                        <radialGradient id="wheel-light-halo">
+                            <stop offset="0" className="wheel-light-halo-core" />
+                            <stop offset="1" className="wheel-light-halo-edge" />
+                        </radialGradient>
                     </defs>
                     <circle className="wheel-rim-ring" cx="50" cy="50" r="48.6" />
                     <circle className="wheel-rim-inner" cx="50" cy="50" r="47.1" />
+                    {/* Halo de cada luz: solo con música, lo enciende music-visuals.ts con la luz */}
+                    {RIM_LIGHTS.map((light, i) => (
+                        <circle key={`halo-${i}`} className="wheel-light-halo" cx={light.x} cy={light.y} r="3.2" />
+                    ))}
                     {RIM_LIGHTS.map((light, i) => (
                         <circle key={i} className="wheel-light wheel-light--rim" cx={light.x} cy={light.y} r="0.75" style={{ animationDelay: light.delay }} />
                     ))}

@@ -225,7 +225,7 @@ function MusicProvider({ library, onLibraryChange, session, children }: MusicPro
             if (!alive || !engine || !currentId) return;
             setPulseSource({
                 bands: () => engine.bands(),
-                onset: () => engine.onset(),
+                live: (analysis, at) => engine.live(analysis, at),
                 clock: () => engine.clock(),
                 grid: () => gridsRef.current.get(currentId) ?? null,
             });

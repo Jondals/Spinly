@@ -57,7 +57,7 @@ While a song plays, the wheel lights and the dotted background move with it. The
 - **Until that finishes**, a real-time tracker runs like a phase-locked loop. It predicts the next beat, nudges its phase with each nearby onset, keeps time through silences, and relocks within a few beats after a tempo change.
 - **The clock is the audio clock.** Each pulse is timed on `AudioContext.currentTime` in song time, minus the context and output latency, so it lands when you *hear* the beat, not when the analyser sees it.
 
-Each song gets one effect at a time, chosen from how it sounds: a beating rim with rings, a chase, sparkles, a flower that blooms from the wheel, comets orbiting it once per bar, or rays of light with a marquee rim. Everything is timed in beats rather than milliseconds, so a fast song gets snappy, dry hits and a slow one long, breathing pulses. Effects change every four bars, exactly on the first beat of a bar, and the first beat of each bar gets a stronger accent. Synthetic test songs cover the hard cases: straight time, swing, a tempo change, a pause and a long reverb tail.
+Each song gets one effect at a time, chosen from how it sounds: a beating rim with rings, a chase, sparkles, a flower that blooms from the wheel, comets orbiting it once per bar, rays of light with a marquee rim, a circular equalizer, fireworks, or a tunnel of rings falling into the wheel. Everything is timed in beats rather than milliseconds (pulse decay, ring travel, fades between effects, even the drift of the dotted background), so a fast song gets snappy, dry hits and a slow one long, breathing pulses. Effects change every four bars, exactly on the first beat of a bar, and the first beat of each bar gets a stronger accent. Synthetic test songs cover the hard cases: straight time, swing, a tempo change, a pause and a long reverb tail.
 
 ### A background that notices you
 The dotted background behind the wheel is drawn on a `<canvas>`. A slow diagonal wave runs across the dots, and the ones near your cursor drift away, grow and light up in the accent color, easing in and out instead of snapping. To keep it cheap, dots of similar brightness are batched into a handful of `Path2D` fills per frame, the animation drops to 30 fps when nobody is interacting, and it pauses entirely off screen or with reduced motion enabled.
@@ -80,9 +80,11 @@ Supabase Auth requires an email, so each account gets an internal address derive
 Each account is one private JSON document in Storage. Changes upload about 1.5 s after the last edit, and immediately when the tab is hidden. On startup the app compares its local sync marker with the cloud copy and applies anything newer from another device. Signing out is refused if pending changes could not be saved, and it leaves the browser exactly as a first visit.
 
 ### Lighthouse 100, and what the splash taught me
-Only what the first paint needs is shipped: panels, the color picker, the music player and the winner dialog load on demand, the Supabase SDK is never downloaded for visitors without a session, and the main stylesheet is inlined at build time. Adding the splash made the first paint arrive earlier, which exposed start-up work that used to be hidden before it. Three fixes brought the score back:
+Only what the first paint needs is shipped: panels, the color picker, the music player and the winner dialog load on demand, the Supabase SDK is never downloaded for visitors without a session, and the main stylesheet is inlined at build time. Adding the splash made the first paint arrive earlier, which exposed start-up work that used to be hidden before it. These fixes brought the score back:
 - the first render runs inside `startTransition`, so it yields to the browser;
-- the canvas measures itself in a `ResizeObserver` callback instead of forcing a synchronous layout;
+- React DOM is its own chunk, preloaded from the HTML, so evaluating the JavaScript is two short tasks instead of one long one;
+- behind the splash the app mounts in two steps (header and wheel first, then the menu and the panel), splitting the first layout;
+- the dotted canvas does not measure, read styles or draw while the splash covers it;
 - a percentage formatter no longer creates an `Intl.NumberFormat` on every render.
 
 ### Security

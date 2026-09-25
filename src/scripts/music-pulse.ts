@@ -1,14 +1,15 @@
 // Lo que "hace" la música en cada momento, para que las luces de la ruleta y el fondo de puntos se
 // muevan con ella. Sin React. No detecta golpes sueltos: sigue el pulso de la canción.
 // - Tiempos: los del análisis previo de la canción entera (beat-analysis.ts, en un worker). Mientras
-//   no está listo, o si no se pudo hacer, un seguidor en tiempo real (BeatTracker) predice el siguiente
-//   tiempo y sigue marcando en silencios y pasajes sin percusión.
+//   no está listo, o si no se pudo hacer, un seguidor en tiempo real (BeatTracker, dentro del motor de
+//   audio, que se carga bajo demanda) predice el siguiente tiempo y sigue marcando en silencios y
+//   pasajes sin percusión.
 // - Reloj: el del audio (AudioContext), en tiempo de la canción y ya descontada la latencia de salida:
 //   cada latido cae cuando se oye el tiempo, no cuando el analizador lo ve.
 // - Latido (0-1): sube de golpe en cada tiempo y cae enseguida; el primero de cada compás, más fuerte.
 // - Efecto visual: uno solo a la vez, elegido según cómo suena la canción, que cambia cada cuatro
 //   compases justo al empezar un compás, con un fundido entre el anterior y el nuevo.
-import { BeatTracker, type BeatGrid } from './beat-analysis';
+import type { BeatGrid } from './beat-analysis';
 
 export type MusicBands = { bass: number; mid: number; high: number; pitch: number };
 
@@ -16,9 +17,11 @@ export type MusicBands = { bass: number; mid: number; high: number; pitch: numbe
  * rings: el aro late entero y salen anillos desde la ruleta · spin: las luces dan la vuelta y una
  * espiral gira en el fondo · sparkle: destellos al azar · bloom: una flor que se abre desde la ruleta ·
  * comets: cometas que orbitan la ruleta, una vuelta por compás · rays: rayos de luz que salen de la
- * ruleta en cada tiempo, con las bombillas alternándose como una marquesina.
+ * ruleta en cada tiempo, con las bombillas alternándose como una marquesina · equalizer: barras de
+ * ecualizador que saltan en cada tiempo · fireworks: fuegos artificiales que estallan en cada tiempo ·
+ * tunnel: anillos que caen hacia la ruleta como un túnel, a un anillo por tiempo.
  */
-export type MusicPattern = 'rings' | 'spin' | 'sparkle' | 'bloom' | 'comets' | 'rays';
+export type MusicPattern = 'rings' | 'spin' | 'sparkle' | 'bloom' | 'comets' | 'rays' | 'equalizer' | 'fireworks' | 'tunnel';
 
 /** Tiempos de la canción (s): lo que se oye ahora y lo que mide ahora el analizador (va por delante). */
 export interface MusicClock {
@@ -32,8 +35,11 @@ export interface PulseSource {
     bands(): MusicBands;
     /** null si no suena (en pausa, cargando). */
     clock(): MusicClock | null;
-    /** Fuerza de ataque de lo que mide el analizador. */
-    onset(): number;
+    /**
+     * Seguidor en tiempo real: le da lo que mide ahora el analizador (en el instante `analysis` de la
+     * canción) y devuelve el último tiempo previsto en o antes de `at` y el periodo (s); null sin enganche.
+     */
+    live(analysis: number, at: number): { beat: number; period: number } | null;
     /** Rejilla del análisis previo, en cuanto esté lista. */
     grid(): BeatGrid | null;
 }
@@ -58,7 +64,7 @@ export interface MusicFrame {
     patternBlend: number;
 }
 
-const PATTERNS: readonly MusicPattern[] = ['rings', 'spin', 'sparkle', 'bloom', 'comets', 'rays'];
+const PATTERNS: readonly MusicPattern[] = ['rings', 'spin', 'sparkle', 'bloom', 'comets', 'rays', 'equalizer', 'fireworks', 'tunnel'];
 const SILENT: MusicBands = { bass: 0, mid: 0, high: 0, pitch: 0.5 };
 const DEFAULT_BEAT_MS = 500;
 // El fotograma que se calcula ahora se ve en pantalla en el siguiente refresco (un fotograma después:
@@ -68,25 +74,24 @@ const DEFAULT_FRAME_MS = 16.7;
 // Caída del latido: un tercio del tiempo, así una canción rápida da golpes secos y una lenta,
 // latidos largos. Y fuerza de los tiempos que no abren compás.
 const PULSE_DECAY_SHARE = 0.3;
-const PULSE_DECAY_MIN_MS = 90;
-const PULSE_DECAY_MAX_MS = 260;
-const OFFBEAT_ACCENT = 0.7;
+const OFFBEAT_ACCENT = 0.85;
 // Primer efecto con algo de canción escuchada; luego cambia cada cuatro compases (16 tiempos), al
-// empezar compás, pero nunca antes de 7 s. Sin pulso (aún no enganchado), cada 12 s. Fundido de 700 ms.
+// empezar compás; en canciones muy rápidas (cuatro compases en menos de 6 s), cada ocho. Sin pulso
+// (aún no enganchado), cada 12 s. El cambio se funde durante un tiempo (entre 300 y 900 ms).
 const FIRST_PATTERN_MS = 2200;
 // La canción entra con un fundido de 0,8 s (y la anterior tarda ~0,5 s en irse): hasta que suena a
 // su volumen real no cuenta para el carácter.
 const CHARACTER_FROM_MS = 1000;
 const PATTERN_BEATS = 16;
-const PATTERN_MIN_MS = 7000;
+const PATTERN_SHORTEST_MS = 6000;
 const PATTERN_UNLOCKED_MS = 12000;
-const PATTERN_FADE_MS = 700;
+const PATTERN_FADE_MIN_MS = 300;
+const PATTERN_FADE_MAX_MS = 900;
 
 /** Rango propio de una banda: el mínimo y el máximo se adaptan a la canción, así 0-1 es "su" silencio y "su" máximo. */
 interface Range { low: number; high: number }
 
 let source: PulseSource | null = null;
-let tracker = new BeatTracker();
 let character: MusicBands | null = null;
 let bassRange: Range | null = null;
 let midRange: Range | null = null;
@@ -110,7 +115,6 @@ let patternAt = 0;
 let patternBeat = 0;
 
 function resetSong(): void {
-    tracker = new BeatTracker();
     character = null;
     bassRange = null;
     midRange = null;
@@ -147,6 +151,9 @@ const suitability = ({ mid, high }: MusicBands): Record<MusicPattern, number> =>
     spin: mid > 0.2 ? 2.5 : 1.4,
     sparkle: high > 0.35 ? 3 : 0.3,
     bloom: mid > 0.2 ? 2.2 : 1.2,
+    equalizer: mid < 0.2 ? 1.8 : 1.4,
+    fireworks: high > 0.3 ? 2.2 : 1,
+    tunnel: 1.6,
     comets: mid > 0.2 ? 2 : 1.3,
     rays: high > 0.25 ? 2.2 : 1.2,
 });
@@ -198,15 +205,14 @@ function gridIndex(list: number[], time: number): number {
 }
 
 /** El tiempo que suena ahora: el de la rejilla si la hay; si no, el que predice el seguidor. */
-function currentBeat(at: number): { time: number; period: number; index: number | null; downbeat: boolean | null } | null {
-    const grid = source?.grid() ?? null;
+function currentBeat(at: number, analysis: number, grid: BeatGrid | null): { time: number; period: number; index: number | null; downbeat: boolean | null } | null {
     if (grid && grid.beats.length > 1) {
         const i = gridIndex(grid.beats, at);
         if (i < 0) return null;
         const next = grid.beats[i + 1] ?? grid.beats[i] + (grid.beats[i] - grid.beats[i - 1]);
         return { time: grid.beats[i], period: next - grid.beats[i], index: i + 1, downbeat: (i - grid.downbeat) % 4 === 0 };
     }
-    const predicted = tracker.beatAt(at);
+    const predicted = source?.live(analysis, at) ?? null;
     return predicted && predicted.beat >= 0 ? { time: predicted.beat, period: predicted.period, index: null, downbeat: null } : null;
 }
 
@@ -216,15 +222,12 @@ function update(now: number): void {
     lastRead = now;
     let clock: MusicClock | null = null;
     let bands = SILENT;
-    let onset = 0;
-    let analyzed = false;
+    let grid: BeatGrid | null = null;
     if (source) {
         try {
             clock = source.clock();
             bands = source.bands();
-            // Con el análisis previo listo, el seguidor en tiempo real ya no hace falta.
-            analyzed = source.grid() !== null;
-            if (!analyzed) onset = source.onset();
+            grid = source.grid();
         } catch {
             // El motor no pudo leer el audio (contexto cerrado, o en desarrollo un motor de antes de una
             // recarga en caliente): las luces se quedan tranquilas en vez de romper la página.
@@ -242,7 +245,6 @@ function update(now: number): void {
     if (clock.audible < songTime - 0.5) resetSong();
     songTime = clock.audible;
     if (!startedAt) startedAt = now;
-    if (!analyzed) tracker.push(clock.analysis, onset);
 
     // Presencia: cuánto suenan los graves en el rango de la canción. En un pasaje sin percusión el
     // latido sigue a compás, pero más suave.
@@ -250,11 +252,12 @@ function update(now: number): void {
     presence = envelope(presence, within(bassRange, bands.bass), dt, 600);
     midRange = track(midRange, bands.mid, dt);
     highRange = track(highRange, bands.high, dt);
-    melody = envelope(melody, within(midRange, bands.mid), dt, 220);
-    sparkle = envelope(sparkle, within(highRange, bands.high), dt, 160);
+    // Caen en una fracción del tiempo: más rápido cuanto más rápida la canción.
+    melody = envelope(melody, within(midRange, bands.mid), dt, beatMs * 0.45);
+    sparkle = envelope(sparkle, within(highRange, bands.high), dt, beatMs * 0.32);
 
     const shown = clock.audible + frameMs / 1000;
-    const beat = currentBeat(shown + frameMs / 2000);
+    const beat = currentBeat(shown + frameMs / 2000, clock.analysis, grid);
     if (beat && beat.time > beatTime + beat.period * 0.5) {
         beats = beat.index ?? beats + 1;
         downbeat = beat.downbeat ?? beats % 4 === 1;
@@ -263,8 +266,12 @@ function update(now: number): void {
     }
     if (beat) beatMs = beat.period * 1000;
     const since = beat ? now - beatAudibleAt : Infinity;
-    const accent = (downbeat ? 1 : OFFBEAT_ACCENT) * (0.45 + 0.55 * presence);
-    pulse = Number.isFinite(since) ? accent * Math.exp(-Math.max(0, since) / Math.min(PULSE_DECAY_MAX_MS, Math.max(PULSE_DECAY_MIN_MS, beatMs * PULSE_DECAY_SHARE))) : pulse * Math.exp(-dt / 120);
+    const accent = (downbeat ? 1 : OFFBEAT_ACCENT) * (0.7 + 0.3 * presence);
+    // Hasta tener el pulso (los primeros segundos, mientras se analiza la canción), las luces laten
+    // con los golpes de graves tal cual: la música se ve desde el primer instante.
+    pulse = Number.isFinite(since)
+        ? accent * Math.exp(-Math.max(0, since) / (beatMs * PULSE_DECAY_SHARE))
+        : envelope(pulse, within(bassRange, bands.bass) ** 2, dt, 140);
 
     // Carácter de la canción (medias de ~4 s) y rotación del patrón.
     if (now - startedAt >= CHARACTER_FROM_MS) {
@@ -283,8 +290,9 @@ function update(now: number): void {
     // El primero, al empezar un compás (o a los 4 s si aún no hay pulso).
     const first = !patternAt && elapsed >= FIRST_PATTERN_MS && (barStart || elapsed >= 4000);
     const held = now - patternAt;
-    // Con pulso, al empezar el compás que completa cuatro (o más) desde el cambio anterior.
-    const onBar = barStart && beats - patternBeat >= PATTERN_BEATS && held >= PATTERN_MIN_MS;
+    // Con pulso, al empezar el compás que completa cuatro (u ocho) desde el cambio anterior.
+    const barsBeats = beatMs * PATTERN_BEATS < PATTERN_SHORTEST_MS ? PATTERN_BEATS * 2 : PATTERN_BEATS;
+    const onBar = barStart && beats - patternBeat >= barsBeats;
     const rotate = patternAt > 0 && (onBar || (!beat && held >= PATTERN_UNLOCKED_MS));
     if ((first || rotate) && character) {
         const next = nextPattern(first ? null : pattern, character);
@@ -308,7 +316,7 @@ export function readMusic(now: number = performance.now()): MusicFrame {
         sparkle,
         pattern,
         previousPattern,
-        patternBlend: patternAt ? Math.min(1, (now - patternAt) / PATTERN_FADE_MS) : 1,
+        patternBlend: patternAt ? Math.min(1, (now - patternAt) / Math.min(PATTERN_FADE_MAX_MS, Math.max(PATTERN_FADE_MIN_MS, beatMs))) : 1,
     };
 }
 

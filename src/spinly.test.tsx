@@ -3,6 +3,7 @@ import App from './App';
 import { LanguageProvider } from './Components/i18n/LanguageProvider';
 import { mergeMusicLibraries, sanitizeMusicLibrary } from './scripts/music-library';
 import { readMusic, readPulse, setPulseSource } from './scripts/music-pulse';
+import { BeatTracker } from './scripts/beat-analysis';
 import { fitImageToSector, getImageBox, getSectorAngles, normalizeDegrees, randomSegmentColor, SPIN_DURATION, WHEEL_VIEWBOX } from './scripts/wheel';
 import {
     ACTIVE_THEME_STORAGE_KEY,
@@ -133,7 +134,7 @@ jest.mock('./scripts/music-engine', () => ({
         },
         setVolume: () => undefined,
         bands: () => ({ bass: 0, mid: 0, high: 0, pitch: 0.5 }),
-        onset: () => 0,
+        live: () => null,
         clock: () => null,
         analyze: async () => null,
         onEnded: () => undefined,
@@ -1005,6 +1006,16 @@ describe('música', () => {
         expect(localStorage.getItem('spinly-music-pending')).toBeNull();
     });
 
+    /** El seguidor en tiempo real del motor, alimentado con la fuerza de ataque dada. */
+    const liveTracker = (onset: () => number) => {
+        const tracker = new BeatTracker();
+        return (analysis: number, at: number) => {
+            tracker.push(analysis, onset());
+            const predicted = tracker.beatAt(at);
+            return predicted && predicted.beat >= 0 ? predicted : null;
+        };
+    };
+
     /**
      * Canción sintética a 120 BPM (un tiempo cada 500 ms, compás en el primero) con el reparto de
      * bandas dado. Con `grid`, el análisis previo ya está listo; sin él, solo el seguidor en tiempo real.
@@ -1014,7 +1025,7 @@ describe('música', () => {
         const beats = Array.from({ length: 200 }, (_, i) => i * period);
         setPulseSource({
             bands: () => ({ bass: bass && songTime % period < 0.06 ? 0.8 : 0.15, mid, high, pitch: 0.5 }),
-            onset: () => (bass && songTime % period < 0.016 ? 5 : 0.1),
+            live: liveTracker(() => (bass && songTime % period < 0.016 ? 5 : 0.1)),
             clock: () => ({ audible: songTime, analysis: songTime }),
             grid: () => (grid ? { beats, bpm: 60 / period, downbeat: 0 } : null),
         });
@@ -1125,7 +1136,7 @@ describe('música', () => {
         let songTime = 0;
         setPulseSource({
             bands: () => ({ bass: hits && songTime % 0.5 < 0.06 ? 0.8 : 0.15, mid: 0.1, high: 0.05, pitch: 0.5 }),
-            onset: () => (hits && songTime % 0.5 < 0.016 ? 5 : 0.1),
+            live: liveTracker(() => (hits && songTime % 0.5 < 0.016 ? 5 : 0.1)),
             clock: () => ({ audible: songTime, analysis: songTime }),
             grid: () => null,
         });

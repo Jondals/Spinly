@@ -14,9 +14,11 @@ export type MusicBands = { bass: number; mid: number; high: number; pitch: numbe
 
 /**
  * rings: el aro late entero y salen anillos desde la ruleta · spin: las luces dan la vuelta y una
- * espiral gira en el fondo · sparkle: destellos al azar · bloom: una flor que se abre desde la ruleta.
+ * espiral gira en el fondo · sparkle: destellos al azar · bloom: una flor que se abre desde la ruleta ·
+ * comets: cometas que orbitan la ruleta, una vuelta por compás · rays: rayos de luz que salen de la
+ * ruleta en cada tiempo, con las bombillas alternándose como una marquesina.
  */
-export type MusicPattern = 'rings' | 'spin' | 'sparkle' | 'bloom';
+export type MusicPattern = 'rings' | 'spin' | 'sparkle' | 'bloom' | 'comets' | 'rays';
 
 /** Tiempos de la canción (s): lo que se oye ahora y lo que mide ahora el analizador (va por delante). */
 export interface MusicClock {
@@ -56,15 +58,18 @@ export interface MusicFrame {
     patternBlend: number;
 }
 
-const PATTERNS: readonly MusicPattern[] = ['rings', 'spin', 'sparkle', 'bloom'];
+const PATTERNS: readonly MusicPattern[] = ['rings', 'spin', 'sparkle', 'bloom', 'comets', 'rays'];
 const SILENT: MusicBands = { bass: 0, mid: 0, high: 0, pitch: 0.5 };
 const DEFAULT_BEAT_MS = 500;
 // El fotograma que se calcula ahora se ve en pantalla en el siguiente refresco (un fotograma después:
 // ~16 ms a 60 Hz, ~7 ms a 144 Hz), y cada tiempo se enciende en el fotograma que se ve más cerca de él,
 // hasta medio fotograma antes. La duración del fotograma se mide.
 const DEFAULT_FRAME_MS = 16.7;
-// Caída del latido tras cada tiempo y fuerza de los tiempos que no abren compás.
-const PULSE_DECAY_MS = 150;
+// Caída del latido: un tercio del tiempo, así una canción rápida da golpes secos y una lenta,
+// latidos largos. Y fuerza de los tiempos que no abren compás.
+const PULSE_DECAY_SHARE = 0.3;
+const PULSE_DECAY_MIN_MS = 90;
+const PULSE_DECAY_MAX_MS = 260;
 const OFFBEAT_ACCENT = 0.7;
 // Primer efecto con algo de canción escuchada; luego cambia cada cuatro compases (16 tiempos), al
 // empezar compás, pero nunca antes de 7 s. Sin pulso (aún no enganchado), cada 12 s. Fundido de 700 ms.
@@ -142,6 +147,8 @@ const suitability = ({ mid, high }: MusicBands): Record<MusicPattern, number> =>
     spin: mid > 0.2 ? 2.5 : 1.4,
     sparkle: high > 0.35 ? 3 : 0.3,
     bloom: mid > 0.2 ? 2.2 : 1.2,
+    comets: mid > 0.2 ? 2 : 1.3,
+    rays: high > 0.25 ? 2.2 : 1.2,
 });
 
 /** El más adecuado para empezar; después, al azar entre los demás, con más peso los que encajan. */
@@ -257,7 +264,7 @@ function update(now: number): void {
     if (beat) beatMs = beat.period * 1000;
     const since = beat ? now - beatAudibleAt : Infinity;
     const accent = (downbeat ? 1 : OFFBEAT_ACCENT) * (0.45 + 0.55 * presence);
-    pulse = Number.isFinite(since) ? accent * Math.exp(-Math.max(0, since) / PULSE_DECAY_MS) : pulse * Math.exp(-dt / 120);
+    pulse = Number.isFinite(since) ? accent * Math.exp(-Math.max(0, since) / Math.min(PULSE_DECAY_MAX_MS, Math.max(PULSE_DECAY_MIN_MS, beatMs * PULSE_DECAY_SHARE))) : pulse * Math.exp(-dt / 120);
 
     // Carácter de la canción (medias de ~4 s) y rotación del patrón.
     if (now - startedAt >= CHARACTER_FROM_MS) {

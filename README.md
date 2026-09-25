@@ -57,7 +57,7 @@ While a song plays, the wheel lights and the dotted background move with it. The
 - **Until that finishes**, a real-time tracker runs like a phase-locked loop. It predicts the next beat, nudges its phase with each nearby onset, keeps time through silences, and relocks within a few beats after a tempo change.
 - **The clock is the audio clock.** Each pulse is timed on `AudioContext.currentTime` in song time, minus the context and output latency, so it lands when you *hear* the beat, not when the analyser sees it.
 
-Each song gets one effect at a time, chosen from how it sounds: a beating rim with rings, a chase, sparkles, or a flower that blooms from the wheel. Effects change every four bars, exactly on the first beat of a bar, and the first beat of each bar gets a stronger accent. Synthetic test songs cover the hard cases: straight time, swing, a tempo change, a pause and a long reverb tail.
+Each song gets one effect at a time, chosen from how it sounds: a beating rim with rings, a chase, sparkles, a flower that blooms from the wheel, comets orbiting it once per bar, or rays of light with a marquee rim. Everything is timed in beats rather than milliseconds, so a fast song gets snappy, dry hits and a slow one long, breathing pulses. Effects change every four bars, exactly on the first beat of a bar, and the first beat of each bar gets a stronger accent. Synthetic test songs cover the hard cases: straight time, swing, a tempo change, a pause and a long reverb tail.
 
 ### A background that notices you
 The dotted background behind the wheel is drawn on a `<canvas>`. A slow diagonal wave runs across the dots, and the ones near your cursor drift away, grow and light up in the accent color, easing in and out instead of snapping. To keep it cheap, dots of similar brightness are batched into a handful of `Path2D` fills per frame, the animation drops to 30 fps when nobody is interacting, and it pauses entirely off screen or with reduced motion enabled.
@@ -113,7 +113,7 @@ src/
 | **Supabase** | Auth, Postgres with row level security, and Storage for avatars, sync and songs |
 | **Web Audio, Canvas, IndexedDB** | Sound effects, the music player, the dotted background and the song cache |
 | **EyeDropper, Screen Capture and Media Session APIs** | The eyedropper and lock-screen music controls |
-| **Jest + Testing Library** | 66 tests covering the UI, the data models, music, beat tracking and the account flows |
+| **Jest + Testing Library** | 67 tests covering the UI, the data models, music, beat tracking and the account flows |
 | **Vercel** | Static hosting with a strict Content Security Policy |
 | **pnpm** | Dependencies, plus two patches that keep Create React App working on Node 24 |
 

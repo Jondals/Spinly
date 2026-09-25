@@ -1009,14 +1009,14 @@ describe('música', () => {
      * Canción sintética a 120 BPM (un tiempo cada 500 ms, compás en el primero) con el reparto de
      * bandas dado. Con `grid`, el análisis previo ya está listo; sin él, solo el seguidor en tiempo real.
      */
-    const fakeSong = ({ mid = 0.1, high = 0.05, grid = true, bass = true }: { mid?: number; high?: number; grid?: boolean; bass?: boolean } = {}) => {
+    const fakeSong = ({ mid = 0.1, high = 0.05, grid = true, bass = true, period = 0.5 }: { mid?: number; high?: number; grid?: boolean; bass?: boolean; period?: number } = {}) => {
         let songTime = 0;
-        const beats = Array.from({ length: 200 }, (_, i) => i * 0.5);
+        const beats = Array.from({ length: 200 }, (_, i) => i * period);
         setPulseSource({
-            bands: () => ({ bass: bass && songTime % 0.5 < 0.06 ? 0.8 : 0.15, mid, high, pitch: 0.5 }),
-            onset: () => (bass && songTime % 0.5 < 0.016 ? 5 : 0.1),
+            bands: () => ({ bass: bass && songTime % period < 0.06 ? 0.8 : 0.15, mid, high, pitch: 0.5 }),
+            onset: () => (bass && songTime % period < 0.016 ? 5 : 0.1),
             clock: () => ({ audible: songTime, analysis: songTime }),
-            grid: () => (grid ? { beats, bpm: 120, downbeat: 0 } : null),
+            grid: () => (grid ? { beats, bpm: 60 / period, downbeat: 0 } : null),
         });
         return {
             advance: (ms: number) => {
@@ -1054,6 +1054,25 @@ describe('música', () => {
             readPulse(time);
         }
         expect(readPulse(time + 16)).toBeLessThan(0.01);
+    });
+
+    test('el latido se adapta a la velocidad: seco en una canción rápida, largo en una lenta', () => {
+        let time = performance.now() + 1.5e6;
+        // Pulso 120 ms después del quinto tiempo de compás (a 4 tiempos por compás, el tiempo 8).
+        const pulseAfterBeat = (period: number) => {
+            const song = fakeSong({ period });
+            const target = 8 * period + 0.12;
+            for (let t = 0; t < target * 1000; t += 4) {
+                song.advance(4);
+                time += 4;
+                readMusic(time);
+            }
+            return readMusic(time).pulse;
+        };
+        const fast = pulseAfterBeat(0.33);
+        const slow = pulseAfterBeat(0.9);
+        expect(slow).toBeGreaterThan(fast * 1.8);
+        setPulseSource(null);
     });
 
     test('la música marca los tiempos, el tempo y un patrón según cómo suena', () => {

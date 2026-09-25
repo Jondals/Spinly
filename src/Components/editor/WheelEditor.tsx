@@ -6,6 +6,7 @@ import PanelHeader from '../common/PanelHeader';
 import { addOption, removeOption, updateOption, reorderOptions, DEFAULT_WHEEL_LIMIT, MAX_OPTION_LENGTH, MAX_WHEEL_OPTIONS, MIN_OPTIONS, type WheelOption } from '../../scripts/option-wheel';
 import { DEFAULT_IMAGE_FIT, DEFAULT_SEGMENT_COLOR, ensureSegments, type ImageFit, type WheelSegmentStyle, type WheelTheme } from '../../types/theme-types';
 import { isAllowedImageMime, MAX_UPLOAD_BYTES } from '../../scripts/supabaseClient';
+import { shrinkImage } from '../../scripts/image-resize';
 import { fitImageToSector, randomSegmentColor } from '../../scripts/wheel';
 import { useTranslation } from '../i18n/LanguageProvider';
 import { dictMessage, type LocalMessage } from '../../scripts/strings';
@@ -15,6 +16,8 @@ const ImageAdjustDialog = lazy(() => import('./ImageAdjustDialog'));
 
 /** base64 ≈ 4/3 del binario: por encima de esto no cabe con holgura en localStorage (~5MB). */
 const MAX_DATA_URL_LENGTH = 2800000;
+// Lado mayor de una textura: de sobra para un sector de la ruleta incluso en pantallas densas.
+const TEXTURE_MAX_SIDE = 1200;
 
 type ImageAdjustState = { optionId: string; index: number; image: string; fit: ImageFit; isNew: boolean };
 
@@ -128,16 +131,18 @@ function WheelEditor({ options, setOptions, activeTheme, setActiveTheme, wheelLi
             return;
         }
         setImageWarning(null);
-        const reader = new FileReader();
-        reader.onload = () => {
-            const dataUrl = String(reader.result ?? '');
-            if (dataUrl.length > MAX_DATA_URL_LENGTH) {
-                setImageWarning(dictMessage('options', 'imgTooHeavy'));
-                return;
-            }
-            setAdjusting({ optionId, index, image: dataUrl, fit: fitImageToSector(index, options.length), isNew: true });
-        };
-        reader.readAsDataURL(file);
+        void shrinkImage(file, TEXTURE_MAX_SIDE).then((image) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const dataUrl = String(reader.result ?? '');
+                if (dataUrl.length > MAX_DATA_URL_LENGTH) {
+                    setImageWarning(dictMessage('options', 'imgTooHeavy'));
+                    return;
+                }
+                setAdjusting({ optionId, index, image: dataUrl, fit: fitImageToSector(index, options.length), isNew: true });
+            };
+            reader.readAsDataURL(image);
+        });
     };
 
     // El color se calcula fuera de los updaters: deben ser puros porque StrictMode los ejecuta dos veces.

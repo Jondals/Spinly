@@ -117,5 +117,6 @@ export function isAllowedImageMime(type: string): boolean {
  */
 export const MIN_PASSWORD_LENGTH = 10;
 
-// Compartido por avatar (Storage) y texturas (localStorage ~5MB).
-export const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
+// Máximo de una imagen subida (avatar o textura de la ruleta). Antes de guardarla se reduce
+// (image-resize.ts): lo que llega al bucket de avatares o a localStorage pesa mucho menos.
+export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;

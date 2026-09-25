@@ -16,6 +16,7 @@ import {
     type ServiceResult,
 } from './supabaseClient';
 import { dictMessage, dictMessageWith, type LocalMessage } from './strings';
+import { shrinkImage } from './image-resize';
 
 export type SpinlyProfile = {
     id: string;
@@ -144,6 +145,10 @@ export async function fetchProfile(userId: string): Promise<ServiceResult<Spinly
     }
 }
 
+const AVATAR_MAX_SIDE = 512;
+// file_size_limit del bucket avatars (README).
+const AVATAR_BUCKET_BYTES = 2 * 1024 * 1024;
+
 // La política de Storage exige que la carpeta sea el uid del autor.
 async function uploadAvatar(userId: string, file: File): Promise<ServiceResult<string>> {
     const supabase = await getSupabase();
@@ -152,11 +157,14 @@ async function uploadAvatar(userId: string, file: File): Promise<ServiceResult<s
     if (file.size > MAX_UPLOAD_BYTES) return { ok: false, error: dictMessage('errors', 'photoTooBig') };
     const uploadError = dictMessage('errors', 'uploadPhoto');
     try {
-        const extension = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
+        // Se muestra como mucho a ~80 px: con 512 sobra y cabe siempre en el límite del bucket (2 MB).
+        const photo = await shrinkImage(file, AVATAR_MAX_SIDE);
+        if (!isAllowedImageMime(photo.type) || photo.size > AVATAR_BUCKET_BYTES) return { ok: false, error: dictMessage('errors', 'photoTooBig') };
+        const extension = photo.type.split('/')[1] === 'jpeg' ? 'jpg' : photo.type.split('/')[1];
         const path = `${userId}/avatar_${Date.now()}.${extension}`;
-        const { error } = await supabase.storage.from('avatars').upload(path, file, {
+        const { error } = await supabase.storage.from('avatars').upload(path, photo, {
             cacheControl: '3600',
-            contentType: file.type,
+            contentType: photo.type,
         });
         if (error) return { ok: false, error: supabaseErrorMessage(uploadError, error) };
         const { data } = supabase.storage.from('avatars').getPublicUrl(path);

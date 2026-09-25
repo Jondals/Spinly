@@ -140,7 +140,7 @@ REACT_APP_SUPABASE_ANON_KEY=<anon key>
 
 - **Tables:** `profiles`, `shared_themes` and `shared_presets`, with row level security.
 - **Storage:**
-  - a public `avatars` bucket, limited to PNG, JPEG and WEBP up to 2 MB;
+  - a public `avatars` bucket, limited to PNG, JPEG and WEBP up to 2 MB (photos up to 10 MB are accepted and downscaled to 512 px in the browser before uploading, so they always fit);
   - a private `user-data` bucket for account sync and songs, where each user can only access their own folder and anonymous sessions can't write. It accepts JSON and audio (`audio/mpeg`, `audio/mp4`, `audio/aac`, `audio/ogg`, `audio/wav`, `audio/webm`, `audio/flac`) up to 10 MB per file, with select, insert, update and delete policies.
 - **Authentication:**
   - the Email provider enabled, with **Confirm email** off;

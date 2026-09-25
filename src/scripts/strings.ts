@@ -97,7 +97,7 @@ export const STRINGS = {
         removeOpt: { en: 'Remove option {n}', es: 'Eliminar opción {n}' },
         adjustImg: { en: 'Adjust image', es: 'Ajustar imagen' },
         badImgFormat: { en: 'Unsupported format: use PNG, JPEG or WEBP.', es: 'Formato no permitido: usa PNG, JPEG o WEBP.' },
-        imgTooBig: { en: 'Image over 2MB: exceeds the localStorage limit (~5MB). Pick a lighter one.', es: 'Imagen mayor de 2MB: excede el límite de localStorage (~5MB). Elige una más ligera.' },
+        imgTooBig: { en: 'Image over 10MB. Pick a lighter one.', es: 'La imagen supera los 10MB. Elige una más ligera.' },
         imgTooHeavy: { en: 'This image is too heavy in base64 for localStorage. It was not saved.', es: 'Esta imagen en base64 es muy pesada para localStorage. No se ha guardado.' },
     },
     wheel: {
@@ -293,7 +293,7 @@ export const STRINGS = {
         usernameTooLong: { en: 'Max {max} characters.', es: 'Máximo {max} caracteres.' },
         readProfile: { en: 'Could not read the profile.', es: 'No se pudo leer el perfil.' },
         badFormat: { en: 'Unsupported format: use PNG, JPEG or WEBP.', es: 'Formato no permitido: usa PNG, JPEG o WEBP.' },
-        photoTooBig: { en: 'Photo must be under ~2MB.', es: 'La foto no puede superar ~2MB.' },
+        photoTooBig: { en: 'Photo must be under 10MB.', es: 'La foto no puede superar los 10MB.' },
         uploadPhoto: { en: 'Could not upload the photo.', es: 'No se pudo subir la foto.' },
         photoUrl: { en: 'Could not get the photo URL.', es: 'No se pudo obtener la URL de la foto.' },
         savedWithoutPhoto: { en: '{error} The profile was saved without the new photo.', es: '{error} Se guardó el perfil sin foto nueva.' },

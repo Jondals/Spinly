@@ -71,7 +71,7 @@ html {
     --card-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 2px 6px rgba(15, 23, 42, 0.05);
     --wheel-dots: #b9c3d1;
     --wheel-dots-glow: #6366f1;
-    --wheel-dots-melody: #db2777;
+    --wheel-dots-bloom: #db2777;
 
     --wheel-color-dark: #e6e6ee;
     --wheel-center-color: #ffffff;
@@ -132,8 +132,8 @@ html {
     --badge-bg: var(--bg-transparence);
     --badge-border: var(--color-focus);
     --wheel-dots-glow: #8b90b8;
-    /* Con música: los golpes encienden los puntos en el acento; la melodía, en rosa */
-    --wheel-dots-melody: #f472b6;
+    /* Con música: los tiempos encienden los puntos en el acento; la flor, en rosa */
+    --wheel-dots-bloom: #f472b6;
 
     /* Botón principal: gris claro suave, no blanco puro, para no deslumbrar sobre el fondo oscuro */
     --button-primary-bg: #cdd0dc;

@@ -6,6 +6,9 @@ import { readMusic, type MusicFrame, type MusicPattern } from './music-pulse';
 const CHASE_STEPS_PER_BEAT = 3;
 // Radio de las luces del aro en Wheel.tsx (viewBox de 100).
 const RIM_RADIUS = 0.75;
+// Pétalos de la flor en el aro y en el fondo.
+const BLOOM_RIM_PETALS = 4;
+const BLOOM_PETALS = 8;
 
 /** Distancia entre dos posiciones de un anillo de n luces, por el camino corto. */
 const ringDistance = (a: number, b: number, n: number): number => {
@@ -29,8 +32,14 @@ function patternLevel(pattern: MusicPattern, frame: MusicFrame, i: number, n: nu
         case 'rings':
             // El aro entero late con cada golpe.
             return 0.1 + pulse * 0.9;
-        case 'melody':
-            return melodyLevel(frame, i, n);
+        case 'bloom': {
+            // La flor: cuatro pétalos que en cada tiempo nacen como puntos y se abren hasta llenar el
+            // aro mientras se apagan; cada tiempo giran medio pétalo, y el que abre compás, más fuerte.
+            const open = easeOut(progress);
+            const turn = (beats * Math.PI) / BLOOM_RIM_PETALS;
+            const petal = 0.5 + 0.5 * Math.cos(BLOOM_RIM_PETALS * ((i / n) * Math.PI * 2 - turn));
+            return petal ** (1 + 10 * (1 - open)) * (0.35 + pulse * 0.65);
+        }
         case 'sparkle': {
             // Destellos: en cada golpe se enciende un tercio al azar y titilan con los agudos.
             const flash = hash(i, beats) < 0.34 ? 1 - progress : 0;
@@ -44,20 +53,6 @@ function patternLevel(pattern: MusicPattern, frame: MusicFrame, i: number, n: nu
             return Math.max(0, 1 - distance / 3.5) * (0.4 + pulse * 0.6);
         }
     }
-}
-
-/**
- * La melodía sube por los dos lados del aro como un medidor: las notas graves encienden la parte de
- * abajo y las agudas la de arriba, más ancho cuanto más fuerte suena; cada nota nueva da un destello
- * a su altura.
- */
-function melodyLevel(frame: MusicFrame, i: number, n: number): number {
-    const half = n / 2;
-    const at = (height: number) => half - height * half;
-    const spot = (height: number, width: number) =>
-        Math.max(0, 1 - Math.min(ringDistance(i, at(height), n), ringDistance(i, n - at(height), n)) / width);
-    if (frame.sinceNote >= 450) return 0;
-    return spot(frame.notePitch, 1.4 + frame.melody * 2) * (1 - frame.sinceNote / 450);
 }
 
 /** Un solo efecto a la vez; al cambiar, el anterior se funde con el nuevo. */
@@ -86,7 +81,7 @@ export function startWheelLights(element: HTMLElement): () => void {
             // Encendida también crece un poco: se lee como una bombilla que se enciende.
             light.setAttribute('r', (RIM_RADIUS + level * 0.4).toFixed(3));
         });
-        // El centro late con cada golpe y respira con la melodía.
+        // El centro late con cada tiempo y respira con la melodía.
         const hubLevel = Math.max(0.3 + music.pulse * 0.7, music.melody).toFixed(3);
         hub.forEach((light) => {
             light.style.opacity = hubLevel;
@@ -107,6 +102,9 @@ export function startWheelLights(element: HTMLElement): () => void {
 // Con música: velocidad (px/ms) y grosor de las ondas que salen de la ruleta en cada golpe.
 const RING_SPEED = 0.75;
 const RING_WIDTH = 70;
+// Largo máximo de los pétalos desde el borde de la ruleta (px) y grosor de su contorno.
+const BLOOM_REACH = 240;
+const BLOOM_EDGE = 30;
 
 /** Pseudoaleatorio estable por punto y golpe: el mismo golpe enciende siempre los mismos puntos. */
 const dotHash = (ix: number, iy: number, beat: number): number => {
@@ -114,18 +112,20 @@ const dotHash = (ix: number, iy: number, beat: number): number => {
     return v - Math.floor(v);
 };
 
-export type Point = { x: number; y: number };
+/** Centro de la ruleta en el fondo y su radio (px). */
+export type WheelArea = { x: number; y: number; radius: number };
 
 /**
  * Cuánto enciende cada efecto el punto (x, y):
  * rings: un anillo sale de la ruleta en cada golpe · spin: tres brazos en espiral giran desde la
- * ruleta · sparkle: destellos al azar, más cuantos más agudos · melody: destellos por nota.
+ * ruleta · sparkle: destellos al azar, más cuantos más agudos · bloom: una flor que se abre desde
+ * la ruleta en cada tiempo.
  */
-export function patternLift(pattern: MusicPattern, music: MusicFrame, x: number, y: number, ix: number, iy: number, wave: number, center: Point, width: number, height: number): number {
+export function patternLift(pattern: MusicPattern, music: MusicFrame, x: number, y: number, ix: number, iy: number, wave: number, center: WheelArea): number {
     const { pulse, sinceBeat, beatMs, beats, sparkle } = music;
     switch (pattern) {
-        case 'melody':
-            return melodyLift(music, x, y, wave, height, width);
+        case 'bloom':
+            return bloomLift(music, x - center.x, y - center.y, center.radius, wave);
         case 'rings': {
             const radius = sinceBeat * RING_SPEED;
             const d = Math.hypot(x - center.x, y - center.y);
@@ -150,17 +150,29 @@ export function patternLift(pattern: MusicPattern, music: MusicFrame, x: number,
 }
 
 /**
- * La melodía: una franja de luz que sube y baja por el panel con la altura de las notas (graves
- * abajo, agudas arriba), más intensa cuanto más fuerte suena; cada nota nueva suelta una onda.
+ * La flor: en cada tiempo se abre desde el borde de la ruleta una roseta de ocho pétalos (el borde
+ * brilla y el interior se ilumina suave) que se desvanece al crecer. Cada tiempo gira medio pétalo,
+ * así las flores se alternan; la del primer tiempo del compás llega más lejos y trae una segunda
+ * capa de pétalos por dentro.
  */
-function melodyLift(music: MusicFrame, x: number, y: number, wave: number, height: number, width: number): number {
-    // Solo con cada nota nueva y se apaga en ~0,4 s: con el nivel continuo quedaba una franja
-    // siempre encendida mientras sonara algo.
-    if (music.sinceNote > 700) return 0;
-    const bandY = height * (0.85 - music.notePitch * 0.7);
-    const band = Math.exp(-(((y - bandY) / 70) ** 2)) * Math.max(0, 1 - music.sinceNote / 420) * (0.55 + 0.45 * wave);
-    const noteX = width * (0.15 + 0.7 * dotHash(music.notes, 3, 7));
-    const noteY = height * (0.85 - music.notePitch * 0.7);
-    const ripple = Math.max(0, 1 - Math.abs(Math.hypot(x - noteX, y - noteY) - music.sinceNote * 0.35) / 26);
-    return Math.max(band, ripple * (1 - music.sinceNote / 700));
+function bloomLift(music: MusicFrame, dx: number, dy: number, base: number, wave: number): number {
+    // Se abre durante algo más de un tiempo: se ve la nueva flor salir mientras la anterior se va.
+    const progress = Math.min(1, music.sinceBeat / (music.beatMs * 1.2));
+    if (progress >= 1) return music.pulse * 0.1;
+    const open = easeOut(progress);
+    const d = Math.hypot(dx, dy);
+    const angle = Math.atan2(dy, dx) - (music.beats * Math.PI) / BLOOM_PETALS;
+    const reach = (music.downbeat ? BLOOM_REACH * 1.35 : BLOOM_REACH) * (0.15 + 0.85 * open);
+    const fade = 1 - progress;
+    const petals = (length: number, turn: number) => {
+        // Cada pétalo: del borde de la ruleta hacia fuera, redondeado en la punta.
+        const shape = Math.abs(Math.cos((BLOOM_PETALS / 2) * (angle + turn)));
+        const edge = base * 0.9 + length * shape ** 0.6;
+        const rim = Math.max(0, 1 - Math.abs(d - edge) / BLOOM_EDGE);
+        const inside = d < edge && d > base * 0.9 ? 0.5 * (d - base * 0.9) / Math.max(edge - base * 0.9, 1) : 0;
+        return Math.max(rim, inside);
+    };
+    const outer = petals(reach, 0);
+    const inner = music.downbeat ? petals(reach * 0.55, Math.PI / BLOOM_PETALS) * 0.85 : 0;
+    return Math.max(outer, inner) * fade * (0.8 + 0.2 * wave);
 }

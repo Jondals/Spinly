@@ -65,14 +65,14 @@ function DotField() {
         let height = 0;
         let base: Rgb = [38, 40, 56];
         let glow: Rgb = [139, 144, 184];
-        let melodyTint: Rgb = [244, 114, 182];
+        let bloomTint: Rgb = [244, 114, 182];
         let baseFill = `rgb(${base.join(', ')})`;
         let frame = 0;
         let lastTime = 0;
         let lastDraw = 0;
         let onScreen = true;
         let colorsRead = false;
-        let center = { x: 0, y: 0 };
+        let center = { x: 0, y: 0, radius: 0 };
         // Capas de la música: se descargan la primera vez que suena una canción.
         let visuals: MusicVisuals | null = null;
         let visualsRequested = false;
@@ -82,7 +82,7 @@ function DotField() {
             const style = getComputedStyle(canvas);
             base = toRgb(ctx, style.getPropertyValue('--wheel-dots').trim(), base);
             glow = toRgb(ctx, style.getPropertyValue('--wheel-dots-glow').trim(), glow);
-            melodyTint = toRgb(ctx, style.getPropertyValue('--wheel-dots-melody').trim(), melodyTint);
+            bloomTint = toRgb(ctx, style.getPropertyValue('--wheel-dots-bloom').trim(), bloomTint);
             baseFill = `rgb(${base.join(', ')})`;
         };
 
@@ -103,7 +103,7 @@ function DotField() {
             const layers = visuals;
             const musicOn = music !== null && layers !== null && (isPulseActive() || music.pulse > 0.01);
             const buckets = Array.from({ length: ALPHA_STEPS }, () => new Path2D());
-            // tint: 0 color de acento (golpes y cursor), 1 color de la melodía.
+            // tint: 0 color de acento (golpes y cursor), 1 color de la flor.
             const lit: Array<{ x: number; y: number; radius: number; alpha: number; amount: number; tint: number }> = [];
 
             for (let y = offsetY - SPACING; y < height + SPACING; y += SPACING) {
@@ -115,13 +115,13 @@ function DotField() {
                     if (musicOn && layers) {
                         const ix = Math.round((x - offsetX) / SPACING);
                         const iy = Math.round((y - offsetY) / SPACING);
-                        const from = layers.patternLift(music.previousPattern, music, x, y, ix, iy, wave, center, width, height);
-                        const to = layers.patternLift(music.pattern, music, x, y, ix, iy, wave, center, width, height);
+                        const from = layers.patternLift(music.previousPattern, music, x, y, ix, iy, wave, center);
+                        const to = layers.patternLift(music.pattern, music, x, y, ix, iy, wave, center);
                         beatLift = from + (to - from) * music.patternBlend;
                     }
                     const lift = Math.min(1, beatLift);
-                    // El efecto de la melodía pinta en su color; los demás, en el de acento.
-                    const tint = musicOn && (music.patternBlend > 0.5 ? music.pattern : music.previousPattern) === 'melody' ? 1 : 0;
+                    // La flor pinta en su color; los demás efectos, en el de acento.
+                    const tint = musicOn && (music.patternBlend > 0.5 ? music.pattern : music.previousPattern) === 'bloom' ? 1 : 0;
                     let radius = BASE_RADIUS + wave * 0.35 + lift * 1.8;
                     let alpha = 0.6 + wave * 0.4;
                     alpha += (1 - alpha) * lift;
@@ -161,7 +161,7 @@ function DotField() {
             });
             for (const dot of lit) {
                 ctx.globalAlpha = dot.alpha;
-                ctx.fillStyle = mixRgb(base, dot.tint ? melodyTint : glow, dot.amount);
+                ctx.fillStyle = mixRgb(base, dot.tint ? bloomTint : glow, dot.amount);
                 ctx.beginPath();
                 ctx.arc(dot.x, dot.y, dot.radius, 0, Math.PI * 2);
                 ctx.fill();
@@ -213,7 +213,9 @@ function DotField() {
             // Centro de la ruleta en el lienzo: de ahí salen las ondas con música.
             const wheel = host.querySelector('.wheel-container')?.getBoundingClientRect();
             const box = host.getBoundingClientRect();
-            center = wheel ? { x: wheel.left + wheel.width / 2 - box.left, y: wheel.top + wheel.height / 2 - box.top } : { x: width / 2, y: height / 2 };
+            center = wheel
+                ? { x: wheel.left + wheel.width / 2 - box.left, y: wheel.top + wheel.height / 2 - box.top, radius: wheel.width / 2 }
+                : { x: width / 2, y: height / 2, radius: 0 };
             draw(performance.now());
         };
 

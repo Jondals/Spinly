@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { Notice } from '../common/StatusMessage';
 import type { AccountSession } from '../../scripts/profile';
 import type { MusicEngine } from '../../scripts/music-engine';
+import type { BeatGrid } from '../../scripts/beat-analysis';
 import { setPulseSource } from '../../scripts/music-pulse';
 import { dictMessage, type LocalMessage } from '../../scripts/strings';
 import { isSwitchingAccount } from '../../scripts/account-data';
@@ -94,6 +95,9 @@ function MusicProvider({ library, onLibraryChange, session, children }: MusicPro
     const urlRef = useRef<string | null>(null);
     // Cada petición de reproducción invalida las anteriores que sigan cargando.
     const requestRef = useRef(0);
+    // Pulso de cada canción ya analizada (null: no se pudo; sin entrada: sin analizar o analizando).
+    const gridsRef = useRef(new Map<string, BeatGrid | null>());
+    const analyzingRef = useRef(new Set<string>());
     const libraryRef = useRef(library);
     libraryRef.current = library;
     const uidRef = useRef(uid);
@@ -164,6 +168,15 @@ function MusicProvider({ library, onLibraryChange, session, children }: MusicPro
             stopPlayback();
             return;
         }
+        // El pulso de la canción entera se analiza mientras empieza a sonar; hasta que acaba, las luces
+        // siguen el pulso en tiempo real.
+        if (!gridsRef.current.has(id) && !analyzingRef.current.has(id)) {
+            analyzingRef.current.add(id);
+            void engine.analyze(file).then((grid) => {
+                analyzingRef.current.delete(id);
+                gridsRef.current.set(id, grid);
+            });
+        }
         const url = URL.createObjectURL(file);
         const played = await engine.playFile(url);
         if (request !== requestRef.current) {
@@ -209,7 +222,13 @@ function MusicProvider({ library, onLibraryChange, session, children }: MusicPro
         if (!playing) return undefined;
         let alive = true;
         void getEngine().then((engine) => {
-            if (alive && engine) setPulseSource(() => engine.bands());
+            if (!alive || !engine || !currentId) return;
+            setPulseSource({
+                bands: () => engine.bands(),
+                onset: () => engine.onset(),
+                clock: () => engine.clock(),
+                grid: () => gridsRef.current.get(currentId) ?? null,
+            });
         });
         return () => {
             alive = false;

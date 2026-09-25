@@ -133,6 +133,9 @@ jest.mock('./scripts/music-engine', () => ({
         },
         setVolume: () => undefined,
         bands: () => ({ bass: 0, mid: 0, high: 0, pitch: 0.5 }),
+        onset: () => 0,
+        clock: () => null,
+        analyze: async () => null,
         onEnded: () => undefined,
         dispose: () => undefined,
     }),
@@ -1002,80 +1005,133 @@ describe('música', () => {
         expect(localStorage.getItem('spinly-music-pending')).toBeNull();
     });
 
-    test('el pulso sube en cada golpe de graves y cae entre golpes; sin música se apaga', () => {
-        let energy = 0.2;
-        setPulseSource(() => ({ bass: energy, mid: 0.1, high: 0.05, pitch: 0.5 }));
+    /**
+     * Canción sintética a 120 BPM (un tiempo cada 500 ms, compás en el primero) con el reparto de
+     * bandas dado. Con `grid`, el análisis previo ya está listo; sin él, solo el seguidor en tiempo real.
+     */
+    const fakeSong = ({ mid = 0.1, high = 0.05, grid = true, bass = true }: { mid?: number; high?: number; grid?: boolean; bass?: boolean } = {}) => {
+        let songTime = 0;
+        const beats = Array.from({ length: 200 }, (_, i) => i * 0.5);
+        setPulseSource({
+            bands: () => ({ bass: bass && songTime % 0.5 < 0.06 ? 0.8 : 0.15, mid, high, pitch: 0.5 }),
+            onset: () => (bass && songTime % 0.5 < 0.016 ? 5 : 0.1),
+            clock: () => ({ audible: songTime, analysis: songTime }),
+            grid: () => (grid ? { beats, bpm: 120, downbeat: 0 } : null),
+        });
+        return {
+            advance: (ms: number) => {
+                songTime += ms / 1000;
+            },
+        };
+    };
+
+    test('el latido cae en cada tiempo, más fuerte al empezar compás, y se apaga sin música', () => {
         // Reloj propio por delante del real: otros tests ya leyeron el pulso con performance.now().
         let time = performance.now() + 1e6;
-        const frame = () => {
-            time += 16;
-            return readPulse(time);
+        const song = fakeSong();
+        const at = (ms: number) => {
+            for (let t = 0; t < ms; t += 4) {
+                song.advance(4);
+                time += 4;
+                readMusic(time);
+            }
+            return readMusic(time);
         };
-        // Un segundo de base constante: el latido se asienta.
-        for (let i = 0; i < 60; i++) frame();
-        const calm = frame();
-        energy = 0.8;
-        const hit = frame();
-        energy = 0.2;
-        for (let i = 0; i < 20; i++) frame();
-        const after = frame();
-        expect(hit).toBeGreaterThan(calm + 0.4);
-        expect(after).toBeLessThan(hit / 2);
+        at(3992);
+        // 4 s: primer tiempo de compás (el noveno tiempo); medio tiempo después, casi apagado.
+        const bar = at(8);
+        expect(bar.downbeat).toBe(true);
+        expect(bar.sinceBeat).toBeLessThan(20);
+        const middle = at(250);
+        expect(middle.pulse).toBeLessThan(bar.pulse / 3);
+        const second = at(250);
+        expect(second.downbeat).toBe(false);
+        expect(second.pulse).toBeLessThan(bar.pulse);
+        expect(second.pulse).toBeGreaterThan(middle.pulse * 2);
         setPulseSource(null);
-        for (let i = 0; i < 60; i++) frame();
-        expect(frame()).toBeLessThan(0.01);
+        for (let i = 0; i < 60; i++) {
+            time += 16;
+            readPulse(time);
+        }
+        expect(readPulse(time + 16)).toBeLessThan(0.01);
     });
 
-    test('la música marca los golpes, el tempo y un patrón según cómo suena', () => {
+    test('la música marca los tiempos, el tempo y un patrón según cómo suena', () => {
         let time = performance.now() + 2e6;
-        // Canción sintética a 120 BPM (un golpe cada 500 ms) durante 6 s, con el reparto de bandas dado.
         const play = (mid: number, high: number) => {
-            let clock = 0;
-            setPulseSource(() => ({ bass: clock % 500 < 60 ? 0.8 : 0.15, mid, high, pitch: 0.5 }));
+            const song = fakeSong({ mid, high });
             for (let i = 0; i < 375; i++) {
-                clock += 16;
+                song.advance(16);
                 time += 16;
                 readMusic(time);
             }
             return readMusic(time);
         };
         const bassy = play(0.06, 0.02);
-        expect(bassy.beats).toBeGreaterThanOrEqual(10);
-        expect(bassy.beatMs).toBeGreaterThan(450);
-        expect(bassy.beatMs).toBeLessThan(550);
+        // 6 s a 120 BPM: los tiempos de 0 a 6 s, ambos incluidos.
+        expect(bassy.beats).toBe(13);
+        expect(bassy.beatMs).toBe(500);
         expect(bassy.pattern).toBe('rings');
         expect(play(0.7, 0.67).pattern).toBe('sparkle');
         expect(play(0.52, 0.04).pattern).toBe('spin');
         setPulseSource(null);
     });
 
-    test('el patrón rota cada cuatro compases con fundido y la melodía marca sus notas y su altura', () => {
+    test('el patrón cambia cada cuatro compases, justo al empezar compás, y con fundido', () => {
         let time = performance.now() + 3e6;
-        let clock = 0;
-        // 120 BPM con una melodía que entra en cada corchea (250 ms) y sube de grave a agudo en 6 s.
-        setPulseSource(() => ({
-            bass: clock % 500 < 60 ? 0.8 : 0.15,
-            mid: clock % 250 < 90 ? 0.75 : 0.3,
-            high: 0.1,
-            pitch: Math.min(1, clock / 6000),
-        }));
+        const song = fakeSong({ mid: 0.5 });
+        const changes: { beats: number; downbeat: boolean; changed: boolean }[] = [];
+        let blend = 1;
+        let pattern = readMusic(time).pattern;
+        for (let t = 0; t < 30000; t += 16) {
+            song.advance(16);
+            time += 16;
+            const frame = readMusic(time);
+            // Un cambio: el fundido vuelve a empezar.
+            if (frame.patternBlend < blend) changes.push({ beats: frame.beats, downbeat: frame.downbeat, changed: frame.pattern !== pattern });
+            blend = frame.patternBlend;
+            pattern = frame.pattern;
+        }
+        // El primero en el compás que sigue a los 2,2 s (a los 4 s, noveno tiempo); después, cada 16
+        // tiempos (8 s a 120 BPM), siempre en el primer tiempo de un compás y a un efecto distinto.
+        expect(changes.map((change) => change.beats)).toEqual([9, 25, 41, 57]);
+        expect(changes.every((change) => change.downbeat)).toBe(true);
+        expect(changes.slice(1).every((change) => change.changed)).toBe(true);
+        setPulseSource(null);
+    });
+
+    test('sin análisis previo, el seguidor en tiempo real engancha el pulso y lo mantiene en un silencio', () => {
+        let time = performance.now() + 4e6;
+        let hits = true;
+        let songTime = 0;
+        setPulseSource({
+            bands: () => ({ bass: hits && songTime % 0.5 < 0.06 ? 0.8 : 0.15, mid: 0.1, high: 0.05, pitch: 0.5 }),
+            onset: () => (hits && songTime % 0.5 < 0.016 ? 5 : 0.1),
+            clock: () => ({ audible: songTime, analysis: songTime }),
+            grid: () => null,
+        });
         const run = (ms: number) => {
             for (let t = 0; t < ms; t += 16) {
-                clock += 16;
+                songTime += 0.016;
                 time += 16;
                 readMusic(time);
             }
             return readMusic(time);
         };
-        const start = run(2000);
-        const firstPattern = start.pattern;
-        expect(start.notes).toBeGreaterThanOrEqual(5);
-        const later = run(8600);
-        // Tras 16 golpes (y al menos 7 s) cambia a otro efecto, y el cambio empieza fundido.
-        expect(later.pattern).not.toBe(firstPattern);
-        expect(later.previousPattern).toBe(firstPattern);
-        expect(later.pitch).toBeGreaterThan(0.8);
-        expect(later.notes).toBeGreaterThan(start.notes + 20);
+        const locked = run(6000);
+        expect(Math.abs(locked.beatMs - 500)).toBeLessThan(10);
+        // El reloj va a la par que la canción: lo que se ve (un fotograma, 16 ms, por delante de lo que
+        // suena) está a la misma altura del tiempo. Distancia circular dentro del tiempo de 500 ms.
+        const offPhase = (frame: { sinceBeat: number }) => {
+            const d = Math.abs(frame.sinceBeat - (((songTime + 0.016) % 0.5) * 1000));
+            return Math.min(d, 500 - d);
+        };
+        expect(offPhase(locked)).toBeLessThan(25);
+        hits = false;
+        const before = locked.beats;
+        const silent = run(3000);
+        expect(silent.beats - before).toBe(6);
+        expect(offPhase(silent)).toBeLessThan(25);
         setPulseSource(null);
     });
 

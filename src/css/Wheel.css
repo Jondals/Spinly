@@ -174,7 +174,7 @@
 }
 
 /* Con música: useMusicPulse da a cada luz su brillo en cada frame según el patrón de la canción
-   (persecución a compás, bombillas alternas o destellos) y --pulse (0-1) hace brillar el aro. */
+   (el aro que late, la vuelta a compás, destellos o la flor) y --pulse (0-1) hace brillar el aro. */
 .wheel-container--music .wheel-light {
     animation: none;
 }

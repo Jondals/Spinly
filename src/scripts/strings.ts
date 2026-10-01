@@ -71,6 +71,7 @@ export const STRINGS = {
         editor: { en: 'Wheel Editor', es: 'Editor de ruleta' },
         presets: { en: 'Presets', es: 'Preajustes' },
         themes: { en: 'Themes', es: 'Temas' },
+        tournament: { en: 'Tournament', es: 'Torneo' },
         credit: { en: 'Developed by', es: 'Desarrollado por' },
         hideCredit: { en: 'Hide credit', es: 'Ocultar firma' },
     },

@@ -73,12 +73,14 @@ function preloadable<P extends object>(load: () => Promise<{ default: ComponentT
 
 const PresetsPanel = preloadable(() => import('./Components/presets/Presets'));
 const ThemesPanel = preloadable(() => import('./Components/themes/Themes'));
+const TournamentPanel = preloadable(() => import('./Components/tournament/Tournament'));
 
 /** Precarga los paneles secundarios cuando el navegador queda libre tras el primer pintado. */
 function prefetchPanels(): () => void {
     const run = () => {
         void PresetsPanel.preload();
         void ThemesPanel.preload();
+        void TournamentPanel.preload();
     };
     if ('requestIdleCallback' in window) {
         const id = window.requestIdleCallback(run, { timeout: 4000 });
@@ -454,6 +456,8 @@ function App() {
         const Presets = PresetsPanel.Component;
         const Themes = ThemesPanel.Component;
         switch (activeSection) {
+            case 'tournament':
+                return null;
             case 'presets':
                 return (
                     <Presets
@@ -521,8 +525,13 @@ function App() {
                             </Suspense>
                         )}
                     </div>
-                    {/* Siempre montada: cambiar de sección no reinicia la ruleta */}
-                    <Wheel options={options} activeTheme={activeTheme} onColorChange={handleWheelColor} />
+                    {/* Siempre montada: cambiar de sección no reinicia la ruleta (en el torneo queda oculta y quieta) */}
+                    <Wheel options={options} activeTheme={activeTheme} onColorChange={handleWheelColor} active={activeSection !== 'tournament'} />
+                    {ready && activeSection === 'tournament' && (
+                        <Suspense fallback={<div className="spinly-tournament" />}>
+                            <TournamentPanel.Component wheelNames={options.map((option) => option.name)} onColorChange={handleWheelColor} />
+                        </Suspense>
+                    )}
                 </main>
 
                 {storageWarning && (

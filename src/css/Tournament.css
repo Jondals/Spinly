@@ -1,0 +1,1698 @@
+/* Modo torneo (Components/tournament): ocupa el panel y la zona de la ruleta. Misma paleta y piezas
+   que el resto de la app (tarjetas, pestañas, botón principal, ruleta) sobre un fondo propio. */
+
+.spinly-tournament {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+    background-color: var(--bg-wheel-color);
+    --tour-live: var(--wheel-light-color);
+    --tour-card: color-mix(in srgb, var(--bg-card-color) 90%, transparent);
+}
+
+:root[data-theme="light"] .spinly-tournament {
+    --tour-live: #d97706;
+    --tour-card: color-mix(in srgb, var(--bg-card-color) 94%, transparent);
+}
+
+/* Fondo: la misma trama de puntos que hay detrás de la ruleta (misma variable de color, así son
+   el mismo fondo) y, encima, la aurora de tres manchas de la pantalla de carga, mucho más lenta y
+   tenue: una firma visual ya conocida en vez de un plató de concurso. Solo transform y opacity. */
+.spinly-tour-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.spinly-tour-bg-dots {
+    position: absolute;
+    inset: -28px 0 0 -28px;
+    background-image: radial-gradient(var(--wheel-dots) 1.25px, transparent 1.25px);
+    background-size: 28px 28px;
+    opacity: 0.6;
+    animation: spinly-tour-dots 50s linear infinite;
+    will-change: transform;
+}
+
+.spinly-tour-bg-aurora {
+    position: absolute;
+    inset: 0;
+    will-change: transform;
+}
+
+.spinly-tour-bg-glow {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 64vmax;
+    height: 64vmax;
+    margin: -32vmax 0 0 -32vmax;
+    border-radius: 50%;
+    will-change: transform, opacity;
+}
+
+.spinly-tour-bg-glow--a {
+    transform: translate(-30%, -26%);
+    background: radial-gradient(closest-side, color-mix(in srgb, #7c3aed 30%, transparent), transparent);
+    animation: spinly-tour-drift-a 26s ease-in-out infinite alternate;
+}
+
+.spinly-tour-bg-glow--b {
+    transform: translate(28%, 20%);
+    background: radial-gradient(closest-side, color-mix(in srgb, #f0197d 22%, transparent), transparent);
+    animation: spinly-tour-drift-b 32s ease-in-out infinite alternate;
+}
+
+.spinly-tour-bg-glow--c {
+    transform: translate(2%, 32%);
+    width: 50vmax;
+    height: 50vmax;
+    margin: -25vmax 0 0 -25vmax;
+    background: radial-gradient(closest-side, color-mix(in srgb, #22c7ff 18%, transparent), transparent);
+    animation: spinly-tour-drift-c 38s ease-in-out infinite alternate;
+}
+
+:root[data-theme="light"] .spinly-tour-bg-dots {
+    opacity: 0.8;
+}
+
+:root[data-theme="light"] .spinly-tour-bg-glow {
+    opacity: 0.6;
+}
+
+@keyframes spinly-tour-dots {
+    to { transform: translate(28px, 28px); }
+}
+
+@keyframes spinly-tour-drift-a {
+    to { transform: translate(-22%, -32%) scale(1.1); }
+}
+
+@keyframes spinly-tour-drift-b {
+    to { transform: translate(34%, 12%) scale(1.14); }
+}
+
+@keyframes spinly-tour-drift-c {
+    to { transform: translate(-6%, 24%) scale(0.92); }
+}
+
+.spinly-tour-content {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1rem 1.5rem 5rem;
+}
+
+.spinly-tour-card {
+    background: var(--tour-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-card-radius);
+    box-shadow: var(--card-shadow);
+}
+
+/* Configuración */
+.spinly-tour-setup {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: 1.25rem;
+    max-width: 72rem;
+    margin: 0 auto;
+    animation: spinly-tour-in 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.spinly-tour-setup-players,
+.spinly-tour-setup-format {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.spinly-tour-setup-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0 var(--spinly-panel-pad-x) 0.75rem;
+}
+
+.spinly-tour-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.7rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-badge-radius);
+    background: var(--bg-transparence);
+    color: var(--font-color-light);
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.spinly-tour-ghost:hover:not(:disabled) {
+    background: var(--color-hover);
+    border-color: var(--color-border-light);
+    color: var(--font-color);
+}
+
+.spinly-tour-ghost:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.spinly-tour-entries {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spinly-list-gap);
+    max-height: 26rem;
+    margin: 0;
+    padding: 0 var(--spinly-panel-pad-x);
+    overflow-y: auto;
+    list-style: none;
+}
+
+.spinly-tour-entry {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 3rem;
+    padding: 0 0.9rem;
+    transition: border-color 0.15s ease;
+}
+
+.spinly-tour-entry:focus-within {
+    border-color: var(--color-border-light);
+}
+
+.spinly-tour-entry-seed {
+    min-width: 1.4rem;
+    color: var(--font-color-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.spinly-tour-swatch {
+    flex-shrink: 0;
+    width: 1.35rem;
+    height: 1.35rem;
+    padding: 0;
+    border: 2px solid var(--color-border-dark);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.spinly-tour-swatch:hover,
+.spinly-tour-swatch:focus-visible {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 2px var(--color-focus-light);
+    outline: none;
+}
+
+.spinly-tour-entry input {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--font-color);
+    font: inherit;
+    font-size: 0.92rem;
+    font-weight: 500;
+}
+
+.spinly-tour-entry input::placeholder {
+    color: var(--font-color-disabled);
+}
+
+.spinly-tour-entry-remove {
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--font-color-muted);
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.55;
+    transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.spinly-tour-entry:hover .spinly-tour-entry-remove,
+.spinly-tour-entry:focus-within .spinly-tour-entry-remove {
+    opacity: 1;
+}
+
+.spinly-tour-entry-remove:hover {
+    color: var(--color-remove);
+}
+
+.spinly-tour-setup-add {
+    margin-top: auto;
+    padding: var(--spinly-panel-pad-y) var(--spinly-panel-pad-x);
+}
+
+/* Igual que "Añadir opción" del editor */
+.spinly-tour-add {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    height: 2.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-card-radius);
+    background-color: var(--bg-transparence);
+    color: var(--font-color-light);
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.spinly-tour-add svg {
+    width: 1rem;
+    height: 1rem;
+    color: var(--color-focus-light);
+}
+
+.spinly-tour-add:hover:not(:disabled) {
+    background-color: var(--color-focus);
+    border-color: var(--color-focus);
+    color: #ffffff;
+}
+
+.spinly-tour-add:hover:not(:disabled) svg {
+    color: #ffffff;
+}
+
+.spinly-tour-add:disabled {
+    opacity: 0.4;
+    border-style: dashed;
+    cursor: not-allowed;
+}
+
+.spinly-tour-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    padding: 0 var(--spinly-panel-pad-x);
+}
+
+.spinly-tour-desc {
+    color: var(--font-color-muted);
+    font-size: 0.74rem;
+    line-height: 1.4;
+}
+
+/* Solo para quien usa lector de pantalla: a la vista, la explicación va en el `title` del interruptor */
+.spinly-tour-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+.spinly-tour-setup-hint {
+    padding: 0 var(--spinly-panel-pad-x) 0.75rem;
+}
+
+/* Grupos numerados del formato: una etiqueta y sus controles, separados por una línea */
+.spinly-tour-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--color-border);
+}
+
+.spinly-tour-field-title {
+    color: var(--font-color-light);
+    font-size: 0.84rem;
+    font-weight: 600;
+}
+
+/* Estilos predefinidos: tres tarjetas con icono, nombre y qué significan */
+.spinly-tour-styles {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.6rem;
+}
+
+.spinly-tour-style,
+.spinly-tour-choice {
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-card-radius);
+    background: var(--bg-transparence);
+    color: var(--font-color-light);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.spinly-tour-style {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.6rem 0.7rem;
+}
+
+.spinly-tour-style svg {
+    color: var(--font-color-muted);
+    transition: color 0.18s ease;
+}
+
+.spinly-tour-style strong {
+    font-size: 0.88rem;
+}
+
+.spinly-tour-style span,
+.spinly-tour-choice-text span {
+    color: var(--font-color-muted);
+    font-size: 0.72rem;
+    line-height: 1.35;
+}
+
+.spinly-tour-style:hover,
+.spinly-tour-choice:hover {
+    border-color: var(--color-border-light);
+    background: var(--color-hover);
+    transform: translateY(-1px);
+}
+
+.spinly-tour-style--active,
+.spinly-tour-style--active:hover,
+.spinly-tour-choice--active,
+.spinly-tour-choice--active:hover {
+    border-color: var(--color-focus-light);
+    background: color-mix(in srgb, var(--color-focus-light) 12%, var(--bg-card-color));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-focus-light) 35%, transparent);
+}
+
+.spinly-tour-style--active svg,
+.spinly-tour-choice--active .spinly-tour-choice-icon {
+    color: var(--color-focus-light);
+}
+
+.spinly-tour-style:focus-visible,
+.spinly-tour-choice:focus-visible {
+    outline: 2px solid var(--color-focus-light);
+    outline-offset: 2px;
+}
+
+.spinly-tour-choices {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+
+/* Una tarjeta debajo de otra: para cuando la pregunta ya vive en media columna (ver spinly-tour-field-row) */
+.spinly-tour-choices--stacked {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.spinly-tour-choice {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    padding: 0.55rem 0.7rem;
+}
+
+.spinly-tour-choice-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+    color: var(--font-color-muted);
+    transition: color 0.18s ease;
+}
+
+.spinly-tour-choice-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.spinly-tour-choice-text strong {
+    font-size: 0.84rem;
+}
+
+/* Vista previa de la primera ronda */
+.spinly-tour-preview {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem;
+    margin: 0;
+    list-style: none;
+}
+
+.spinly-tour-preview li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.55rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    background: var(--bg-card-color);
+    font-size: 0.74rem;
+}
+
+.spinly-tour-preview span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.spinly-tour-preview span:last-child {
+    justify-content: flex-end;
+}
+
+.spinly-tour-preview i {
+    flex-shrink: 0;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+}
+
+.spinly-tour-preview em {
+    color: var(--font-color-muted);
+    font-size: 0.64rem;
+    font-style: normal;
+    text-transform: uppercase;
+}
+
+.spinly-tour-preview-bye {
+    color: var(--font-color-muted);
+    font-style: italic;
+}
+
+li.spinly-tour-preview-more {
+    display: block;
+    color: var(--font-color-muted);
+    text-align: center;
+}
+
+.spinly-tour-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-width: 0;
+}
+
+.spinly-tour-field .spinly-segmented {
+    margin: 0;
+}
+
+.spinly-tour-field-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.spinly-tour-label {
+    color: var(--font-color-muted);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+/* Extras: una fila de píldoras (el porqué de cada una va en el `title`, al pasar el ratón) */
+.spinly-tour-switches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+/* Interruptor: checkbox real (accesible con teclado) dibujado como un chip con su propio switch */
+.spinly-tour-switch {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.75rem 0.4rem 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--bg-transparence);
+    cursor: pointer;
+    transition: border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.spinly-tour-switch:hover {
+    border-color: var(--color-border-light);
+}
+
+.spinly-tour-switch--on {
+    border-color: color-mix(in srgb, var(--color-focus-light) 55%, transparent);
+    background: color-mix(in srgb, var(--color-focus-light) 12%, var(--bg-card-color));
+}
+
+.spinly-tour-switch input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+}
+
+.spinly-tour-switch-track {
+    position: relative;
+    flex-shrink: 0;
+    width: 1.9rem;
+    height: 1.1rem;
+    border: 1px solid var(--color-border-light);
+    border-radius: 1rem;
+    background: var(--bg-card-color);
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.spinly-tour-switch-thumb {
+    position: absolute;
+    top: 50%;
+    left: 0.14rem;
+    width: 0.76rem;
+    height: 0.76rem;
+    border-radius: 50%;
+    background: var(--font-color-muted);
+    transform: translateY(-50%);
+    transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s ease;
+}
+
+.spinly-tour-switch input:checked + .spinly-tour-switch-track {
+    background: var(--color-focus);
+    border-color: var(--color-focus-light);
+}
+
+.spinly-tour-switch input:checked + .spinly-tour-switch-track .spinly-tour-switch-thumb {
+    background: #ffffff;
+    transform: translate(0.8rem, -50%);
+}
+
+.spinly-tour-switch input:focus-visible + .spinly-tour-switch-track {
+    outline: 2px solid var(--color-focus-light);
+    outline-offset: 2px;
+}
+
+.spinly-tour-switch-label {
+    color: var(--font-color-light);
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* Disclosure "Personalizar reglas": con las reglas plegadas, un resumen de una línea a su lado */
+.spinly-tour-disclosure {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+    padding: 0.2rem 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-focus-light);
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.spinly-tour-disclosure svg {
+    flex-shrink: 0;
+    transition: transform 0.18s ease;
+}
+
+.spinly-tour-disclosure-icon {
+    transform: rotate(180deg);
+}
+
+.spinly-tour-disclosure-summary {
+    overflow: hidden;
+    color: var(--font-color-muted);
+    font-weight: 400;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.spinly-tour-rules {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    animation: spinly-tour-in 0.2s ease;
+}
+
+.spinly-tour-setup-start {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: auto;
+    padding: 1rem var(--spinly-panel-pad-x) var(--spinly-panel-pad-x);
+}
+
+.spinly-tour-hint {
+    color: var(--font-color-muted);
+    font-size: 0.78rem;
+    text-align: center;
+}
+
+button.spinly-tour-start.spinly-btn-primary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    padding: 1rem 1.5rem;
+    border-radius: 1.35rem;
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: 0.12rem;
+}
+
+button.spinly-tour-start.spinly-btn-primary:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* En juego */
+.spinly-tour-live {
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+    max-width: 92rem;
+    margin: 0 auto;
+    animation: spinly-tour-in 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes spinly-tour-in {
+    from { opacity: 0; transform: translateY(0.6rem); }
+}
+
+.spinly-tour-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1rem;
+}
+
+.spinly-tour-titles,
+.spinly-tour-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+    min-width: 0;
+}
+
+.spinly-tour-badge,
+.spinly-tour-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    max-width: 100%;
+    padding: 0.45rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-badge-radius);
+    background: var(--tour-card);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.spinly-tour-badge svg {
+    color: var(--tour-live);
+}
+
+.spinly-tour-chip {
+    color: var(--font-color-light);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: none;
+}
+
+.spinly-tour-chip i {
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background: var(--font-color-muted);
+}
+
+.spinly-tour-chip--live i {
+    background: var(--item-mint);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--item-mint) 60%, transparent);
+    animation: spinly-tour-ping 1.8s ease-out infinite;
+}
+
+@keyframes spinly-tour-ping {
+    to { box-shadow: 0 0 0 0.45rem transparent; }
+}
+
+.spinly-tour-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--font-color-muted);
+    font-size: 0.78rem;
+}
+
+.spinly-tour-tabs.spinly-segmented {
+    margin: 0;
+}
+
+.spinly-tour-tabs .spinly-segmented-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.85rem;
+    font-size: 0.8rem;
+}
+
+.spinly-tour-tool,
+.spinly-tour-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    height: 2.45rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-badge-radius);
+    background: var(--tour-card);
+    color: var(--font-color-light);
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.spinly-tour-tool {
+    padding: 0 0.85rem;
+}
+
+.spinly-tour-icon-btn {
+    width: 2.45rem;
+}
+
+.spinly-tour-tool:hover:not(:disabled),
+.spinly-tour-icon-btn:hover:not(:disabled) {
+    background: var(--color-hover);
+    border-color: var(--color-border-light);
+    color: var(--font-color);
+}
+
+.spinly-tour-tool--on,
+.spinly-tour-tool--on:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--tour-live) 16%, var(--bg-card-color));
+    border-color: color-mix(in srgb, var(--tour-live) 55%, transparent);
+    color: var(--font-color);
+}
+
+.spinly-tour-tool--on svg {
+    color: var(--tour-live);
+}
+
+.spinly-tour-icon-btn--armed,
+.spinly-tour-icon-btn--armed:hover:not(:disabled) {
+    border-color: var(--color-remove);
+    color: var(--color-remove);
+}
+
+.spinly-tour-tool:disabled,
+.spinly-tour-icon-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.spinly-tour-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(19rem, 1fr);
+    gap: 1.25rem;
+    align-items: start;
+}
+
+.spinly-tour-main {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.spinly-tour-board {
+    min-height: 24rem;
+    padding: 1rem 1.1rem;
+}
+
+.spinly-tour-board-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.spinly-tour-board-head h3 {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.spinly-tour-board-head h3 svg {
+    color: var(--color-focus-light);
+}
+
+.spinly-tour-board-head span {
+    color: var(--font-color-muted);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.spinly-tour-board-scroll {
+    overflow-x: auto;
+    padding: 0.75rem 0 0.5rem;
+}
+
+/* Cuadro: columnas por ronda; cada duelo, centrado entre los dos que lo alimentan */
+.spinly-bracket {
+    --gap: 2.25rem;
+    display: flex;
+    gap: var(--gap);
+    width: max-content;
+    min-width: 100%;
+    min-height: 20rem;
+}
+
+.spinly-bracket-round {
+    display: flex;
+    flex-direction: column;
+    width: 12rem;
+    flex-shrink: 0;
+}
+
+.spinly-bracket-round-title {
+    margin-bottom: 0.6rem;
+    color: var(--font-color-muted);
+    font-size: 0.64rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.spinly-bracket-column,
+.spinly-bracket-pair {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+}
+
+.spinly-bracket-slot {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    padding: 0.45rem 0;
+}
+
+/* Líneas del cuadro: del duelo al hueco, el hueco que une la pareja y del hueco al siguiente */
+.spinly-bracket-slot::after,
+.spinly-bracket-round--fed .spinly-bracket-slot::before,
+.spinly-bracket-pair:not(.spinly-bracket-pair--final)::after {
+    content: '';
+    position: absolute;
+    border-color: var(--color-border-light);
+    pointer-events: none;
+}
+
+.spinly-bracket-slot::after {
+    top: 50%;
+    right: calc(var(--gap) / -2);
+    width: calc(var(--gap) / 2);
+    border-top: 1px solid;
+    border-color: var(--color-border-light);
+}
+
+.spinly-bracket-pair--final .spinly-bracket-slot::after {
+    right: calc(var(--gap) * -1);
+    width: var(--gap);
+}
+
+.spinly-bracket-round--fed .spinly-bracket-slot::before {
+    top: 50%;
+    left: calc(var(--gap) / -2);
+    width: calc(var(--gap) / 2);
+    border-top: 1px solid;
+    border-color: var(--color-border-light);
+}
+
+.spinly-bracket-pair:not(.spinly-bracket-pair--final)::after {
+    top: 25%;
+    bottom: 25%;
+    right: calc(var(--gap) / -2);
+    border-right: 1px solid;
+    border-color: var(--color-border-light);
+}
+
+.spinly-match {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    width: 100%;
+    padding: 0.4rem 0.5rem 0.35rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.6rem;
+    background: var(--bg-card-color);
+    font-size: 0.8rem;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.spinly-match--bye {
+    opacity: 0.55;
+}
+
+.spinly-match--live {
+    border-color: color-mix(in srgb, var(--tour-live) 70%, transparent);
+    box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--tour-live) 35%, transparent),
+        0 0 24px -6px color-mix(in srgb, var(--tour-live) 55%, transparent);
+    animation: spinly-tour-live 2.4s ease-in-out infinite;
+}
+
+@keyframes spinly-tour-live {
+    50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--tour-live) 55%, transparent), 0 0 30px -4px color-mix(in srgb, var(--tour-live) 65%, transparent); }
+}
+
+.spinly-match-live {
+    position: absolute;
+    top: -0.62rem;
+    right: 0.5rem;
+    padding: 0.08rem 0.4rem;
+    border-radius: 0.25rem;
+    background: var(--tour-live);
+    color: #16161d;
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+}
+
+.spinly-match-row {
+    display: grid;
+    grid-template-columns: 0.55rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.22rem 0.3rem;
+    border-radius: 0.35rem;
+}
+
+.spinly-match-row--won {
+    background: color-mix(in srgb, var(--color-hover) 80%, transparent);
+}
+
+.spinly-match-row--won .spinly-match-name {
+    font-weight: 700;
+}
+
+.spinly-match-row--lost .spinly-match-name {
+    color: var(--font-color-muted);
+    text-decoration: line-through;
+    text-decoration-color: color-mix(in srgb, var(--font-color-muted) 60%, transparent);
+}
+
+.spinly-match-dot {
+    flex-shrink: 0;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: var(--color-border-light);
+}
+
+.spinly-match-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.spinly-match-score {
+    min-width: 1ch;
+    color: var(--font-color-muted);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.spinly-match-row--won .spinly-match-score {
+    color: var(--font-color);
+}
+
+.spinly-match-state {
+    margin-top: 0.1rem;
+    color: var(--font-color-muted);
+    font-size: 0.62rem;
+    text-align: right;
+}
+
+.spinly-match--live .spinly-match-state {
+    color: var(--tour-live);
+    font-weight: 600;
+}
+
+.spinly-bracket-column--podium {
+    justify-content: center;
+    gap: 1.25rem;
+}
+
+.spinly-champion {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 1rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-card-radius);
+    background: var(--bg-card-color);
+    text-align: center;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.spinly-champion-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    margin-bottom: 0.25rem;
+    border: 1px solid color-mix(in srgb, var(--tour-live) 40%, transparent);
+    border-radius: 0.7rem;
+    background: color-mix(in srgb, var(--tour-live) 14%, transparent);
+    color: var(--tour-live);
+}
+
+.spinly-champion-name {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 1.05rem;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.spinly-champion-sub {
+    color: var(--font-color-muted);
+    font-size: 0.66rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.spinly-champion-finalists {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    width: 100%;
+    margin-top: 0.5rem;
+    padding: 0.5rem 0 0;
+    border-top: 1px solid var(--color-border);
+    list-style: none;
+}
+
+.spinly-champion-finalists li {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    color: var(--font-color-light);
+    font-size: 0.76rem;
+}
+
+.spinly-champion-finalist--out {
+    color: var(--font-color-muted);
+    text-decoration: line-through;
+}
+
+.spinly-champion--crowned {
+    border-color: color-mix(in srgb, var(--tour-live) 70%, transparent);
+    box-shadow: 0 0 36px -10px color-mix(in srgb, var(--tour-live) 70%, transparent);
+}
+
+.spinly-champion--crowned .spinly-champion-icon {
+    animation: spinly-tour-crown 2.6s ease-in-out infinite;
+}
+
+@keyframes spinly-tour-crown {
+    50% { transform: translateY(-3px) rotate(-4deg); }
+}
+
+/* Estadísticas */
+.spinly-tour-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin: 0;
+}
+
+.spinly-tour-stat {
+    padding: 0.75rem 0.9rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-card-radius);
+    background: var(--tour-card);
+}
+
+.spinly-tour-stat dt {
+    color: var(--font-color-muted);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.spinly-tour-stat dd {
+    margin: 0.3rem 0 0;
+    font-size: 1.3rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Participantes e historial */
+.spinly-tour-players,
+.spinly-tour-history {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0;
+    list-style: none;
+}
+
+.spinly-tour-player {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.85rem;
+}
+
+.spinly-tour-player--out {
+    opacity: 0.6;
+}
+
+.spinly-tour-player-seed {
+    min-width: 1.4rem;
+    color: var(--font-color-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-align: right;
+}
+
+.spinly-tour-player-main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.spinly-tour-player-main strong {
+    overflow: hidden;
+    font-size: 0.9rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.spinly-tour-player-main span {
+    color: var(--font-color-muted);
+    font-size: 0.72rem;
+}
+
+.spinly-tour-rank {
+    flex-shrink: 0;
+    padding: 0.2rem 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-chip-radius);
+    background: var(--bg-transparence);
+    color: var(--font-color-light);
+    font-size: 0.68rem;
+    font-weight: 600;
+}
+
+.spinly-tour-rank--gold { border-color: color-mix(in srgb, var(--item-amber) 60%, transparent); color: var(--item-amber); }
+.spinly-tour-rank--silver { border-color: var(--color-border-light); color: var(--font-color); }
+.spinly-tour-rank--bronze { border-color: color-mix(in srgb, var(--item-coral) 55%, transparent); color: var(--item-coral); }
+.spinly-tour-rank--live { border-color: color-mix(in srgb, var(--item-mint) 55%, transparent); color: var(--item-mint); }
+.spinly-tour-rank--out { color: var(--font-color-muted); }
+
+:root[data-theme="light"] .spinly-tour-rank--gold { color: #b45309; }
+:root[data-theme="light"] .spinly-tour-rank--bronze { color: #c2410c; }
+:root[data-theme="light"] .spinly-tour-rank--live { color: #15803d; }
+
+.spinly-tour-history-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+        "round duel tally"
+        "round text tally";
+    align-items: center;
+    gap: 0.1rem 0.85rem;
+    padding: 0.6rem 0.85rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-card-radius);
+    background: var(--bg-card-color);
+}
+
+.spinly-tour-history-item--won {
+    border-color: color-mix(in srgb, var(--tour-live) 45%, var(--color-border));
+}
+
+.spinly-tour-history-round {
+    grid-area: round;
+    color: var(--font-color-muted);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.spinly-tour-history-duel {
+    grid-area: duel;
+    overflow: hidden;
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.spinly-tour-history-duel em {
+    color: var(--font-color-muted);
+    font-style: normal;
+    font-weight: 400;
+}
+
+.spinly-tour-history-text {
+    grid-area: text;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--font-color-muted);
+    font-size: 0.74rem;
+}
+
+.spinly-tour-history-item--won .spinly-tour-history-text {
+    color: var(--tour-live);
+    font-weight: 600;
+}
+
+.spinly-tour-history-tally {
+    grid-area: tally;
+    font-size: 0.95rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+.spinly-tour-empty {
+    padding: 3rem 1rem;
+    color: var(--font-color-muted);
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+/* Duelo */
+.spinly-tour-duel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.8rem;
+    min-width: 0;
+}
+
+.spinly-duel-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-areas: "a score b";
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.85rem 1rem;
+}
+
+.spinly-duel-side {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+}
+
+.spinly-duel-side--a {
+    grid-area: a;
+}
+
+.spinly-duel-side--b {
+    grid-area: b;
+    flex-direction: row-reverse;
+    text-align: right;
+}
+
+.spinly-duel-side .spinly-match-dot {
+    width: 0.7rem;
+    height: 0.7rem;
+}
+
+.spinly-duel-side-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.spinly-duel-side-text strong {
+    overflow: hidden;
+    font-size: 0.95rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.spinly-duel-side-text span {
+    overflow: hidden;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.spinly-duel-score {
+    grid-area: score;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.spinly-duel-score-box {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.85rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.55rem;
+    background: var(--bg-transparence);
+    font-size: 1.2rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.spinly-duel-score-box b {
+    font-weight: 800;
+}
+
+.spinly-duel-score-box i {
+    margin: 0 0.45rem;
+    color: var(--font-color-muted);
+    font-style: normal;
+}
+
+.spinly-duel-score-info {
+    color: var(--font-color-muted);
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.spinly-duel-wheel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.35rem;
+    width: 100%;
+}
+
+.spinly-duel-stage {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    padding-top: 1.5rem;
+    container-type: inline-size;
+}
+
+.spinly-duel-container.wheel-container {
+    --wheel-radius: max(6rem, min(40cqi, 10.5rem, calc((100dvh - 30rem) / 2)));
+}
+
+.spinly-duel-container .wheel-rim-ring {
+    stroke: url(#duel-rim-gradient);
+}
+
+.spinly-duel-container .wheel-light-halo {
+    fill: url(#duel-light-halo);
+}
+
+.spinly-duel-spin-zone.wheel-spin-zone {
+    padding: 0;
+}
+
+.spinly-duel-status {
+    width: 100%;
+    padding: 0.6rem 0.9rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-card-radius);
+    background: var(--tour-card);
+    color: var(--font-color-light);
+    font-size: 0.8rem;
+    text-align: center;
+    animation: spinly-tour-in 0.3s ease;
+}
+
+.spinly-duel-referee {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--color-border);
+}
+
+.spinly-duel-referee-label {
+    color: var(--font-color-muted);
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.spinly-duel-force {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid transparent;
+    border-radius: var(--spinly-badge-radius);
+    background: transparent;
+    color: var(--font-color-light);
+    font: inherit;
+    font-size: 0.72rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.spinly-duel-force svg {
+    flex-shrink: 0;
+    color: var(--tour-live);
+}
+
+.spinly-duel-force:hover:not(:disabled) {
+    background: var(--color-hover);
+    border-color: var(--color-border-light);
+    color: var(--font-color);
+}
+
+.spinly-duel-force:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* Campeón: la tarjeta del resultado de la ruleta con un estallido de destellos */
+.spinly-champion-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.spinly-champion-burst {
+    position: absolute;
+    top: 38%;
+    left: 50%;
+    pointer-events: none;
+}
+
+.spinly-champion-burst i {
+    position: absolute;
+    width: 0.4rem;
+    height: 1.4rem;
+    border-radius: 1rem;
+    background: var(--tour-live, var(--wheel-light-color));
+    opacity: 0;
+    transform: rotate(calc(var(--i) * 30deg)) translateY(-1rem);
+    animation: spinly-tour-burst 1.4s cubic-bezier(0.22, 1, 0.36, 1) calc(var(--i) * 25ms) 2;
+}
+
+.spinly-champion-burst i:nth-child(3n) { background: var(--item-pink); }
+.spinly-champion-burst i:nth-child(3n + 1) { background: var(--item-sky); }
+
+@keyframes spinly-tour-burst {
+    0% { opacity: 0; transform: rotate(calc(var(--i) * 30deg)) translateY(-1rem) scaleY(0.4); }
+    25% { opacity: 1; }
+    100% { opacity: 0; transform: rotate(calc(var(--i) * 30deg)) translateY(-9rem) scaleY(1); }
+}
+
+.spinly-champion-of {
+    color: var(--font-color-muted);
+    font-size: 0.85rem;
+}
+
+.spinly-champion-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.6rem;
+    margin-top: 0.4rem;
+}
+
+.spinly-champion-actions button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.2rem;
+    border-radius: 1.2rem;
+}
+
+/* Columna estrecha y portátiles: el duelo baja bajo el cuadro */
+@media (max-width: 1180px) {
+    .spinly-tour-body {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .spinly-tour-duel {
+        order: -1;
+    }
+
+    .spinly-duel-container.wheel-container {
+        --wheel-radius: max(6rem, min(34cqi, 11rem));
+    }
+}
+
+@media (max-width: 1000px) {
+    .spinly-tour-setup {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .spinly-tour-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 750px) {
+    .spinly-tournament {
+        height: auto;
+        min-height: calc(100dvh - 4rem);
+        overflow: visible;
+    }
+
+    .spinly-tour-content {
+        overflow: visible;
+        padding: 1rem 1rem 2rem;
+    }
+
+    .spinly-tour-top,
+    .spinly-tour-controls {
+        width: 100%;
+    }
+
+    .spinly-tour-tabs.spinly-segmented {
+        flex: 1 1 100%;
+    }
+
+    .spinly-tour-tabs .spinly-segmented-btn {
+        padding: 0.5rem 0.4rem;
+        font-size: 0.72rem;
+    }
+
+    .spinly-tour-tabs .spinly-segmented-btn svg {
+        display: none;
+    }
+
+    .spinly-tour-tool {
+        flex: 1;
+    }
+
+    .spinly-duel-container.wheel-container {
+        --wheel-radius: max(6rem, min(38cqi, 10.5rem));
+    }
+
+    .spinly-tour-field-row,
+    .spinly-tour-choices,
+    .spinly-tour-styles,
+    .spinly-tour-preview {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .spinly-tour-entries {
+        max-height: none;
+    }
+
+    .spinly-bracket {
+        --gap: 1.5rem;
+    }
+
+    .spinly-bracket-round {
+        width: 10.5rem;
+    }
+
+    .spinly-duel-referee {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .spinly-duel-referee-label {
+        order: -1;
+        width: 100%;
+        text-align: center;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .spinly-tour-bg-dots,
+    .spinly-tour-bg-glow,
+    .spinly-tour-chip--live i,
+    .spinly-match--live,
+    .spinly-champion--crowned .spinly-champion-icon,
+    .spinly-champion-burst i,
+    .spinly-tour-setup,
+    .spinly-tour-rules,
+    .spinly-tour-live,
+    .spinly-duel-status {
+        animation: none;
+    }
+}

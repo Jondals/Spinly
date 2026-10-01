@@ -23,6 +23,8 @@ interface WheelProps {
     options: WheelOption[];
     activeTheme?: WheelTheme | null;
     onColorChange: (field: WheelColorField, color: string) => void;
+    /** false mientras otra vista la tapa (el torneo): Espacio no la gira. */
+    active?: boolean;
 }
 
 // Solo se usan tras una interacción: fuera del JS inicial.
@@ -50,7 +52,7 @@ const HUB_LIGHTS = ringOfLights(8, 5, LIGHT_CYCLE_S);
 const cssColor = (name: string): string =>
     getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#000000';
 
-function Wheel({ options, activeTheme, onColorChange }: WheelProps) {
+function Wheel({ options, activeTheme, onColorChange, active = true }: WheelProps) {
     const { lang, t } = useTranslation();
     const [rotation, setRotation] = useState(0);
     const [spinning, setSpinning] = useState(false);
@@ -71,7 +73,8 @@ function Wheel({ options, activeTheme, onColorChange }: WheelProps) {
     const music = useMusic();
     const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
     const containerRef = useRef<HTMLDivElement>(null);
-    const lightsFollowMusic = music.playing && !reducedMotion;
+    // Oculta (torneo), no: la ruleta del duelo lleva entonces las luces con la música.
+    const lightsFollowMusic = music.playing && !reducedMotion && active;
     useMusicPulse(containerRef, lightsFollowMusic);
 
     useWheelColors(activeTheme);
@@ -110,8 +113,10 @@ function Wheel({ options, activeTheme, onColorChange }: WheelProps) {
 
     // El listener global se registra una vez; la ref evita que use un handleSpin obsoleto.
     const handleSpinRef = useRef(handleSpin);
+    const activeRef = useRef(active);
     useEffect(() => {
         handleSpinRef.current = handleSpin;
+        activeRef.current = active;
     });
 
     // Espacio gira la ruleta salvo que el foco esté en un campo, un botón o un diálogo,
@@ -129,6 +134,7 @@ function Wheel({ options, activeTheme, onColorChange }: WheelProps) {
             if (isTextEntry) return;
             if (target && (target.tagName === 'BUTTON' || target.closest('button'))) return;
             if (target?.closest('[role="dialog"]')) return;
+            if (!activeRef.current) return;
             e.preventDefault();
             handleSpinRef.current();
         };
@@ -304,7 +310,7 @@ function Wheel({ options, activeTheme, onColorChange }: WheelProps) {
                 </div>
             </div>
             {/* Escritorio: música y sonidos abajo a la derecha. En móvil van en el menú. */}
-            {!isMobile && <AudioControls variant="dock" />}
+            {!isMobile && active && <AudioControls variant="dock" />}
         </div>
     );
 }

@@ -8,12 +8,13 @@ import AudioControls from '../music/AudioControls';
 import { MOBILE_QUERY } from '../../scripts/layout';
 import '../../css/WheelManager.css';
 
-export type WheelSectionId = 'options' | 'presets' | 'themes';
+export type WheelSectionId = 'options' | 'presets' | 'themes' | 'tournament';
 
-const SECTIONS: ReadonlyArray<{ id: WheelSectionId; icon: IconName; label: 'editor' | 'presets' | 'themes' }> = [
+const SECTIONS: ReadonlyArray<{ id: WheelSectionId; icon: IconName; label: 'editor' | 'presets' | 'themes' | 'tournament' }> = [
     { id: 'options', icon: 'sliders', label: 'editor' },
     { id: 'presets', icon: 'bookmark', label: 'presets' },
     { id: 'themes', icon: 'palette', label: 'themes' },
+    { id: 'tournament', icon: 'trophy', label: 'tournament' },
 ];
 
 // Preferencia del dispositivo, como el idioma: no viaja con la cuenta ni se borra al cerrar sesión.

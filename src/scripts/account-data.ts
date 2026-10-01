@@ -50,8 +50,12 @@ const MAX_ACCOUNT_BYTES = 10 * 1024 * 1024;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SYNC_KEY = 'spinly-account-sync';
 
+/** Torneo en curso (modo torneo): vive en este navegador, pero se borra al cerrar sesión como lo demás. */
+export const TOURNAMENT_STORAGE_KEY = 'spinly-tournament';
+
 /** Claves de localStorage que pertenecen a la cuenta; se borran al cerrar sesión. */
 const DATA_KEYS = [
+    TOURNAMENT_STORAGE_KEY,
     OPTIONS_STORAGE_KEY,
     THEMES_STORAGE_KEY,
     ACTIVE_THEME_STORAGE_KEY,

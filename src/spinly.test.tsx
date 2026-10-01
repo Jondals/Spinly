@@ -492,6 +492,54 @@ describe('ruleta y editor', () => {
         expect(theme).toMatchObject({ pointerColor: '#22c55e', lightColor: '#7c3aed' });
     });
 
+    test('modo torneo: se configura con las opciones de la ruleta, se juega y corona a un campeón', async () => {
+        renderApp();
+        // El idioma muestra su código junto a la bandera.
+        expect(screen.getByRole('button', { name: /Cambiar a español/ })).toHaveTextContent('EN');
+        fireEvent.click(screen.getByRole('button', { name: 'Tournament' }));
+        // Los participantes salen de la ruleta.
+        expect(await screen.findByDisplayValue('Option 1')).toBeInTheDocument();
+        expect(screen.getByDisplayValue('Option 4')).toBeInTheDocument();
+        fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Duels' })).getByRole('radio', { name: '1' }));
+        fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Final' })).getByRole('radio', { name: '1' }));
+        fireEvent.click(screen.getByRole('checkbox', { name: 'Referee mode (force wins)' }));
+        fireEvent.click(screen.getByRole('button', { name: /START TOURNAMENT/ }));
+
+        expect(await screen.findByText('Knockout bracket')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /SPIN DUEL/ })).toBeEnabled();
+        expect(screen.getByText(/Semifinals · Duel 1 of 3/)).toBeInTheDocument();
+        // Tres duelos decididos por el árbitro: dos semifinales y la final.
+        for (let duel = 0; duel < 3; duel++) {
+            fireEvent.click(screen.getAllByRole('button', { name: /^Give the duel to .* without spinning$/ })[0]);
+        }
+        expect(await screen.findByText('CHAMPION')).toBeInTheDocument();
+        const saved = JSON.parse(localStorage.getItem('spinly-tournament') ?? 'null') as { events: unknown[] } | null;
+        expect(saved?.events).toHaveLength(3);
+        // El historial cuenta las decisiones del árbitro.
+        fireEvent.click(screen.getByRole('button', { name: 'View bracket' }));
+        fireEvent.click(screen.getByRole('tab', { name: 'History' }));
+        expect(screen.getAllByText(/Referee gives the duel to/)).toHaveLength(3);
+    });
+
+    test('configurar un torneo: los estilos rellenan las reglas y la vista previa muestra los cruces', async () => {
+        renderApp();
+        fireEvent.click(screen.getByRole('button', { name: 'Tournament' }));
+        await screen.findByDisplayValue('Option 1');
+        fireEvent.click(screen.getByRole('button', { name: /Epic/ }));
+        expect(within(screen.getByRole('radiogroup', { name: 'Duels' })).getByRole('radio', { name: '5' })).toBeChecked();
+        expect(within(screen.getByRole('radiogroup', { name: 'Final' })).getByRole('radio', { name: '7' })).toBeChecked();
+        expect(screen.getByRole('checkbox', { name: 'Third place match' })).toBeChecked();
+        expect(screen.getByText('First to 3 spin wins takes the duel')).toBeInTheDocument();
+        // Tocar una regla a mano lo deja en "Personalizado".
+        fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Duels' })).getByRole('radio', { name: '3' }));
+        expect(screen.getByText('Custom')).toBeInTheDocument();
+        // Con orden de lista, la primera ronda se ve antes de empezar: 1 contra 4 y 2 contra 3.
+        fireEvent.click(screen.getByRole('radio', { name: /List order/ }));
+        const preview = screen.getByText('First round').parentElement as HTMLElement;
+        expect(within(preview).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Option 1vsOption 4', 'Option 2vsOption 3']);
+        expect(screen.getByText('4 participants · 4 duels · 4-slot bracket')).toBeInTheDocument();
+    });
+
     test('aplicar un tema pone sus propios colores de flecha y luces', async () => {
         renderApp();
         await pickColor('Change the pointer color', '#22c55e');
@@ -546,9 +594,9 @@ describe('ruleta y editor', () => {
 
             // La bandera se sustituye al cambiar de idioma: el clic debe sonar igualmente.
             played.length = 0;
-            fireEvent.click(screen.getByRole('button', { name: 'Cambiar a español' }).querySelector('svg *') as Element);
+            fireEvent.click(screen.getByRole('button', { name: /Cambiar a español/ }).querySelector('svg *') as Element);
             expect(played.length).toBeGreaterThan(0);
-            fireEvent.click(screen.getByRole('button', { name: 'Switch to English' }));
+            fireEvent.click(screen.getByRole('button', { name: /Switch to English/ }));
 
             fireEvent.click(screen.getByRole('button', { name: 'Open playlist' }));
             fireEvent.change(await screen.findByRole('slider', { name: 'Sound effects volume' }), { target: { value: '0' } });
@@ -590,7 +638,7 @@ describe('ruleta y editor', () => {
         renderApp();
         fireEvent.click(screen.getByRole('button', { name: 'Remove option 4' }));
         expect(screen.getByText('Each option has a 33.33% chance (3 options).')).toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'Cambiar a español' }));
+        fireEvent.click(screen.getByRole('button', { name: /Cambiar a español/ }));
         expect(screen.getByText('Cada opción tiene un 33,33% de probabilidad (3 opciones).')).toBeInTheDocument();
     });
 
@@ -617,7 +665,7 @@ describe('ruleta y editor', () => {
 describe('idioma', () => {
     test('la bandera de la cabecera y el selector del drawer cambian el idioma', () => {
         renderApp();
-        fireEvent.click(screen.getByRole('button', { name: 'Cambiar a español' }));
+        fireEvent.click(screen.getByRole('button', { name: /Cambiar a español/ }));
         expect(screen.getByRole('button', { name: 'Editor de ruleta' })).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'EDITOR DE RULETA' })).toBeInTheDocument();
         expect(document.documentElement.lang).toBe('es');

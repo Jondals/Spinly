@@ -28,7 +28,7 @@ function LanguageSwitch({ variant, className = '' }: LanguageSwitchProps) {
                 onChange={setLang}
                 options={LANGUAGES.map(({ id, name, flag }) => ({
                     id,
-                    label: <><Icon name={flag} className="spinly-flag" />{name}</>,
+                    label: <><Icon name={flag} className="spinly-flag" />{name}<span className="spinly-lang-code" aria-hidden="true">{id.toUpperCase()}</span></>,
                 }))}
             />
         );
@@ -40,10 +40,12 @@ function LanguageSwitch({ variant, className = '' }: LanguageSwitchProps) {
             type="button"
             className={`spinly-lang ${className}`.trim()}
             onClick={() => setLang(lang === 'en' ? 'es' : 'en')}
-            aria-label={t('header', 'switchLang')}
+            // El nombre empieza por el código que se ve (EN/ES), como piden las pautas de accesibilidad.
+            aria-label={`${current.id.toUpperCase()} · ${t('header', 'switchLang')}`}
             title={t('header', 'switchLang')}
         >
             <Icon name={current.flag} className="spinly-flag" />
+            <span className="spinly-lang-code">{current.id.toUpperCase()}</span>
         </button>
     );
 }

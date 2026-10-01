@@ -27,6 +27,7 @@ Most online wheels are a picture that turns. Spinly treats the wheel as the cent
 - **Spin** it and watch the pointer tick across each sector until a dialog announces the winner.
 - **Save** the look as a *theme* or the whole wheel as a *preset*, and share both with the community.
 - **Play** your own playlist in the background, with separate volumes for music and sound effects.
+- **Run a tournament**: a knockout bracket where every duel is decided on a two-sector wheel.
 - **Sign in** with just a username and password, and everything is there on your next device.
 
 With no backend configured it still works end to end: everything lives in the browser, and accounts and the community are an optional layer on top.
@@ -50,6 +51,15 @@ Songs you upload are stored twice: in **IndexedDB** for instant playback (a few 
 - On a new device a song downloads the first time you play it, then stays cached.
 - Each song plays through its own gain node, so changing tracks is a short **crossfade** rather than a cut.
 - The **Media Session API** puts the current song on the lock screen and wires up the media keys.
+
+### Tournament mode
+A knockout bracket where each duel is played on its own wheel, with a live bracket, participant standings, a spin history and stats (spins, average spin, comeback rate).
+- **Set up in two steps**: first who plays (the current wheel options in one click, any colour per participant, shuffle or reorder), then how. Three styles (Quick, Classic, Epic) fill in the rules, and every rule explains itself right where you choose it: best of 1/3/5/7 for the rounds and the final, even odds or odds weighted by seed, random draw or list order, third-place match, referee mode and quick spins. With list order, a preview shows the first-round pairings before you start.
+- **Your wheel, in every duel**: the duel wheel has the same rim, lights and pointer as the main one. Tap the pointer or the wheel to recolour them; the colours are saved in the active theme, so both wheels always match.
+- **Any number of players** from 2 to 32: the bracket grows to the next power of two and the byes go to the top seeds in classic seeding order, so seeds 1 and 2 can only meet in the final.
+- **Only the essentials are saved**: config, seeded participants and the list of spins. The whole bracket is rebuilt from them, so it can never end up inconsistent, and undo is just dropping the last spin.
+- The duel wheel lands inside the winner's sector, sized by their odds.
+- **A background that plays along**: the view has its own stadium-light background built with GPU-only animations. With music on, it follows the song: the lights pulse on every beat and breathe with the mids and highs, the floor grid moves one tile per beat, and a light beam sweeps across on the first beat of each bar. The duel wheel's lights follow the music too, just like the main wheel.
 
 ### Lights that follow the beat
 While a song plays, the wheel lights and the dotted background move with it. They follow the pulse, not individual hits:
@@ -115,7 +125,7 @@ src/
 | **Supabase** | Auth, Postgres with row level security, and Storage for avatars, sync and songs |
 | **Web Audio, Canvas, IndexedDB** | Sound effects, the music player, the dotted background and the song cache |
 | **EyeDropper, Screen Capture and Media Session APIs** | The eyedropper and lock-screen music controls |
-| **Jest + Testing Library** | 67 tests covering the UI, the data models, music, beat tracking and the account flows |
+| **Jest + Testing Library** | 79 tests covering the UI, the data models, music, beat tracking, tournaments and the account flows |
 | **Vercel** | Static hosting with a strict Content Security Policy |
 | **pnpm** | Dependencies, plus two patches that keep Create React App working on Node 24 |
 

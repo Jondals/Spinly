@@ -160,6 +160,21 @@ const ICONS = defineIcons({
     cloud: {
         body: <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />,
     },
+    users: {
+        body: (
+            <>
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+            </>
+        ),
+    },
+    zap: { body: <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z" /> },
+    restart: { body: <><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></> },
+    undo: { body: <><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></> },
+    flag: { body: <><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1Z" /><path d="M4 22v-7" /></> },
+    history: { body: <><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l4 2" /></> },
+    bracket: { body: <path d="M3 5h5v5H3M3 19h5v-5M8 7.5h4v9H8M12 12h9" /> },
     trophy: {
         body: (
             <>

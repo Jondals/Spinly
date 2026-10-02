@@ -1,5 +1,7 @@
-// Worker del análisis del pulso: la canción entera se analiza fuera del hilo principal, así las
-// animaciones no se resienten. Recibe los canales ya decodificados y devuelve la rejilla (o null).
+/**
+ * Web Worker for beat analysis: the whole song is analysed off the main thread so animations never
+ * stutter. It receives the decoded channels and posts back the beat grid (or null).
+ */
 import { analyzeBeats, type BeatGrid } from './beat-analysis';
 
 export interface BeatRequest {
@@ -12,6 +14,7 @@ const scope = globalThis as unknown as {
     postMessage(grid: BeatGrid | null): void;
 };
 
+/** Mixes the channels down to mono, analyses them and posts the result back. */
 scope.onmessage = ({ data }) => {
     const { channels, sampleRate } = data;
     const length = channels[0]?.length ?? 0;

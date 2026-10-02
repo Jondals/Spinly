@@ -1,3 +1,6 @@
+/**
+ * ImageAdjustDialog: the modal editor that fits a sector's image (move, zoom, rotate).
+ */
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import '../../css/ImageAdjust.css';
 import Icon from '../common/Icon';
@@ -27,17 +30,19 @@ const KEY_STEP_FAST = 0.05;
 const ZOOM_STEP = 1.06;
 const WHEEL_ZOOM_SENSITIVITY = 0.0015;
 const LABEL_Y = SIZE * 0.14 + 18;
-// Proporción del centro real de la ruleta (2.25rem sobre 26rem de diámetro).
+// Same proportion as the real wheel's hub (2.25rem over a 26rem diameter).
 const HUB_RADIUS = 21;
 
+/** Keeps a fit within its limits (or falls back to the default fit). */
 const clampFit = (fit: ImageFit): ImageFit => sanitizeImageFit(fit) ?? DEFAULT_IMAGE_FIT;
 
+/** Distance between two points, for pinch zoom. */
 const distance = (a: Point, b: Point): number => Math.hypot(a.x - b.x, a.y - b.y);
 
 /**
- * Editor modal del encaje de la imagen de un sector. La vista previa gira la ruleta
- * para dejar el sector bajo el puntero (como al ganar), así que los gestos se
- * convierten de coordenadas de pantalla a coordenadas de la ruleta sin girar.
+ * Modal editor for how a sector's image is fitted. The preview rotates the wheel to put the sector
+ * under the pointer (as when it wins), so gestures are converted from screen coordinates to the
+ * coordinates of the unrotated wheel.
  */
 function ImageAdjustDialog({ image, initialFit, index, segments, labels, onApply, onCancel, onReplace, onRemove }: ImageAdjustDialogProps) {
     const { t } = useTranslation();
@@ -55,6 +60,7 @@ function ImageAdjustDialog({ image, initialFit, index, segments, labels, onApply
     const label = labels[index] ?? '';
     const color = segments[index]?.color;
 
+    /** Converts a screen movement into a movement on the unrotated wheel. */
     const toWheelDelta = useCallback((dx: number, dy: number): Point => {
         const rad = (mid * Math.PI) / 180;
         const cos = Math.cos(rad);
@@ -62,19 +68,22 @@ function ImageAdjustDialog({ image, initialFit, index, segments, labels, onApply
         return { x: dx * cos - dy * sin, y: dx * sin + dy * cos };
     }, [mid]);
 
+    /** Moves the image by a fraction of the preview's width. */
     const moveBy = useCallback((dx: number, dy: number) => {
         const delta = toWheelDelta(dx, dy);
         setFit((prev) => clampFit({ ...prev, x: prev.x + delta.x, y: prev.y + delta.y }));
     }, [toWheelDelta]);
 
+    /** Multiplies the image scale by a factor. */
     const zoomBy = useCallback((factor: number) => {
         setFit((prev) => clampFit({ ...prev, scale: prev.scale * factor }));
     }, []);
 
-    // Listener nativo: el onWheel de React es pasivo y no permite preventDefault.
+    // Native listener: React's onWheel is passive and does not allow preventDefault.
     useEffect(() => {
         const stage = stageRef.current;
         if (!stage) return undefined;
+        /** Mouse wheel / trackpad pinch zooms the image. */
         const onWheel = (event: WheelEvent) => {
             event.preventDefault();
             zoomBy(Math.exp(-event.deltaY * WHEEL_ZOOM_SENSITIVITY));
@@ -83,6 +92,7 @@ function ImageAdjustDialog({ image, initialFit, index, segments, labels, onApply
         return () => stage.removeEventListener('wheel', onWheel);
     }, [zoomBy]);
 
+    /** Starts a drag, or a pinch when a second finger comes down. */
     const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
         event.currentTarget.setPointerCapture(event.pointerId);
         pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -92,6 +102,7 @@ function ImageAdjustDialog({ image, initialFit, index, segments, labels, onApply
         }
     };
 
+    /** One pointer drags the image; two pointers pinch to zoom. */
     const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
         const previous = pointers.current.get(event.pointerId);
         if (!previous) return;
@@ -109,11 +120,13 @@ function ImageAdjustDialog({ image, initialFit, index, segments, labels, onApply
         moveBy((current.x - previous.x) / width, (current.y - previous.y) / width);
     };
 
+    /** Forgets a pointer that was lifted or cancelled. */
     const onPointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
         pointers.current.delete(event.pointerId);
         if (pointers.current.size < 2) pinchDistance.current = null;
     };
 
+    /** Keyboard: arrows move (Shift moves faster), + and - zoom. */
     const onStageKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
         const step = event.shiftKey ? KEY_STEP_FAST : KEY_STEP;
         const actions: Record<string, () => void> = {

@@ -1,10 +1,13 @@
-// Lanza el análisis del pulso de una canción decodificada en un worker propio y lo cierra al acabar.
-// Aparte del motor para que los tests (Jest no entiende import.meta) puedan sustituirlo.
+/**
+ * Runs the beat analysis of a decoded song in its own Web Worker and closes it when done.
+ * It lives apart from the music engine so tests (Jest does not understand import.meta) can mock it.
+ */
 import type { BeatGrid } from './beat-analysis';
 import type { BeatRequest } from './beat-worker';
 
 const TIMEOUT_MS = 30000;
 
+/** Analyses a song in a worker; resolves with the beat grid, or null on error, timeout or no Worker support. */
 export function analyzeInWorker(audio: AudioBuffer): Promise<BeatGrid | null> {
     if (typeof Worker === 'undefined') return Promise.resolve(null);
     return new Promise((resolve) => {
@@ -15,6 +18,7 @@ export function analyzeInWorker(audio: AudioBuffer): Promise<BeatGrid | null> {
             resolve(null);
             return;
         }
+        /** Resolves once and shuts the worker down. */
         const finish = (grid: BeatGrid | null) => {
             window.clearTimeout(timer);
             worker.terminate();
@@ -23,7 +27,7 @@ export function analyzeInWorker(audio: AudioBuffer): Promise<BeatGrid | null> {
         const timer = window.setTimeout(() => finish(null), TIMEOUT_MS);
         worker.onmessage = (event: MessageEvent<BeatGrid | null>) => finish(event.data);
         worker.onerror = () => finish(null);
-        // Copias de los canales, transferidas sin volver a copiar.
+        // Copies of the channels, transferred to the worker without copying them again.
         const channels = Array.from({ length: audio.numberOfChannels }, (_, i) => audio.getChannelData(i).slice());
         const request: BeatRequest = { channels, sampleRate: audio.sampleRate };
         worker.postMessage(request, channels.map((channel) => channel.buffer));

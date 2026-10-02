@@ -1,8 +1,11 @@
-// Reduce una imagen subida antes de guardarla. Se aceptan fotos de hasta 10 MB, pero ni una textura de
-// la ruleta (vive en localStorage, ~5 MB en total) ni un avatar (se ve a 40 px) necesitan tanto: se
-// redimensiona para que su lado mayor no pase de `maxSide` y se vuelve a comprimir en WEBP (o JPEG si
-// el navegador no codifica WEBP y la imagen no tiene transparencia que perder).
+/**
+ * Shrinks an uploaded image before saving it. Photos up to 10 MB are accepted, but neither a wheel
+ * texture (it lives in localStorage, ~5 MB in total) nor an avatar (shown at 40 px) needs that much: the
+ * image is resized so its longer side is at most `maxSide` and re-encoded as WEBP (or JPEG when the
+ * browser cannot encode WEBP and the image has no transparency to lose).
+ */
 
+/** Decodes an image file into something a canvas can draw. */
 async function decode(file: Blob): Promise<CanvasImageSource & { width: number; height: number }> {
     if (typeof createImageBitmap === 'function') return createImageBitmap(file);
     const url = URL.createObjectURL(file);
@@ -16,12 +19,13 @@ async function decode(file: Blob): Promise<CanvasImageSource & { width: number; 
     }
 }
 
+/** Promise wrapper around canvas.toBlob. */
 const toBlob = (canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob | null> =>
     new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 
 /**
- * La imagen reducida, o la original si ya era pequeña, si la reducida no pesa menos o si el navegador
- * no puede procesarla (entonces deciden los límites de siempre).
+ * The shrunk image, or the original one if it was already small, if the shrunk one is not lighter, or if
+ * the browser cannot process it (then the usual size limits decide).
  */
 export async function shrinkImage(file: Blob, maxSide: number, quality = 0.86): Promise<Blob> {
     try {
@@ -37,7 +41,7 @@ export async function shrinkImage(file: Blob, maxSide: number, quality = 0.86): 
         ctx.drawImage(image, 0, 0, width, height);
         if ('close' in image && typeof image.close === 'function') image.close();
         let result = await toBlob(canvas, 'image/webp', quality);
-        // Sin codificador WEBP el navegador devuelve PNG: JPEG pesa mucho menos si no hay transparencia.
+        // Without a WEBP encoder the browser returns PNG: JPEG is much lighter when there is no transparency.
         if (result && result.type !== 'image/webp' && file.type !== 'image/png') result = await toBlob(canvas, 'image/jpeg', quality);
         return result && result.size < file.size ? result : file;
     } catch {

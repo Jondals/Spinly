@@ -1,8 +1,12 @@
+/**
+ * useSortable: drag-to-reorder for vertical lists, with pointer events and keyboard arrows.
+ */
 import { useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 
 const EDGE_PX = 48;
 const SCROLL_STEP_PX = 12;
 
+/** Nearest scrollable ancestor, to auto-scroll it while dragging near its edges. */
 function scrollParent(element: HTMLElement | null): HTMLElement | null {
     for (let node = element?.parentElement ?? null; node; node = node.parentElement) {
         const { overflowY } = getComputedStyle(node);
@@ -12,9 +16,9 @@ function scrollParent(element: HTMLElement | null): HTMLElement | null {
 }
 
 /**
- * Reordenación de una lista vertical con eventos de puntero (ratón y táctil por igual;
- * el HTML5 drag and drop no existe en móvil) y con flechas desde el asa. El asa lleva
- * `touch-action: none` para que el dedo arrastre la fila en vez de desplazar la página.
+ * Reordering of a vertical list with pointer events (mouse and touch alike; HTML5 drag and drop does not
+ * exist on mobile) and with the arrow keys from the handle. The handle has `touch-action: none` so a
+ * finger drags the row instead of scrolling the page.
  */
 export function useSortable(onMove: (from: number, to: number) => void, rowClass = 'option-item') {
     const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -25,14 +29,15 @@ export function useSortable(onMove: (from: number, to: number) => void, rowClass
     const startScroll = useRef(0);
     const scroller = useRef<HTMLElement | null>(null);
 
+    /** Ends the drag. */
     const reset = () => {
         setDragIndex(null);
         setOverIndex(null);
         setOffsetY(0);
     };
 
-    // Posición final = cuántas de las otras filas quedan por encima del puntero.
-    // La fila arrastrada se excluye: se desplaza con el dedo y falsearía la cuenta.
+    // Final position = how many of the other rows are above the pointer.
+    // The dragged row is excluded: it moves with the finger and would skew the count.
     const targetIndex = (from: number, clientY: number): number =>
         items.current.filter((row, index): row is HTMLElement => {
             if (!row || index === from) return false;
@@ -40,6 +45,7 @@ export function useSortable(onMove: (from: number, to: number) => void, rowClass
             return clientY > rect.top + rect.height / 2;
         }).length;
 
+    /** Scrolls the list when the pointer gets close to its top or bottom edge. */
     const autoScroll = (clientY: number) => {
         const area = scroller.current;
         if (!area) return;
@@ -48,6 +54,7 @@ export function useSortable(onMove: (from: number, to: number) => void, rowClass
         else if (clientY > rect.bottom - EDGE_PX) area.scrollTop += SCROLL_STEP_PX;
     };
 
+    /** Props for a row's drag handle: pointer dragging and arrow keys. */
     const handleProps = (index: number, total: number) => ({
         onPointerDown: (event: PointerEvent<HTMLElement>) => {
             if (event.pointerType === 'mouse' && event.button !== 0) return;
@@ -79,11 +86,12 @@ export function useSortable(onMove: (from: number, to: number) => void, rowClass
         },
     });
 
+    /** Ref callback that registers each row's element. */
     const itemRef = (index: number) => (element: HTMLElement | null) => {
         items.current[index] = element;
     };
 
-    /** Clases y estilo de la fila: la arrastrada sigue al puntero; la de destino marca dónde caerá. */
+    /** Row classes and style: the dragged row follows the pointer; the target row marks where it will land. */
     const itemState = (index: number): { className: string; style?: CSSProperties } => {
         if (dragIndex === null) return { className: '' };
         if (index === dragIndex) return { className: ` ${rowClass}--dragging`, style: { transform: `translateY(${offsetY}px)` } };

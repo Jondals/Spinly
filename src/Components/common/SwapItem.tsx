@@ -1,22 +1,26 @@
+/**
+ * SwapItem: a list item that swaps between a card and its edit form with a smooth height animation.
+ */
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
 
 interface SwapItemProps {
-    /** true mientras la tarjeta está sustituida por su formulario de edición. */
+    /** true while the card is replaced by its edit form. */
     swapped: boolean;
     className: string;
     children: ReactNode;
 }
 
-// Debe coincidir con la animación de .spinly-swap-fade (shared.css).
+// Must match the .spinly-swap-fade animation (shared.css).
 const SWAP_MS = 300;
 
+/** Whether the user asked for reduced motion. */
 const prefersReducedMotion = () =>
     typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
 
 /**
- * Elemento de lista que cambia entre tarjeta y formulario sin saltos: anima su alto desde
- * el contenido anterior al nuevo y el contenido nuevo entra con un fundido. El alto se
- * sigue con ResizeObserver para partir siempre del tamaño real, aunque haya cambiado antes.
+ * List item that switches between card and form without jumps: it animates its height from the old
+ * content to the new one and the new content fades in. The height is tracked with a ResizeObserver so
+ * the animation always starts from the real size, even if it changed earlier.
  */
 function SwapItem({ swapped, className, children }: SwapItemProps) {
     const ref = useRef<HTMLLIElement>(null);
@@ -56,6 +60,7 @@ function SwapItem({ swapped, className, children }: SwapItemProps) {
         el.style.transition = `height ${SWAP_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`;
         el.style.height = `${to}px`;
 
+        /** Removes the inline animation styles. */
         const clearStyles = () => {
             animating.current = false;
             el.classList.remove('spinly-swap-fade');
@@ -67,8 +72,8 @@ function SwapItem({ swapped, className, children }: SwapItemProps) {
             clearStyles();
             lastHeight.current = el.offsetHeight;
         }, SWAP_MS + 50);
-        // Si vuelve a cambiar a mitad de animación, no se mide aquí: el DOM ya es el nuevo y
-        // el siguiente cambio debe partir del alto que se estaba mostrando (el de destino).
+        // If it changes again mid-animation, nothing is measured here: the DOM is already the new one and
+        // the next change must start from the height being shown (the target height).
         return () => {
             window.clearTimeout(timer);
             clearStyles();

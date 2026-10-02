@@ -1,20 +1,24 @@
+/**
+ * LanguageSwitch: the English / Spanish switch (a flag button in the header, a toggle in the mobile menu).
+ */
 import Icon, { type IconName } from '../common/Icon';
 import SegmentedToggle from '../common/SegmentedToggle';
 import { useTranslation } from './LanguageProvider';
 import type { SpinlyLang } from '../../scripts/strings';
 
-// Cada idioma se nombra en su propia lengua: así lo reconoce quien no entiende el idioma activo.
+// Each language is named in itself, so people who do not understand the active language still recognise it.
 const LANGUAGES: ReadonlyArray<{ id: SpinlyLang; name: string; flag: IconName }> = [
     { id: 'en', name: 'English', flag: 'flagGb' },
     { id: 'es', name: 'Español', flag: 'flagEs' },
 ];
 
 interface LanguageSwitchProps {
-    /** button: bandera del idioma activo que alterna (cabecera). choice: selector con ambos (drawer móvil). */
+    /** button: flag of the active language that toggles it (header). choice: a toggle with both (mobile drawer). */
     variant: 'button' | 'choice';
     className?: string;
 }
 
+/** Renders the language switch in the requested variant. */
 function LanguageSwitch({ variant, className = '' }: LanguageSwitchProps) {
     const { lang, setLang, t } = useTranslation();
 
@@ -40,7 +44,7 @@ function LanguageSwitch({ variant, className = '' }: LanguageSwitchProps) {
             type="button"
             className={`spinly-lang ${className}`.trim()}
             onClick={() => setLang(lang === 'en' ? 'es' : 'en')}
-            // El nombre empieza por el código que se ve (EN/ES), como piden las pautas de accesibilidad.
+            // The accessible name starts with the visible code (EN/ES), as accessibility guidelines require.
             aria-label={`${current.id.toUpperCase()} · ${t('header', 'switchLang')}`}
             title={t('header', 'switchLang')}
         >

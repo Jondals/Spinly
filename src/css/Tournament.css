@@ -1,5 +1,6 @@
-/* Modo torneo (Components/tournament): ocupa el panel y la zona de la ruleta. Misma paleta y piezas
-   que el resto de la app (tarjetas, pestañas, botón principal, ruleta) sobre un fondo propio. */
+/* Tournament mode (Components/tournament). It takes over the panel and the wheel area with its own
+   background. The live view is an arena: the two rivals face each other in big cards on both sides of
+   the wheel, each in their own color, with the bracket, standings and history on a board below. */
 
 .spinly-tournament {
     position: relative;
@@ -11,217 +12,535 @@
     height: 100%;
     overflow: hidden;
     background-color: var(--bg-wheel-color);
+    /* Accent for live things: the duel in play, progress, the champion */
     --tour-live: var(--wheel-light-color);
-    --tour-card: color-mix(in srgb, var(--bg-card-color) 90%, transparent);
+    --tour-surface: color-mix(in srgb, var(--bg-card-color) 88%, transparent);
+    --tour-surface-strong: color-mix(in srgb, var(--bg-card-color) 96%, transparent);
+    --tour-radius: var(--spinly-card-radius);
 }
 
 :root[data-theme="light"] .spinly-tournament {
-    --tour-live: #d97706;
-    --tour-card: color-mix(in srgb, var(--bg-card-color) 94%, transparent);
+    --tour-live: #b45309;
+    --tour-surface: color-mix(in srgb, var(--bg-card-color) 92%, transparent);
+    --tour-surface-strong: var(--bg-card-color);
 }
 
-/* Fondo: la misma trama de puntos que hay detrás de la ruleta (misma variable de color, así son
-   el mismo fondo) y, encima, la aurora de tres manchas de la pantalla de carga, mucho más lenta y
-   tenue: una firma visual ya conocida en vez de un plató de concurso. Solo transform y opacity. */
-.spinly-tour-bg {
+/* ---------------------------------------------------------------------------------------------
+   Background: a stage. Two spotlights sweep from the top corners, rings leave the centre, a
+   perspective floor grid rolls towards the viewer and sparks rise. Logo colors over the app's dark
+   canvas; only transform and opacity are animated. With music, useMusicBackdrop crossfades the idle
+   stage into a copy that moves in time with the song (and back when it stops), with no jumps.
+   --------------------------------------------------------------------------------------------- */
+.tour-bg {
     position: absolute;
     inset: 0;
     z-index: 0;
     overflow: hidden;
+    background:
+        radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, #7c3aed 22%, transparent), transparent 70%),
+        radial-gradient(70% 50% at 50% 100%, color-mix(in srgb, #f0197d 14%, transparent), transparent 70%),
+        var(--bg-wheel-color);
     pointer-events: none;
 }
 
-.spinly-tour-bg-dots {
+/* Spotlights: soft cones of light hanging from the top corners, swinging slowly. A conic gradient
+   gives the cone soft edges, and a mask fades it out towards the floor. */
+.tour-bg-beam {
     position: absolute;
-    inset: -28px 0 0 -28px;
-    background-image: radial-gradient(var(--wheel-dots) 1.25px, transparent 1.25px);
-    background-size: 28px 28px;
-    opacity: 0.6;
-    animation: spinly-tour-dots 50s linear infinite;
-    will-change: transform;
-}
-
-.spinly-tour-bg-aurora {
-    position: absolute;
-    inset: 0;
-    will-change: transform;
-}
-
-.spinly-tour-bg-glow {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    width: 64vmax;
-    height: 64vmax;
-    margin: -32vmax 0 0 -32vmax;
-    border-radius: 50%;
+    top: -6%;
+    width: 70vmax;
+    height: 110%;
+    margin-left: -35vmax;
+    opacity: 0.75;
+    -webkit-mask-image: linear-gradient(to bottom, #000 10%, transparent 85%);
+    mask-image: linear-gradient(to bottom, #000 10%, transparent 85%);
+    transform-origin: 50% 0;
     will-change: transform, opacity;
 }
 
-.spinly-tour-bg-glow--a {
-    transform: translate(-30%, -26%);
-    background: radial-gradient(closest-side, color-mix(in srgb, #7c3aed 30%, transparent), transparent);
-    animation: spinly-tour-drift-a 26s ease-in-out infinite alternate;
+.tour-bg-beam--left {
+    left: 18%;
+    background: conic-gradient(from 168deg at 50% 0%, transparent 0deg, color-mix(in srgb, #a78bfa 30%, transparent) 12deg, transparent 24deg);
+    animation: tour-swing-left 9s ease-in-out infinite alternate;
 }
 
-.spinly-tour-bg-glow--b {
-    transform: translate(28%, 20%);
-    background: radial-gradient(closest-side, color-mix(in srgb, #f0197d 22%, transparent), transparent);
-    animation: spinly-tour-drift-b 32s ease-in-out infinite alternate;
+.tour-bg-beam--right {
+    left: 82%;
+    background: conic-gradient(from 168deg at 50% 0%, transparent 0deg, color-mix(in srgb, #f472b6 26%, transparent) 12deg, transparent 24deg);
+    animation: tour-swing-right 11s ease-in-out infinite alternate;
 }
 
-.spinly-tour-bg-glow--c {
-    transform: translate(2%, 32%);
-    width: 50vmax;
-    height: 50vmax;
-    margin: -25vmax 0 0 -25vmax;
-    background: radial-gradient(closest-side, color-mix(in srgb, #22c7ff 18%, transparent), transparent);
-    animation: spinly-tour-drift-c 38s ease-in-out infinite alternate;
+/* Rings leaving the centre of the stage, like a wheel's rim echoing outwards */
+.tour-bg-rings i {
+    position: absolute;
+    top: 42%;
+    left: 50%;
+    width: 70vmin;
+    height: 70vmin;
+    border: 2px solid color-mix(in srgb, var(--wheel-light-color) 55%, transparent);
+    border-radius: 50%;
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.15);
+    animation: tour-ring 8s linear infinite;
+    will-change: transform, opacity;
 }
 
-:root[data-theme="light"] .spinly-tour-bg-dots {
-    opacity: 0.8;
+.tour-bg-rings i:nth-child(2) { animation-delay: -2s; border-color: color-mix(in srgb, #f472b6 50%, transparent); }
+.tour-bg-rings i:nth-child(3) { animation-delay: -4s; border-color: color-mix(in srgb, #38bdf8 50%, transparent); }
+.tour-bg-rings i:nth-child(4) { animation-delay: -6s; }
+
+/* Floor: a grid in perspective rolling towards the viewer, fading into the horizon */
+.tour-bg-floor {
+    position: absolute;
+    right: -30%;
+    bottom: 0;
+    left: -30%;
+    height: 36%;
+    overflow: hidden;
+    perspective: 420px;
+    perspective-origin: 50% 0;
+    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 45%);
+    mask-image: linear-gradient(to bottom, transparent, #000 45%);
 }
 
-:root[data-theme="light"] .spinly-tour-bg-glow {
+.tour-bg-grid {
+    position: absolute;
+    inset: -64px 0 0;
+    background-image:
+        linear-gradient(to right, color-mix(in srgb, #a78bfa 26%, transparent) 1px, transparent 1px),
+        linear-gradient(to bottom, color-mix(in srgb, #a78bfa 26%, transparent) 1px, transparent 1px);
+    background-size: 64px 64px;
+    transform-origin: 50% 0;
+    animation: tour-floor 2s linear infinite;
+    will-change: transform;
+}
+
+.tour-bg-floor .tour-bg-grid {
+    rotate: x 62deg;
+}
+
+/* A glow on the floor that flashes with the beat */
+.tour-bg-floor-glow {
+    position: absolute;
+    bottom: -18%;
+    left: 50%;
+    width: 90vmax;
+    height: 40vmax;
+    margin-left: -45vmax;
+    border-radius: 50%;
+    background: radial-gradient(closest-side, color-mix(in srgb, #f472b6 32%, transparent), transparent);
+    opacity: 0.45;
+    animation: tour-glow 4s ease-in-out infinite alternate;
+    will-change: opacity;
+}
+
+/* Sparks rising from the floor */
+.tour-bg-sparks {
+    position: absolute;
+    inset: 0;
     opacity: 0.6;
 }
 
-@keyframes spinly-tour-dots {
-    to { transform: translate(28px, 28px); }
+.tour-bg-sparks i {
+    position: absolute;
+    bottom: -10px;
+    border-radius: 50%;
+    box-shadow: 0 0 10px 1px rgba(255, 255, 255, 0.35);
+    opacity: 0;
+    animation-name: tour-spark;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+    will-change: transform, opacity;
 }
 
-@keyframes spinly-tour-drift-a {
-    to { transform: translate(-22%, -32%) scale(1.1); }
+:root[data-theme="light"] .tour-bg {
+    background:
+        radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, #7c3aed 12%, transparent), transparent 70%),
+        radial-gradient(70% 50% at 50% 100%, color-mix(in srgb, #f0197d 8%, transparent), transparent 70%),
+        var(--bg-wheel-color);
 }
 
-@keyframes spinly-tour-drift-b {
-    to { transform: translate(34%, 12%) scale(1.14); }
+:root[data-theme="light"] .tour-bg-beam { opacity: 0.35; }
+:root[data-theme="light"] .tour-bg-grid { opacity: 0.55; }
+:root[data-theme="light"] .tour-bg-floor-glow { opacity: 0.25; }
+
+/* Two copies of the rings, floor and glow: the idle one runs on CSS animations and never stops, the live
+   one is placed by JS in time with the music. useMusicBackdrop crossfades their opacity. */
+.tour-bg-stage {
+    position: absolute;
+    inset: 0;
 }
 
-@keyframes spinly-tour-drift-c {
-    to { transform: translate(-6%, 24%) scale(0.92); }
+.tour-bg-live {
+    opacity: 0;
 }
 
-.spinly-tour-content {
+.tour-bg-live .tour-bg-rings i,
+.tour-bg-live .tour-bg-grid,
+.tour-bg-live .tour-bg-floor-glow {
+    animation: none;
+}
+
+@keyframes tour-swing-left {
+    from { transform: rotate(-28deg); }
+    to { transform: rotate(-4deg); }
+}
+
+@keyframes tour-swing-right {
+    from { transform: rotate(28deg); }
+    to { transform: rotate(4deg); }
+}
+
+@keyframes tour-ring {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.15); }
+    15% { opacity: 0.45; }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.85); }
+}
+
+@keyframes tour-floor {
+    to { transform: translate3d(0, 64px, 0); }
+}
+
+@keyframes tour-glow {
+    to { opacity: 0.8; }
+}
+
+@keyframes tour-spark {
+    0% { opacity: 0; transform: translate3d(0, 0, 0); }
+    10% { opacity: 0.9; }
+    80% { opacity: 0.6; }
+    100% { opacity: 0; transform: translate3d(14px, -95vh, 0); }
+}
+
+@keyframes tour-in { from { opacity: 0; transform: translateY(0.75rem); } }
+@keyframes tour-ping { to { box-shadow: 0 0 0 0.5rem transparent; } }
+@keyframes tour-blink { 50% { opacity: 0.35; } }
+@keyframes tour-float { 50% { transform: translateY(-4px) rotate(-3deg); } }
+
+.tour-content {
     position: relative;
     z-index: 1;
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 1rem 1.5rem 5rem;
+    padding: 1.1rem 1.5rem 5rem;
 }
 
-.spinly-tour-card {
-    background: var(--tour-card);
+/* ---------------------------------------------------------------------------------------------
+   Shared pieces
+   --------------------------------------------------------------------------------------------- */
+.tour-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    min-width: 0;
+    padding: 1.1rem 1.2rem;
     border: 1px solid var(--color-border);
-    border-radius: var(--spinly-card-radius);
+    border-radius: var(--tour-radius);
+    background: var(--tour-surface);
     box-shadow: var(--card-shadow);
 }
 
-/* Configuración */
-.spinly-tour-setup {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-    gap: 1.25rem;
-    max-width: 72rem;
-    margin: 0 auto;
-    animation: spinly-tour-in 0.35s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.spinly-tour-setup-players,
-.spinly-tour-setup-format {
+.tour-panel-head {
     display: flex;
-    flex-direction: column;
-    min-height: 0;
-}
-
-.spinly-tour-setup-tools {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    padding: 0 var(--spinly-panel-pad-x) 0.75rem;
-}
-
-.spinly-tour-ghost {
-    display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.4rem 0.7rem;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.tour-panel-head h3 {
+    font-size: 1rem;
+    font-weight: 800;
+}
+
+
+.tour-count {
+    padding: 0.25rem 0.65rem;
     border: 1px solid var(--color-border);
     border-radius: var(--spinly-badge-radius);
+    color: var(--font-color-light);
+    font-size: 0.75rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.tour-hint {
+    color: var(--font-color-muted);
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+
+.tour-label {
+    color: var(--font-color-muted);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.tour-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.tour-field .spinly-segmented {
+    margin: 0;
+}
+
+.tour-field-title {
+    color: var(--font-color-light);
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.tour-ghost-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    padding: 0.5rem 0.85rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-card-radius);
     background: var(--bg-transparence);
     color: var(--font-color-light);
     font: inherit;
-    font-size: 0.75rem;
+    font-size: 0.78rem;
     font-weight: 600;
     cursor: pointer;
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.spinly-tour-ghost:hover:not(:disabled) {
-    background: var(--color-hover);
+.tour-ghost-btn:hover:not(:disabled) {
     border-color: var(--color-border-light);
+    background: var(--color-hover);
     color: var(--font-color);
 }
 
-.spinly-tour-ghost:disabled {
+.tour-ghost-btn:disabled {
     opacity: 0.45;
     cursor: not-allowed;
 }
 
-.spinly-tour-entries {
+/* The big call to action: start the tournament, new tournament */
+button.tour-cta.spinly-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    padding: 0.95rem 1.8rem;
+    border-radius: var(--spinly-card-radius);
+    font-size: 0.92rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+}
+
+button.tour-cta.spinly-btn-primary:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Setup
+   --------------------------------------------------------------------------------------------- */
+.tour-setup {
     display: flex;
     flex-direction: column;
-    gap: var(--spinly-list-gap);
-    max-height: 26rem;
+    gap: 1.25rem;
+    max-width: 76rem;
+    margin: 0 auto;
+    animation: tour-in 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+
+
+
+
+
+
+
+
+.tour-setup-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    gap: 1.25rem;
+    align-items: start;
+}
+
+.tour-setup-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+/* Head: a trophy tile, the title and one line about tournament mode */
+.tour-setup-head {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+}
+
+.tour-setup-head h2 {
+    font-size: 1.35rem;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.tour-setup-head p {
+    color: var(--font-color-muted);
+    font-size: 0.85rem;
+}
+
+/* Trophy tile of the setup head and the live bar: theme-independent colors so it always shows */
+.tour-icon-tile {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 2.6rem;
+    height: 2.6rem;
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--spinly-card-radius);
+    background: var(--bg-card-color);
+}
+
+.tour-icon-tile svg,
+.tour-icon-tile svg * {
+    color: #f59e0b;
+}
+
+/* Fixed field to add participants: it never moves while the list grows */
+.tour-add {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.tour-add .spinly-field-input {
+    flex: 1;
+    padding: 0.65rem 0.8rem;
+}
+
+.spinly-action-btn.tour-add-btn {
+    flex-shrink: 0;
+    width: auto;
+    padding: 0 1rem;
+}
+
+.tour-roster-empty {
+    padding: 0.5rem 0;
+    text-align: center;
+}
+
+.tour-setup-tools .spinly-action-btn {
+    width: auto;
+}
+
+.tour-setup-tools .spinly-action-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* Two questions side by side */
+.tour-questions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.tour-question p:first-child {
+    color: var(--font-color-light);
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+
+/* Start: the same primary button as "Spin" on the main wheel, with one line summing up the setup */
+.tour-start-zone {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-top: 0.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
+    text-align: center;
+}
+
+button.tour-start.spinly-btn-primary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+    width: 100%;
+    padding: 1rem 2rem;
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: 0.14rem;
+}
+
+button.tour-start.spinly-btn-primary:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* Roster: one colored tile per participant, two per row */
+.tour-roster {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+    max-height: 28rem;
     margin: 0;
-    padding: 0 var(--spinly-panel-pad-x);
+    padding: 0.15rem;
     overflow-y: auto;
     list-style: none;
 }
 
-.spinly-tour-entry {
+.tour-player {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.55rem;
     min-height: 3rem;
-    padding: 0 0.9rem;
-    transition: border-color 0.15s ease;
+    padding: 0 0.5rem 0 0.65rem;
+    border: 1px solid color-mix(in srgb, var(--side) 35%, var(--color-border));
+    border-radius: var(--spinly-card-radius);
+    background: color-mix(in srgb, var(--side) 9%, var(--bg-card-color));
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.spinly-tour-entry:focus-within {
-    border-color: var(--color-border-light);
+.tour-player:focus-within {
+    border-color: var(--side);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--side) 25%, transparent);
 }
 
-.spinly-tour-entry-seed {
-    min-width: 1.4rem;
+.tour-player-seed {
+    min-width: 1.1rem;
     color: var(--font-color-muted);
     font-size: 0.72rem;
-    font-weight: 700;
+    font-weight: 800;
     font-variant-numeric: tabular-nums;
-    text-align: right;
+    text-align: center;
 }
 
-.spinly-tour-swatch {
+.tour-player-swatch {
     flex-shrink: 0;
-    width: 1.35rem;
-    height: 1.35rem;
+    width: 1.5rem;
+    height: 1.5rem;
     padding: 0;
-    border: 2px solid var(--color-border-dark);
+    border: 3px solid color-mix(in srgb, var(--side) 45%, var(--bg-card-color));
     border-radius: 50%;
+    background: var(--side);
     cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    transition: transform 0.15s ease;
 }
 
-.spinly-tour-swatch:hover,
-.spinly-tour-swatch:focus-visible {
-    transform: scale(1.1);
-    box-shadow: 0 0 0 2px var(--color-focus-light);
-    outline: none;
+.tour-player-swatch:hover,
+.tour-player-swatch:focus-visible {
+    transform: scale(1.12);
+    outline: 2px solid var(--side);
+    outline-offset: 2px;
 }
 
-.spinly-tour-entry input {
+.tour-player input {
     flex: 1;
     min-width: 0;
     padding: 0;
@@ -231,1385 +550,1772 @@
     color: var(--font-color);
     font: inherit;
     font-size: 0.92rem;
-    font-weight: 500;
+    font-weight: 600;
 }
 
-.spinly-tour-entry input::placeholder {
+.tour-player input::placeholder {
     color: var(--font-color-disabled);
 }
 
-.spinly-tour-entry-remove {
-    width: 1.5rem;
-    height: 1.5rem;
+.tour-player-remove {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 1.7rem;
+    height: 1.7rem;
     padding: 0;
     border: 0;
+    border-radius: 50%;
     background: transparent;
     color: var(--font-color-muted);
-    font-size: 1.2rem;
-    line-height: 1;
     cursor: pointer;
-    opacity: 0.55;
-    transition: opacity 0.15s ease, color 0.15s ease;
+    transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.spinly-tour-entry:hover .spinly-tour-entry-remove,
-.spinly-tour-entry:focus-within .spinly-tour-entry-remove {
-    opacity: 1;
-}
-
-.spinly-tour-entry-remove:hover {
+.tour-player-remove:hover {
+    background: color-mix(in srgb, var(--color-remove) 15%, transparent);
     color: var(--color-remove);
 }
 
-.spinly-tour-setup-add {
-    margin-top: auto;
-    padding: var(--spinly-panel-pad-y) var(--spinly-panel-pad-x);
-}
 
-/* Igual que "Añadir opción" del editor */
-.spinly-tour-add {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    width: 100%;
-    height: 2.75rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--spinly-card-radius);
-    background-color: var(--bg-transparence);
-    color: var(--font-color-light);
-    font: inherit;
-    font-size: 0.85rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-}
 
-.spinly-tour-add svg {
-    width: 1rem;
-    height: 1rem;
-    color: var(--color-focus-light);
-}
 
-.spinly-tour-add:hover:not(:disabled) {
-    background-color: var(--color-focus);
-    border-color: var(--color-focus);
-    color: #ffffff;
-}
-
-.spinly-tour-add:hover:not(:disabled) svg {
-    color: #ffffff;
-}
-
-.spinly-tour-add:disabled {
-    opacity: 0.4;
-    border-style: dashed;
-    cursor: not-allowed;
-}
-
-.spinly-tour-form {
-    display: flex;
-    flex-direction: column;
-    gap: 0.85rem;
-    padding: 0 var(--spinly-panel-pad-x);
-}
-
-.spinly-tour-desc {
-    color: var(--font-color-muted);
-    font-size: 0.74rem;
-    line-height: 1.4;
-}
-
-/* Solo para quien usa lector de pantalla: a la vista, la explicación va en el `title` del interruptor */
-.spinly-tour-sr {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-}
-
-.spinly-tour-setup-hint {
-    padding: 0 var(--spinly-panel-pad-x) 0.75rem;
-}
-
-/* Grupos numerados del formato: una etiqueta y sus controles, separados por una línea */
-.spinly-tour-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.7rem;
-    padding-top: 0.85rem;
-    border-top: 1px solid var(--color-border);
-}
-
-.spinly-tour-field-title {
-    color: var(--font-color-light);
-    font-size: 0.84rem;
-    font-weight: 600;
-}
-
-/* Estilos predefinidos: tres tarjetas con icono, nombre y qué significan */
-.spinly-tour-styles {
+/* Style presets: three compact choices, icon beside the text */
+.tour-styles {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.6rem;
+    gap: 0.5rem;
 }
 
-.spinly-tour-style,
-.spinly-tour-choice {
+.tour-style {
+    --tone: var(--item-sky);
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 0.7rem;
     border: 1px solid var(--color-border);
     border-radius: var(--spinly-card-radius);
     background: var(--bg-transparence);
-    color: var(--font-color-light);
+    color: var(--font-color);
     font: inherit;
     text-align: left;
     cursor: pointer;
-    transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+    transition: border-color 0.18s ease, background-color 0.18s ease;
 }
 
-.spinly-tour-style {
+.tour-style--classic { --tone: var(--item-amber); }
+.tour-style--epic { --tone: var(--item-pink); }
+
+.tour-style-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--spinly-badge-radius);
+    background: color-mix(in srgb, var(--tone) 20%, transparent);
+}
+
+.tour-style-icon svg,
+.tour-style-icon svg * {
+    color: var(--tone);
+}
+
+.tour-style-text {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-    padding: 0.6rem 0.7rem;
+    min-width: 0;
 }
 
-.spinly-tour-style svg {
+.tour-style-text strong {
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.tour-style-text span {
     color: var(--font-color-muted);
-    transition: color 0.18s ease;
+    font-size: 0.7rem;
+    line-height: 1.3;
 }
 
-.spinly-tour-style strong {
-    font-size: 0.88rem;
+.tour-style:hover {
+    border-color: color-mix(in srgb, var(--tone) 50%, var(--color-border));
 }
 
-.spinly-tour-style span,
-.spinly-tour-choice-text span {
-    color: var(--font-color-muted);
-    font-size: 0.72rem;
-    line-height: 1.35;
+.tour-style--active,
+.tour-style--active:hover {
+    border-color: var(--tone);
+    background: color-mix(in srgb, var(--tone) 12%, var(--bg-card-color));
 }
 
-.spinly-tour-style:hover,
-.spinly-tour-choice:hover {
-    border-color: var(--color-border-light);
-    background: var(--color-hover);
-    transform: translateY(-1px);
+.tour-style--active .tour-style-text span {
+    color: var(--font-color-light);
 }
 
-.spinly-tour-style--active,
-.spinly-tour-style--active:hover,
-.spinly-tour-choice--active,
-.spinly-tour-choice--active:hover {
-    border-color: var(--color-focus-light);
-    background: color-mix(in srgb, var(--color-focus-light) 12%, var(--bg-card-color));
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-focus-light) 35%, transparent);
-}
-
-.spinly-tour-style--active svg,
-.spinly-tour-choice--active .spinly-tour-choice-icon {
-    color: var(--color-focus-light);
-}
-
-.spinly-tour-style:focus-visible,
-.spinly-tour-choice:focus-visible {
+.tour-style:focus-visible {
     outline: 2px solid var(--color-focus-light);
     outline-offset: 2px;
 }
 
-.spinly-tour-choices {
+/* Extras: switches with their explanation in view */
+.tour-switches {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.5rem;
 }
 
-/* Una tarjeta debajo de otra: para cuando la pregunta ya vive en media columna (ver spinly-tour-field-row) */
-.spinly-tour-choices--stacked {
-    grid-template-columns: minmax(0, 1fr);
-}
-
-.spinly-tour-choice {
+.tour-switch {
+    position: relative;
     display: flex;
     align-items: flex-start;
-    gap: 0.55rem;
-    padding: 0.55rem 0.7rem;
-}
-
-.spinly-tour-choice-icon {
-    display: inline-flex;
-    flex-shrink: 0;
-    margin-top: 0.1rem;
-    color: var(--font-color-muted);
-    transition: color 0.18s ease;
-}
-
-.spinly-tour-choice-text {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    min-width: 0;
-}
-
-.spinly-tour-choice-text strong {
-    font-size: 0.84rem;
-}
-
-/* Vista previa de la primera ronda */
-.spinly-tour-preview {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.4rem;
-    margin: 0;
-    list-style: none;
-}
-
-.spinly-tour-preview li {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.4rem 0.55rem;
+    gap: 0.65rem;
+    padding: 0.7rem 0.8rem;
     border: 1px solid var(--color-border);
-    border-radius: 0.5rem;
-    background: var(--bg-card-color);
-    font-size: 0.74rem;
-}
-
-.spinly-tour-preview span {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.spinly-tour-preview span:last-child {
-    justify-content: flex-end;
-}
-
-.spinly-tour-preview i {
-    flex-shrink: 0;
-    width: 0.45rem;
-    height: 0.45rem;
-    border-radius: 50%;
-}
-
-.spinly-tour-preview em {
-    color: var(--font-color-muted);
-    font-size: 0.64rem;
-    font-style: normal;
-    text-transform: uppercase;
-}
-
-.spinly-tour-preview-bye {
-    color: var(--font-color-muted);
-    font-style: italic;
-}
-
-li.spinly-tour-preview-more {
-    display: block;
-    color: var(--font-color-muted);
-    text-align: center;
-}
-
-.spinly-tour-field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.45rem;
-    min-width: 0;
-}
-
-.spinly-tour-field .spinly-segmented {
-    margin: 0;
-}
-
-.spinly-tour-field-row {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.75rem;
-}
-
-.spinly-tour-label {
-    color: var(--font-color-muted);
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-}
-
-/* Extras: una fila de píldoras (el porqué de cada una va en el `title`, al pasar el ratón) */
-.spinly-tour-switches {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-}
-
-/* Interruptor: checkbox real (accesible con teclado) dibujado como un chip con su propio switch */
-.spinly-tour-switch {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.4rem 0.75rem 0.4rem 0.5rem;
-    border: 1px solid var(--color-border);
-    border-radius: 999px;
+    border-radius: var(--spinly-card-radius);
     background: var(--bg-transparence);
     cursor: pointer;
     transition: border-color 0.18s ease, background-color 0.18s ease;
 }
 
-.spinly-tour-switch:hover {
+.tour-switch:hover {
     border-color: var(--color-border-light);
 }
 
-.spinly-tour-switch--on {
+.tour-switch--on {
     border-color: color-mix(in srgb, var(--color-focus-light) 55%, transparent);
     background: color-mix(in srgb, var(--color-focus-light) 12%, var(--bg-card-color));
 }
 
-.spinly-tour-switch input {
+.tour-switch input {
     position: absolute;
-    opacity: 0;
     width: 1px;
     height: 1px;
+    opacity: 0;
 }
 
-.spinly-tour-switch-track {
+.tour-switch-track {
     position: relative;
     flex-shrink: 0;
-    width: 1.9rem;
-    height: 1.1rem;
+    width: 2rem;
+    height: 1.15rem;
+    margin-top: 0.05rem;
     border: 1px solid var(--color-border-light);
-    border-radius: 1rem;
+    border-radius: var(--spinly-card-radius);
     background: var(--bg-card-color);
     transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
-.spinly-tour-switch-thumb {
+.tour-switch-thumb {
     position: absolute;
     top: 50%;
-    left: 0.14rem;
-    width: 0.76rem;
-    height: 0.76rem;
+    left: 0.15rem;
+    width: 0.78rem;
+    height: 0.78rem;
     border-radius: 50%;
     background: var(--font-color-muted);
     transform: translateY(-50%);
     transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s ease;
 }
 
-.spinly-tour-switch input:checked + .spinly-tour-switch-track {
-    background: var(--color-focus);
+.tour-switch input:checked + .tour-switch-track {
     border-color: var(--color-focus-light);
+    background: var(--color-focus);
 }
 
-.spinly-tour-switch input:checked + .spinly-tour-switch-track .spinly-tour-switch-thumb {
+.tour-switch input:checked + .tour-switch-track .tour-switch-thumb {
     background: #ffffff;
-    transform: translate(0.8rem, -50%);
+    transform: translate(0.82rem, -50%);
 }
 
-.spinly-tour-switch input:focus-visible + .spinly-tour-switch-track {
+.tour-switch input:focus-visible + .tour-switch-track {
     outline: 2px solid var(--color-focus-light);
     outline-offset: 2px;
 }
 
-.spinly-tour-switch-label {
-    color: var(--font-color-light);
-    font-size: 0.8rem;
-    font-weight: 600;
-    white-space: nowrap;
+.tour-switch-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
 }
 
-/* Disclosure "Personalizar reglas": con las reglas plegadas, un resumen de una línea a su lado */
-.spinly-tour-disclosure {
+.tour-switch-label {
+    color: var(--font-color);
+    font-size: 0.83rem;
+    font-weight: 700;
+}
+
+.tour-switch-desc {
+    color: var(--font-color-muted);
+    font-size: 0.72rem;
+    line-height: 1.35;
+}
+
+
+.tour-question {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+
+/* Two answers side by side, like a big toggle */
+.tour-answers {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+
+.tour-answer {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.9rem;
+    padding: 0.55rem 0.8rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-card-radius);
+    background: var(--bg-transparence);
+    color: var(--font-color-light);
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+}
+
+.tour-answer svg {
+    flex-shrink: 0;
+}
+
+.tour-answer:hover {
+    border-color: var(--color-border-light);
+    color: var(--font-color);
+}
+
+.tour-answer--active,
+.tour-answer--active:hover {
+    border-color: var(--color-focus-light);
+    background: color-mix(in srgb, var(--color-focus-light) 16%, var(--bg-card-color));
+    color: var(--font-color);
+    box-shadow: 0 0 0 1px var(--color-focus-light);
+}
+
+.tour-answer:focus-visible {
+    outline: 2px solid var(--color-focus-light);
+    outline-offset: 2px;
+}
+
+/* What the chosen answer does, always in view */
+.tour-answer-desc {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.65rem 0.8rem;
+    border-radius: 0.7rem;
+    background: color-mix(in srgb, var(--color-focus-light) 8%, transparent);
+    color: var(--font-color-light);
+    font-size: 0.8rem;
+    line-height: 1.45;
+}
+
+/* Spins per duel: two steppers side by side */
+.tour-steppers {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
+}
+
+.tour-stepper {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-card-radius);
+    background: var(--bg-transparence);
+}
+
+.tour-stepper-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.tour-stepper-text {
+    display: flex;
+    flex-direction: column;
     min-width: 0;
-    padding: 0.2rem 0;
+}
+
+.tour-stepper-label {
+    color: var(--font-color);
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.tour-stepper-prefix {
+    color: var(--font-color-muted);
+    font-size: 0.72rem;
+}
+
+.tour-stepper-control {
+    display: inline-flex;
+    align-items: center;
+    overflow: hidden;
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--spinly-card-radius);
+    background: var(--bg-card-color);
+}
+
+.tour-stepper-control button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.3rem;
+    height: 2.3rem;
+    padding: 0;
     border: 0;
     background: transparent;
-    color: var(--color-focus-light);
+    color: var(--font-color);
     font: inherit;
-    font-size: 0.78rem;
+    font-size: 1.2rem;
     font-weight: 700;
     cursor: pointer;
+    transition: background-color 0.15s ease;
 }
 
-.spinly-tour-disclosure svg {
-    flex-shrink: 0;
-    transition: transform 0.18s ease;
+.tour-stepper-control button:hover:not(:disabled) {
+    background: var(--color-hover);
 }
 
-.spinly-tour-disclosure-icon {
-    transform: rotate(180deg);
+.tour-stepper-control button:disabled {
+    color: var(--font-color-disabled);
+    cursor: not-allowed;
 }
 
-.spinly-tour-disclosure-summary {
-    overflow: hidden;
+.tour-stepper-control input {
+    width: 2.6rem;
+    height: 2.3rem;
+    padding: 0;
+    border: 0;
+    border-right: 1px solid var(--color-border);
+    border-left: 1px solid var(--color-border);
+    outline: 0;
+    background: transparent;
+    color: var(--font-color);
+    font: inherit;
+    font-size: 1.1rem;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.tour-stepper-control input::-webkit-inner-spin-button,
+.tour-stepper-control input::-webkit-outer-spin-button {
+    margin: 0;
+    -webkit-appearance: none;
+}
+
+.tour-stepper-control:focus-within {
+    border-color: var(--color-focus-light);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-focus-light) 25%, transparent);
+}
+
+.tour-stepper-meaning {
     color: var(--font-color-muted);
-    font-weight: 400;
+    font-size: 0.74rem;
+    line-height: 1.4;
+}
+
+/* First-round preview (list order) */
+.tour-preview-box {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.tour-preview {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.tour-preview li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.6rem;
+    background: var(--bg-card-color);
+    font-size: 0.76rem;
+}
+
+.tour-preview span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.spinly-tour-rules {
-    display: flex;
-    flex-direction: column;
-    gap: 0.85rem;
-    animation: spinly-tour-in 0.2s ease;
+.tour-preview span:last-child {
+    justify-content: flex-end;
 }
 
-.spinly-tour-setup-start {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    margin-top: auto;
-    padding: 1rem var(--spinly-panel-pad-x) var(--spinly-panel-pad-x);
+.tour-preview i {
+    flex-shrink: 0;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
 }
 
-.spinly-tour-hint {
+.tour-preview em {
     color: var(--font-color-muted);
-    font-size: 0.78rem;
+    font-size: 0.64rem;
+    font-style: normal;
+    text-transform: uppercase;
+}
+
+.tour-preview-bye {
+    color: var(--font-color-muted);
+    font-style: italic;
+}
+
+li.tour-preview-more {
+    display: block;
+    color: var(--font-color-muted);
     text-align: center;
 }
 
-button.spinly-tour-start.spinly-btn-primary {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.6rem;
-    padding: 1rem 1.5rem;
-    border-radius: 1.35rem;
-    font-size: 0.95rem;
-    font-weight: 800;
-    letter-spacing: 0.12rem;
-}
 
-button.spinly-tour-start.spinly-btn-primary:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-}
 
-/* En juego */
-.spinly-tour-live {
+
+
+
+
+
+
+
+
+
+/* ---------------------------------------------------------------------------------------------
+   Live tournament
+   --------------------------------------------------------------------------------------------- */
+.tour-live {
     display: flex;
     flex-direction: column;
-    gap: 1.1rem;
-    max-width: 92rem;
+    gap: 1rem;
+    max-width: 82rem;
     margin: 0 auto;
-    animation: spinly-tour-in 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    animation: tour-in 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@keyframes spinly-tour-in {
-    from { opacity: 0; transform: translateY(0.6rem); }
-}
-
-.spinly-tour-top {
+/* Top bar: title, progress segments and actions */
+.tour-bar {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem 1rem;
+    gap: 0.75rem 1.5rem;
+    padding: 0.7rem 0.8rem 0.7rem 0.9rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--tour-radius);
+    background: var(--tour-surface);
+    box-shadow: var(--card-shadow);
 }
 
-.spinly-tour-titles,
-.spinly-tour-controls {
+.tour-bar-title {
     display: flex;
-    flex-wrap: wrap;
+    flex: 1 1 15rem;
     align-items: center;
-    gap: 0.6rem;
+    gap: 0.75rem;
     min-width: 0;
 }
 
-.spinly-tour-badge,
-.spinly-tour-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    max-width: 100%;
-    padding: 0.45rem 0.75rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--spinly-badge-radius);
-    background: var(--tour-card);
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+
+.tour-bar-text {
+    min-width: 0;
+}
+
+.tour-bar-text h2 {
+    overflow: hidden;
+    font-size: 1.05rem;
+    font-weight: 900;
+    line-height: 1.2;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.spinly-tour-badge svg {
-    color: var(--tour-live);
-}
-
-.spinly-tour-chip {
-    color: var(--font-color-light);
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: none;
-}
-
-.spinly-tour-chip i {
-    width: 0.45rem;
-    height: 0.45rem;
-    border-radius: 50%;
-    background: var(--font-color-muted);
-}
-
-.spinly-tour-chip--live i {
-    background: var(--item-mint);
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--item-mint) 60%, transparent);
-    animation: spinly-tour-ping 1.8s ease-out infinite;
-}
-
-@keyframes spinly-tour-ping {
-    to { box-shadow: 0 0 0 0.45rem transparent; }
-}
-
-.spinly-tour-count {
-    display: inline-flex;
+.tour-bar-text p {
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.15rem 0.45rem;
     color: var(--font-color-muted);
     font-size: 0.78rem;
 }
 
-.spinly-tour-tabs.spinly-segmented {
-    margin: 0;
+
+
+.tour-bar-progress {
+    display: flex;
+    flex: 1 1 14rem;
+    flex-direction: column;
+    gap: 0.4rem;
+    min-width: 10rem;
+    max-width: 22rem;
 }
 
-.spinly-tour-tabs .spinly-segmented-btn {
+.tour-bar-progress-text {
+    color: var(--font-color-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+/* One segment per duel: played, playing now, still to play */
+.tour-segments {
+    display: flex;
+    gap: 3px;
+}
+
+.tour-segments i {
+    flex: 1;
+    height: 0.4rem;
+    border-radius: var(--spinly-card-radius);
+    background: var(--color-border);
+}
+
+.tour-segments .tour-segment--done {
+    background: var(--tour-live);
+}
+
+.tour-segments .tour-segment--live {
+    background: var(--font-color);
+    animation: tour-blink 1.4s ease-in-out infinite;
+}
+
+.tour-bar-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.tour-tool {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.4rem;
-    padding: 0.5rem 0.85rem;
-    font-size: 0.8rem;
-}
-
-.spinly-tour-tool,
-.spinly-tour-icon-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.45rem;
-    height: 2.45rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--spinly-badge-radius);
-    background: var(--tour-card);
+    height: 2.3rem;
+    padding: 0 0.8rem;
+    border: 1px solid transparent;
+    border-radius: var(--spinly-card-radius);
+    background: transparent;
     color: var(--font-color-light);
     font: inherit;
-    font-size: 0.8rem;
-    font-weight: 600;
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
     cursor: pointer;
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.spinly-tour-tool {
-    padding: 0 0.85rem;
-}
-
-.spinly-tour-icon-btn {
-    width: 2.45rem;
-}
-
-.spinly-tour-tool:hover:not(:disabled),
-.spinly-tour-icon-btn:hover:not(:disabled) {
+.tour-tool:hover:not(:disabled) {
     background: var(--color-hover);
-    border-color: var(--color-border-light);
     color: var(--font-color);
 }
 
-.spinly-tour-tool--on,
-.spinly-tour-tool--on:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--tour-live) 16%, var(--bg-card-color));
+.tour-tool--on,
+.tour-tool--on:hover:not(:disabled) {
     border-color: color-mix(in srgb, var(--tour-live) 55%, transparent);
+    background: color-mix(in srgb, var(--tour-live) 16%, transparent);
     color: var(--font-color);
 }
 
-.spinly-tour-tool--on svg {
+.tour-tool--on svg {
     color: var(--tour-live);
 }
 
-.spinly-tour-icon-btn--armed,
-.spinly-tour-icon-btn--armed:hover:not(:disabled) {
+.tour-tool--armed,
+.tour-tool--armed:hover:not(:disabled) {
     border-color: var(--color-remove);
     color: var(--color-remove);
 }
 
-.spinly-tour-tool:disabled,
-.spinly-tour-icon-btn:disabled {
+.tour-tool:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Arena: rival A | wheel | rival B, each side lit by its rival's color */
+.tour-arena {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1.1rem 1.25rem 1.25rem;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-card-radius);
+    background:
+        radial-gradient(60% 90% at 0% 55%, color-mix(in srgb, var(--a) 26%, transparent), transparent 70%),
+        radial-gradient(60% 90% at 100% 55%, color-mix(in srgb, var(--b) 26%, transparent), transparent 70%),
+        var(--tour-surface);
+    box-shadow: var(--card-shadow);
+}
+
+.tour-arena-head {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    text-align: center;
+}
+
+.tour-arena-round {
+    color: var(--font-color);
+    font-size: 0.78rem;
+    font-weight: 900;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+}
+
+.tour-arena-format {
+    color: var(--font-color-light);
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.tour-arena-help {
+    color: var(--font-color-muted);
+    font-size: 0.76rem;
+}
+
+.tour-arena-stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-areas: "a center b";
+    align-items: center;
+    gap: 1.25rem;
+}
+
+.tour-arena-center {
+    grid-area: center;
+    width: clamp(18rem, 32vw, 27rem);
+}
+
+/* A rival */
+.tour-fighter {
+    --side: var(--a);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+    padding: 1.5rem 1rem 1.25rem;
+    border: 1px solid color-mix(in srgb, var(--side) 40%, var(--color-border));
+    border-radius: var(--spinly-card-radius);
+    background: linear-gradient(170deg, color-mix(in srgb, var(--side) 22%, var(--bg-card-color)), color-mix(in srgb, var(--side) 6%, var(--bg-card-color)));
+    text-align: center;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.tour-fighter--a {
+    grid-area: a;
+}
+
+.tour-fighter--b {
+    --side: var(--b);
+    grid-area: b;
+}
+
+/* A color strip on top of the card */
+.tour-fighter::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 18%;
+    right: 18%;
+    height: 4px;
+    border-radius: 0 0 4px 4px;
+    background: var(--side);
+}
+
+.tour-fighter--ahead {
+    border-color: var(--side);
+    box-shadow: 0 18px 50px -22px var(--side);
+    transform: translateY(-3px);
+}
+
+.tour-fighter-seed {
+    color: var(--font-color-muted);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.tour-fighter-name {
+    display: -webkit-box;
+    max-width: 100%;
+    overflow: hidden;
+    font-size: clamp(1.25rem, 2vw, 1.9rem);
+    font-weight: 900;
+    line-height: 1.1;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.tour-fighter-score {
+    margin-top: 0.2rem;
+    color: var(--font-color);
+    font-size: clamp(3rem, 6vw, 4.75rem);
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+
+.tour-fighter--ahead .tour-fighter-score {
+    text-shadow: 0 0 28px color-mix(in srgb, var(--side) 70%, transparent);
+}
+
+/* One pip per spin win needed */
+.tour-fighter-pips {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.35rem;
+    min-height: 0.9rem;
+}
+
+.tour-fighter-pips i {
+    width: 0.85rem;
+    height: 0.85rem;
+    border: 2px solid var(--side);
+    border-radius: 50%;
+    transition: background-color 0.3s ease, transform 0.3s ease;
+}
+
+.tour-fighter-pips .tour-pip--on {
+    background: var(--side);
+    transform: scale(1.12);
+}
+
+.tour-fighter-share {
+    color: var(--font-color-light);
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+/* Referee: award the duel to this rival */
+.tour-fighter-force {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    max-width: 100%;
+    margin-top: 0.45rem;
+    padding: 0.45rem 0.85rem;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--side) 55%, transparent);
+    border-radius: var(--spinly-card-radius);
+    background: color-mix(in srgb, var(--side) 12%, var(--bg-card-color));
+    color: var(--font-color);
+    font: inherit;
+    font-size: 0.76rem;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.tour-fighter-force:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--side) 26%, var(--bg-card-color));
+}
+
+.tour-fighter-force:disabled {
     opacity: 0.45;
     cursor: not-allowed;
 }
 
-.spinly-tour-body {
-    display: grid;
-    grid-template-columns: minmax(0, 1.4fr) minmax(19rem, 1fr);
-    gap: 1.25rem;
-    align-items: start;
-}
-
-.spinly-tour-main {
+/* The duel wheel in the middle of the arena */
+.tour-duel-wheel {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
-    min-width: 0;
+    align-items: center;
+    gap: 1.1rem;
+    width: 100%;
 }
 
-.spinly-tour-board {
-    min-height: 24rem;
-    padding: 1rem 1.1rem;
+.tour-duel-stage {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    padding-top: 1.25rem;
+    container-type: inline-size;
 }
 
-.spinly-tour-board-head {
+.tour-duel-container.wheel-container {
+    --wheel-radius: max(6.5rem, min(44cqi, 12rem, calc((100dvh - 27rem) / 2)));
+}
+
+.tour-duel-container .wheel-rim-ring {
+    stroke: url(#duel-rim-gradient);
+}
+
+.tour-duel-container .wheel-light-halo {
+    fill: url(#duel-light-halo);
+}
+
+.tour-duel-spin-zone.wheel-spin-zone {
+    width: 100%;
+    padding: 0;
+}
+
+.tour-arena-foot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+/* What is at stake: a pill under the arena, lit up on match point or a decider */
+.tour-arena-status {
+    padding: 0.55rem 1.2rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-card-radius);
+    background: var(--tour-surface-strong);
+    color: var(--font-color);
+    font-size: 0.92rem;
+    font-weight: 800;
+    text-align: center;
+    animation: tour-in 0.3s ease;
+}
+
+.tour-arena-status:empty {
+    display: none;
+}
+
+.tour-arena-status--tense {
+    border-color: var(--tour-live);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--tour-live) 18%, transparent);
+}
+
+.tour-arena-next {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    color: var(--font-color-light);
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.tour-arena-next span {
+    margin-right: 0.25rem;
+    color: var(--font-color-muted);
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.tour-arena-next em {
+    color: var(--font-color-muted);
+    font-style: normal;
+}
+
+/* Podium: the arena once there is a champion */
+.tour-arena--done {
+    align-items: center;
+    padding: 2.5rem 1.5rem;
+}
+
+.tour-podium {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    max-width: 30rem;
+    text-align: center;
+}
+
+.tour-podium-trophy {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 5.5rem;
+    height: 5.5rem;
+    margin-bottom: 0.4rem;
+    border-radius: 50%;
+    background: linear-gradient(145deg, color-mix(in srgb, var(--tour-live) 85%, #ffffff), var(--tour-live));
+    box-shadow: 0 20px 60px -15px var(--tour-live);
+    color: #16161d;
+    animation: tour-float 2.8s ease-in-out infinite;
+}
+
+.tour-podium-label {
+    color: var(--font-color-muted);
+    font-size: 0.75rem;
+    font-weight: 900;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+}
+
+.tour-podium-name {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 900;
+    line-height: 1.1;
+    text-overflow: ellipsis;
+}
+
+.tour-podium-places {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+    margin: 0.3rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.tour-podium-places li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.35rem 0.85rem 0.35rem 0.35rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-card-radius);
+    background: var(--tour-surface-strong);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.tour-podium-places b {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    background: var(--color-border);
+    font-size: 0.72rem;
+}
+
+.tour-podium-text {
+    color: var(--font-color-muted);
+    font-size: 0.85rem;
+    line-height: 1.45;
+}
+
+.tour-podium-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.6rem;
+    margin-top: 0.6rem;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Board: bracket, standings and history
+   --------------------------------------------------------------------------------------------- */
+.tour-board {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 1rem 1.1rem 1.1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-card-radius);
+    background: var(--tour-surface);
+    box-shadow: var(--card-shadow);
+}
+
+.tour-board-head {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
+    gap: 0.75rem 1.5rem;
 }
 
-.spinly-tour-board-head h3 {
+.tour-tabs.spinly-segmented {
+    flex: 0 1 27rem;
+    margin: 0;
+}
+
+.tour-tabs .spinly-segmented-btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.55rem;
-    font-size: 1rem;
-    font-weight: 700;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.55rem 0.8rem;
+    font-size: 0.82rem;
 }
 
-.spinly-tour-board-head h3 svg {
-    color: var(--color-focus-light);
+.tour-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.6rem;
+    margin: 0;
 }
 
-.spinly-tour-board-head span {
+.tour-stats div {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.tour-stats dt {
     color: var(--font-color-muted);
-    font-size: 0.66rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
+    font-size: 0.64rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
 }
 
-.spinly-tour-board-scroll {
-    overflow-x: auto;
-    padding: 0.75rem 0 0.5rem;
+.tour-stats dd {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
 }
 
-/* Cuadro: columnas por ronda; cada duelo, centrado entre los dos que lo alimentan */
-.spinly-bracket {
-    --gap: 2.25rem;
+.tour-board-info {
+    color: var(--font-color-muted);
+    font-size: 0.74rem;
+}
+
+.tour-board-body {
+    min-width: 0;
+    padding-top: 0.6rem;
+}
+
+/* Bracket: one column per round, each match centred between the two that feed it */
+.tour-bracket-scroll {
+    overflow-x: auto;
+    padding: 0.9rem 0.15rem 0.35rem;
+}
+
+.tour-bracket {
+    --gap: 2rem;
+    --line: color-mix(in srgb, var(--font-color-muted) 40%, transparent);
     display: flex;
+    justify-content: center;
     gap: var(--gap);
-    width: max-content;
-    min-width: 100%;
+    min-width: min-content;
     min-height: 20rem;
 }
 
-.spinly-bracket-round {
+.tour-bracket-round {
     display: flex;
+    flex: 1 1 0;
     flex-direction: column;
-    width: 12rem;
-    flex-shrink: 0;
+    min-width: 9rem;
+    max-width: 15rem;
 }
 
-.spinly-bracket-round-title {
+.tour-bracket-round--podium {
+    min-width: 7.5rem;
+}
+
+.tour-bracket-round-title {
     margin-bottom: 0.6rem;
     color: var(--font-color-muted);
-    font-size: 0.64rem;
-    font-weight: 700;
+    font-size: 0.66rem;
+    font-weight: 800;
     letter-spacing: 0.14em;
+    text-align: center;
     text-transform: uppercase;
     white-space: nowrap;
 }
 
-.spinly-bracket-column,
-.spinly-bracket-pair {
+.tour-bracket-column,
+.tour-bracket-pair {
     position: relative;
-    flex: 1;
     display: flex;
+    flex: 1;
     flex-direction: column;
     justify-content: space-around;
 }
 
-.spinly-bracket-slot {
+.tour-bracket-slot {
     position: relative;
-    flex: 1;
     display: flex;
+    flex: 1;
     align-items: center;
-    padding: 0.45rem 0;
+    padding: 0.7rem 0;
 }
 
-/* Líneas del cuadro: del duelo al hueco, el hueco que une la pareja y del hueco al siguiente */
-.spinly-bracket-slot::after,
-.spinly-bracket-round--fed .spinly-bracket-slot::before,
-.spinly-bracket-pair:not(.spinly-bracket-pair--final)::after {
+/* Lines: from each match to the middle of the gap, the elbow joining a pair, and into the next match */
+.tour-bracket-slot::after,
+.tour-bracket-round--fed .tour-bracket-slot::before,
+.tour-bracket-pair:not(.tour-bracket-pair--final)::after {
     content: '';
     position: absolute;
-    border-color: var(--color-border-light);
     pointer-events: none;
 }
 
-.spinly-bracket-slot::after {
+.tour-bracket-slot::after {
     top: 50%;
     right: calc(var(--gap) / -2);
     width: calc(var(--gap) / 2);
-    border-top: 1px solid;
-    border-color: var(--color-border-light);
+    border-top: 2px solid var(--line);
 }
 
-.spinly-bracket-pair--final .spinly-bracket-slot::after {
+.tour-bracket-pair--final .tour-bracket-slot::after {
     right: calc(var(--gap) * -1);
     width: var(--gap);
 }
 
-.spinly-bracket-round--fed .spinly-bracket-slot::before {
+.tour-bracket-round--fed .tour-bracket-slot::before {
     top: 50%;
     left: calc(var(--gap) / -2);
     width: calc(var(--gap) / 2);
-    border-top: 1px solid;
-    border-color: var(--color-border-light);
+    border-top: 2px solid var(--line);
 }
 
-.spinly-bracket-pair:not(.spinly-bracket-pair--final)::after {
+.tour-bracket-pair:not(.tour-bracket-pair--final)::after {
     top: 25%;
     bottom: 25%;
     right: calc(var(--gap) / -2);
-    border-right: 1px solid;
-    border-color: var(--color-border-light);
+    border-right: 2px solid var(--line);
+    border-radius: 0 0.5rem 0.5rem 0;
 }
 
-.spinly-match {
+/* Match card */
+.tour-match {
     position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
     width: 100%;
-    padding: 0.4rem 0.5rem 0.35rem;
     border: 1px solid var(--color-border);
-    border-radius: 0.6rem;
+    border-radius: var(--spinly-card-radius);
     background: var(--bg-card-color);
-    font-size: 0.8rem;
+    font-size: 0.84rem;
     transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
-.spinly-match--bye {
-    opacity: 0.55;
+.tour-match-rows {
+    overflow: hidden;
+    border-radius: inherit;
 }
 
-.spinly-match--live {
-    border-color: color-mix(in srgb, var(--tour-live) 70%, transparent);
-    box-shadow:
-        0 0 0 1px color-mix(in srgb, var(--tour-live) 35%, transparent),
-        0 0 24px -6px color-mix(in srgb, var(--tour-live) 55%, transparent);
-    animation: spinly-tour-live 2.4s ease-in-out infinite;
+.tour-match--bye {
+    border-style: dashed;
 }
 
-@keyframes spinly-tour-live {
-    50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--tour-live) 55%, transparent), 0 0 30px -4px color-mix(in srgb, var(--tour-live) 65%, transparent); }
+.tour-match--bye .tour-match-name {
+    color: var(--font-color-muted);
 }
 
-.spinly-match-live {
+.tour-match--next {
+    border-style: dashed;
+    border-color: var(--color-border-light);
+}
+
+.tour-match--live {
+    border-color: var(--tour-live);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--tour-live) 22%, transparent), 0 16px 34px -16px var(--tour-live);
+}
+
+/* State tag on the top edge: "Now playing", "Up next", "Bye", "Referee" */
+.tour-match-state {
     position: absolute;
-    top: -0.62rem;
-    right: 0.5rem;
-    padding: 0.08rem 0.4rem;
-    border-radius: 0.25rem;
+    z-index: 1;
+    top: 0;
+    left: 50%;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.1rem 0.5rem;
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--spinly-badge-radius);
+    background: var(--bg-card-color);
+    color: var(--font-color-light);
+    font-size: 0.58rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    transform: translate(-50%, -55%);
+}
+
+.tour-match--live .tour-match-state {
+    border-color: transparent;
     background: var(--tour-live);
     color: #16161d;
-    font-size: 0.58rem;
-    font-weight: 800;
-    letter-spacing: 0.1em;
 }
 
-.spinly-match-row {
-    display: grid;
-    grid-template-columns: 0.55rem minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.22rem 0.3rem;
-    border-radius: 0.35rem;
+:root[data-theme="light"] .tour-match--live .tour-match-state {
+    color: #ffffff;
 }
 
-.spinly-match-row--won {
-    background: color-mix(in srgb, var(--color-hover) 80%, transparent);
-}
-
-.spinly-match-row--won .spinly-match-name {
-    font-weight: 700;
-}
-
-.spinly-match-row--lost .spinly-match-name {
-    color: var(--font-color-muted);
-    text-decoration: line-through;
-    text-decoration-color: color-mix(in srgb, var(--font-color-muted) 60%, transparent);
-}
-
-.spinly-match-dot {
-    flex-shrink: 0;
-    width: 0.55rem;
-    height: 0.55rem;
+.tour-match-state i {
+    width: 0.38rem;
+    height: 0.38rem;
     border-radius: 50%;
-    background: var(--color-border-light);
+    background: currentColor;
+    animation: tour-blink 1.2s ease-in-out infinite;
 }
 
-.spinly-match-name {
+.tour-match-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 2.2rem;
+    padding: 0.3rem 0.5rem 0.3rem 0.85rem;
+}
+
+.tour-match-row + .tour-match-row {
+    border-top: 1px solid var(--color-border);
+}
+
+.tour-match-row::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 4px;
+    background: var(--side);
+}
+
+.tour-match-row--won {
+    background: color-mix(in srgb, var(--side) 14%, transparent);
+}
+
+.tour-match-row--won .tour-match-name {
+    font-weight: 800;
+}
+
+/* Knocked out: muted text (not opacity, which would break the contrast) and a faded color bar */
+.tour-match-row--lost .tour-match-name,
+.tour-match-row--lost .tour-match-score {
+    color: var(--font-color-muted);
+}
+
+.tour-match-row--lost::before {
+    opacity: 0.35;
+}
+
+.tour-match-row--empty .tour-match-name {
+    color: var(--font-color-muted);
+    font-style: italic;
+}
+
+.tour-match-name {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.spinly-match-score {
-    min-width: 1ch;
-    color: var(--font-color-muted);
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    text-align: right;
+.tour-match-check {
+    color: var(--item-mint);
 }
 
-.spinly-match-row--won .spinly-match-score {
+:root[data-theme="light"] .tour-match-check {
+    color: #166534;
+}
+
+.tour-match-score {
+    min-width: 1.6rem;
+    padding: 0.1rem 0.3rem;
+    border-radius: 0.4rem;
+    color: var(--font-color-muted);
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+.tour-match-score:not(:empty) {
+    background: var(--bg-transparence);
+}
+
+.tour-match-row--won .tour-match-score {
     color: var(--font-color);
 }
 
-.spinly-match-state {
-    margin-top: 0.1rem;
-    color: var(--font-color-muted);
-    font-size: 0.62rem;
-    text-align: right;
-}
-
-.spinly-match--live .spinly-match-state {
-    color: var(--tour-live);
-    font-weight: 600;
-}
-
-.spinly-bracket-column--podium {
+/* Last column: the crown, with the third-place match below it (out of the flow, so the crown stays
+   level with the final and its line) */
+.tour-bracket-column--podium {
     justify-content: center;
-    gap: 1.25rem;
 }
 
-.spinly-champion {
+.tour-crown {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.35rem;
-    padding: 1rem 0.75rem;
-    border: 1px solid var(--color-border);
+    gap: 0.5rem;
+    padding: 1.1rem 0.75rem;
+    border: 1.5px dashed var(--color-border-light);
     border-radius: var(--spinly-card-radius);
-    background: var(--bg-card-color);
     text-align: center;
-    transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-.spinly-champion-icon {
+.tour-crown-icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 2.75rem;
-    height: 2.75rem;
-    margin-bottom: 0.25rem;
-    border: 1px solid color-mix(in srgb, var(--tour-live) 40%, transparent);
-    border-radius: 0.7rem;
-    background: color-mix(in srgb, var(--tour-live) 14%, transparent);
+    width: 2.6rem;
+    height: 2.6rem;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--tour-live) 16%, transparent);
     color: var(--tour-live);
 }
 
-.spinly-champion-name {
+.tour-crown-name {
     max-width: 100%;
     overflow: hidden;
-    font-size: 1.05rem;
-    font-weight: 800;
+    color: var(--font-color-muted);
+    font-size: 0.85rem;
+    font-style: italic;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.spinly-champion-sub {
-    color: var(--font-color-muted);
-    font-size: 0.66rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+.tour-crown--crowned {
+    border: 1.5px solid var(--tour-live);
+    background: color-mix(in srgb, var(--tour-live) 10%, var(--bg-card-color));
+    box-shadow: 0 16px 40px -18px var(--tour-live);
 }
 
-.spinly-champion-finalists {
+.tour-crown--crowned .tour-crown-icon {
+    background: var(--tour-live);
+    color: #16161d;
+    animation: tour-float 2.8s ease-in-out infinite;
+}
+
+.tour-crown--crowned .tour-crown-name {
+    color: var(--font-color);
+    font-size: 1.05rem;
+    font-style: normal;
+    font-weight: 900;
+}
+
+.tour-bracket-third {
+    position: absolute;
+    top: calc(50% + 4.9rem);
+    left: 0;
+    right: 0;
+}
+
+/* Standings */
+.tour-standings,
+.tour-history {
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
-    width: 100%;
-    margin-top: 0.5rem;
-    padding: 0.5rem 0 0;
-    border-top: 1px solid var(--color-border);
+    gap: 0.45rem;
+    margin: 0;
+    padding: 0;
     list-style: none;
 }
 
-.spinly-champion-finalists li {
+.tour-standing {
+    position: relative;
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 0.45rem;
-    color: var(--font-color-light);
-    font-size: 0.76rem;
-}
-
-.spinly-champion-finalist--out {
-    color: var(--font-color-muted);
-    text-decoration: line-through;
-}
-
-.spinly-champion--crowned {
-    border-color: color-mix(in srgb, var(--tour-live) 70%, transparent);
-    box-shadow: 0 0 36px -10px color-mix(in srgb, var(--tour-live) 70%, transparent);
-}
-
-.spinly-champion--crowned .spinly-champion-icon {
-    animation: spinly-tour-crown 2.6s ease-in-out infinite;
-}
-
-@keyframes spinly-tour-crown {
-    50% { transform: translateY(-3px) rotate(-4deg); }
-}
-
-/* Estadísticas */
-.spinly-tour-stats {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.75rem;
-    margin: 0;
-}
-
-.spinly-tour-stat {
-    padding: 0.75rem 0.9rem;
+    gap: 0.8rem;
+    padding: 0.65rem 0.9rem 0.65rem 1.1rem;
+    overflow: hidden;
     border: 1px solid var(--color-border);
     border-radius: var(--spinly-card-radius);
-    background: var(--tour-card);
+    background: var(--bg-card-color);
 }
 
-.spinly-tour-stat dt {
+.tour-standing::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 4px;
+    background: var(--side);
+}
+
+.tour-standing--live {
+    border-color: color-mix(in srgb, var(--tour-live) 60%, var(--color-border));
+}
+
+.tour-standing--out::before {
+    opacity: 0.35;
+}
+
+.tour-standing--out .tour-standing-main strong {
+    color: var(--font-color-light);
+    font-weight: 600;
+}
+
+.tour-standing-seed {
+    min-width: 1.8rem;
     color: var(--font-color-muted);
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-}
-
-.spinly-tour-stat dd {
-    margin: 0.3rem 0 0;
-    font-size: 1.3rem;
+    font-size: 0.74rem;
     font-weight: 800;
     font-variant-numeric: tabular-nums;
 }
 
-/* Participantes e historial */
-.spinly-tour-players,
-.spinly-tour-history {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    margin: 0;
-    list-style: none;
-}
-
-.spinly-tour-player {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.6rem 0.85rem;
-}
-
-.spinly-tour-player--out {
-    opacity: 0.6;
-}
-
-.spinly-tour-player-seed {
-    min-width: 1.4rem;
-    color: var(--font-color-muted);
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-align: right;
-}
-
-.spinly-tour-player-main {
+.tour-standing-main {
     display: flex;
     flex: 1;
     flex-direction: column;
     min-width: 0;
 }
 
-.spinly-tour-player-main strong {
+.tour-standing-main strong {
     overflow: hidden;
-    font-size: 0.9rem;
+    font-size: 0.92rem;
+    font-weight: 800;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.spinly-tour-player-main span {
+.tour-standing-main span {
     color: var(--font-color-muted);
     font-size: 0.72rem;
 }
 
-.spinly-tour-rank {
+.tour-rank {
+    display: inline-flex;
     flex-shrink: 0;
-    padding: 0.2rem 0.5rem;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.6rem;
     border: 1px solid var(--color-border);
-    border-radius: var(--spinly-chip-radius);
+    border-radius: var(--spinly-badge-radius);
     background: var(--bg-transparence);
     color: var(--font-color-light);
-    font-size: 0.68rem;
-    font-weight: 600;
+    font-size: 0.7rem;
+    font-weight: 700;
 }
 
-.spinly-tour-rank--gold { border-color: color-mix(in srgb, var(--item-amber) 60%, transparent); color: var(--item-amber); }
-.spinly-tour-rank--silver { border-color: var(--color-border-light); color: var(--font-color); }
-.spinly-tour-rank--bronze { border-color: color-mix(in srgb, var(--item-coral) 55%, transparent); color: var(--item-coral); }
-.spinly-tour-rank--live { border-color: color-mix(in srgb, var(--item-mint) 55%, transparent); color: var(--item-mint); }
-.spinly-tour-rank--out { color: var(--font-color-muted); }
+.tour-rank--gold { border-color: color-mix(in srgb, var(--item-amber) 60%, transparent); color: var(--item-amber); }
+.tour-rank--silver { border-color: var(--color-border-light); color: var(--font-color); }
+.tour-rank--bronze { border-color: color-mix(in srgb, var(--item-coral) 55%, transparent); color: var(--item-coral); }
+.tour-rank--live { border-color: color-mix(in srgb, var(--item-mint) 55%, transparent); color: var(--item-mint); }
+.tour-rank--out { color: var(--font-color-muted); }
 
-:root[data-theme="light"] .spinly-tour-rank--gold { color: #b45309; }
-:root[data-theme="light"] .spinly-tour-rank--bronze { color: #c2410c; }
-:root[data-theme="light"] .spinly-tour-rank--live { color: #15803d; }
+/* Darker tones in light mode so the small text keeps AA contrast over the tinted chip */
+:root[data-theme="light"] .tour-rank--gold { color: #92400e; }
+:root[data-theme="light"] .tour-rank--bronze { color: #9a3412; }
+:root[data-theme="light"] .tour-rank--live { color: #166534; }
 
-.spinly-tour-history-item {
+/* History */
+.tour-history-item {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas:
         "round duel tally"
         "round text tally";
     align-items: center;
-    gap: 0.1rem 0.85rem;
-    padding: 0.6rem 0.85rem;
+    gap: 0.1rem 0.9rem;
+    padding: 0.65rem 0.9rem;
     border: 1px solid var(--color-border);
     border-radius: var(--spinly-card-radius);
     background: var(--bg-card-color);
 }
 
-.spinly-tour-history-item--won {
+.tour-history-item--won {
     border-color: color-mix(in srgb, var(--tour-live) 45%, var(--color-border));
 }
 
-.spinly-tour-history-round {
+.tour-history-round {
     grid-area: round;
+    min-width: 6.5rem;
     color: var(--font-color-muted);
     font-size: 0.62rem;
-    font-weight: 700;
+    font-weight: 800;
     letter-spacing: 0.1em;
     text-transform: uppercase;
 }
 
-.spinly-tour-history-duel {
+.tour-history-duel {
     grid-area: duel;
     overflow: hidden;
-    font-size: 0.82rem;
-    font-weight: 600;
+    font-size: 0.84rem;
+    font-weight: 700;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.spinly-tour-history-duel em {
+.tour-history-duel em {
     color: var(--font-color-muted);
     font-style: normal;
     font-weight: 400;
 }
 
-.spinly-tour-history-text {
+.tour-history-text {
     grid-area: text;
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
     color: var(--font-color-muted);
-    font-size: 0.74rem;
+    font-size: 0.75rem;
 }
 
-.spinly-tour-history-item--won .spinly-tour-history-text {
+.tour-history-item--won .tour-history-text {
     color: var(--tour-live);
-    font-weight: 600;
+    font-weight: 700;
 }
 
-.spinly-tour-history-tally {
+.tour-history-tally {
     grid-area: tally;
-    font-size: 0.95rem;
-    font-weight: 800;
+    font-size: 1rem;
+    font-weight: 900;
     font-variant-numeric: tabular-nums;
 }
 
-.spinly-tour-empty {
-    padding: 3rem 1rem;
-    color: var(--font-color-muted);
-    font-size: 0.85rem;
-    text-align: center;
-}
-
-/* Duelo */
-.spinly-tour-duel {
+.tour-empty {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 0.8rem;
-    min-width: 0;
-}
-
-.spinly-duel-head {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    grid-template-areas: "a score b";
     align-items: center;
     gap: 0.75rem;
-    width: 100%;
-    padding: 0.85rem 1rem;
-}
-
-.spinly-duel-side {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    min-width: 0;
-}
-
-.spinly-duel-side--a {
-    grid-area: a;
-}
-
-.spinly-duel-side--b {
-    grid-area: b;
-    flex-direction: row-reverse;
-    text-align: right;
-}
-
-.spinly-duel-side .spinly-match-dot {
-    width: 0.7rem;
-    height: 0.7rem;
-}
-
-.spinly-duel-side-text {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-}
-
-.spinly-duel-side-text strong {
-    overflow: hidden;
-    font-size: 0.95rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.spinly-duel-side-text span {
-    overflow: hidden;
-    font-size: 0.68rem;
-    font-weight: 600;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.spinly-duel-score {
-    grid-area: score;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.3rem;
-}
-
-.spinly-duel-score-box {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.2rem 0.85rem;
-    border: 1px solid var(--color-border);
-    border-radius: 0.55rem;
-    background: var(--bg-transparence);
-    font-size: 1.2rem;
-    font-variant-numeric: tabular-nums;
-}
-
-.spinly-duel-score-box b {
-    font-weight: 800;
-}
-
-.spinly-duel-score-box i {
-    margin: 0 0.45rem;
+    padding: 3.5rem 1rem;
     color: var(--font-color-muted);
-    font-style: normal;
-}
-
-.spinly-duel-score-info {
-    color: var(--font-color-muted);
-    font-size: 0.6rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    white-space: nowrap;
-}
-
-.spinly-duel-wheel {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1.35rem;
-    width: 100%;
-}
-
-.spinly-duel-stage {
-    display: flex;
-    justify-content: center;
-    width: 100%;
-    padding-top: 1.5rem;
-    container-type: inline-size;
-}
-
-.spinly-duel-container.wheel-container {
-    --wheel-radius: max(6rem, min(40cqi, 10.5rem, calc((100dvh - 30rem) / 2)));
-}
-
-.spinly-duel-container .wheel-rim-ring {
-    stroke: url(#duel-rim-gradient);
-}
-
-.spinly-duel-container .wheel-light-halo {
-    fill: url(#duel-light-halo);
-}
-
-.spinly-duel-spin-zone.wheel-spin-zone {
-    padding: 0;
-}
-
-.spinly-duel-status {
-    width: 100%;
-    padding: 0.6rem 0.9rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--spinly-card-radius);
-    background: var(--tour-card);
-    color: var(--font-color-light);
-    font-size: 0.8rem;
+    font-size: 0.86rem;
     text-align: center;
-    animation: spinly-tour-in 0.3s ease;
 }
 
-.spinly-duel-referee {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    width: 100%;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--color-border);
-}
-
-.spinly-duel-referee-label {
-    color: var(--font-color-muted);
-    font-size: 0.66rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    white-space: nowrap;
-}
-
-.spinly-duel-force {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    min-width: 0;
-    padding: 0.35rem 0.5rem;
-    border: 1px solid transparent;
-    border-radius: var(--spinly-badge-radius);
-    background: transparent;
-    color: var(--font-color-light);
-    font: inherit;
-    font-size: 0.72rem;
-    cursor: pointer;
-    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-}
-
-.spinly-duel-force svg {
-    flex-shrink: 0;
-    color: var(--tour-live);
-}
-
-.spinly-duel-force:hover:not(:disabled) {
-    background: var(--color-hover);
-    border-color: var(--color-border-light);
-    color: var(--font-color);
-}
-
-.spinly-duel-force:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-}
-
-/* Campeón: la tarjeta del resultado de la ruleta con un estallido de destellos */
-.spinly-champion-card {
+/* ---------------------------------------------------------------------------------------------
+   Champion celebration: confetti, a glowing trophy, the name, the podium and roomy actions
+   --------------------------------------------------------------------------------------------- */
+.tour-champion {
     position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    width: min(32rem, calc(100vw - 2rem));
+    padding: 3rem 2.25rem 2.25rem;
     overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--wheel-light-color) 45%, var(--color-border));
+    border-radius: var(--spinly-card-radius);
+    background: var(--bg-card-color);
+    box-shadow: 0 40px 120px -30px rgba(0, 0, 0, 0.7), 0 0 0 1px color-mix(in srgb, var(--wheel-light-color) 20%, transparent);
+    text-align: center;
+    animation: tour-pop 0.5s cubic-bezier(0.22, 1.4, 0.36, 1);
 }
 
-.spinly-champion-burst {
+@keyframes tour-pop {
+    from { opacity: 0; transform: scale(0.85) translateY(1rem); }
+}
+
+/* The champion's color glowing behind the trophy */
+.tour-champion-glow {
     position: absolute;
-    top: 38%;
+    top: -30%;
     left: 50%;
+    width: 130%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--side) 32%, transparent), transparent);
+    transform: translateX(-50%);
     pointer-events: none;
 }
 
-.spinly-champion-burst i {
+.tour-confetti {
     position: absolute;
-    width: 0.4rem;
-    height: 1.4rem;
-    border-radius: 1rem;
-    background: var(--tour-live, var(--wheel-light-color));
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.tour-confetti i {
+    position: absolute;
+    top: -12px;
+    width: 8px;
+    height: 13px;
+    border-radius: 2px;
     opacity: 0;
-    transform: rotate(calc(var(--i) * 30deg)) translateY(-1rem);
-    animation: spinly-tour-burst 1.4s cubic-bezier(0.22, 1, 0.36, 1) calc(var(--i) * 25ms) 2;
+    animation: tour-confetti 2.8s cubic-bezier(0.25, 0.6, 0.4, 1) 2;
 }
 
-.spinly-champion-burst i:nth-child(3n) { background: var(--item-pink); }
-.spinly-champion-burst i:nth-child(3n + 1) { background: var(--item-sky); }
+.tour-confetti i:nth-child(3n) { width: 10px; height: 6px; }
+.tour-confetti i:nth-child(4n) { border-radius: 50%; width: 8px; height: 8px; }
 
-@keyframes spinly-tour-burst {
-    0% { opacity: 0; transform: rotate(calc(var(--i) * 30deg)) translateY(-1rem) scaleY(0.4); }
-    25% { opacity: 1; }
-    100% { opacity: 0; transform: rotate(calc(var(--i) * 30deg)) translateY(-9rem) scaleY(1); }
+@keyframes tour-confetti {
+    0% { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg); }
+    85% { opacity: 1; }
+    100% { opacity: 0; transform: translate3d(var(--drift), 34rem, 0) rotate(540deg); }
 }
 
-.spinly-champion-of {
+.tour-champion-trophy {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 6rem;
+    height: 6rem;
+    margin-bottom: 0.4rem;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #fde68a, #f59e0b 55%, #d97706);
+    box-shadow: 0 0 0 8px color-mix(in srgb, #f59e0b 18%, transparent), 0 22px 50px -12px #f59e0b;
+    color: #3b2504;
+    animation: tour-float 2.8s ease-in-out infinite;
+}
+
+.tour-champion-badge {
+    position: relative;
+    padding: 0.3rem 0.9rem;
+    border-radius: var(--spinly-badge-radius);
+    background: color-mix(in srgb, #f59e0b 18%, transparent);
+    color: var(--font-color);
+    font-size: 0.75rem;
+    font-weight: 900;
+    letter-spacing: 0.25em;
+}
+
+.tour-champion-name {
+    position: relative;
+    max-width: 100%;
+    overflow: hidden;
+    font-size: clamp(2rem, 6vw, 3rem);
+    font-weight: 900;
+    line-height: 1.1;
+    overflow-wrap: anywhere;
+}
+
+.tour-champion-of {
+    position: relative;
     color: var(--font-color-muted);
-    font-size: 0.85rem;
+    font-size: 0.92rem;
 }
 
-.spinly-champion-actions {
+.tour-champion-podium {
+    position: relative;
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 0.6rem;
-    margin-top: 0.4rem;
+    gap: 0.5rem;
+    margin: 0.4rem 0 0;
+    padding: 0;
+    list-style: none;
 }
 
-.spinly-champion-actions button {
+.tour-champion-podium li {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.75rem 1.2rem;
-    border-radius: 1.2rem;
+    padding: 0.4rem 0.9rem 0.4rem 0.4rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--spinly-card-radius);
+    background: var(--bg-transparence);
+    font-size: 0.86rem;
+    font-weight: 700;
 }
 
-/* Columna estrecha y portátiles: el duelo baja bajo el cuadro */
-@media (max-width: 1180px) {
-    .spinly-tour-body {
-        grid-template-columns: minmax(0, 1fr);
+.tour-champion-podium b {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 50%;
+    background: var(--color-border-light);
+    font-size: 0.75rem;
+}
+
+.tour-champion-actions {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.85rem;
+    width: 100%;
+    margin-top: 1.4rem;
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--color-border);
+}
+
+.tour-champion-btn {
+    padding: 0.85rem 1.4rem;
+    font-size: 0.85rem;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Responsive
+   --------------------------------------------------------------------------------------------- */
+
+/* Laptops: tighter arena and bracket */
+@media (max-width: 1280px) {
+    .tour-arena-stage {
+        gap: 0.9rem;
     }
 
-    .spinly-tour-duel {
-        order: -1;
+    .tour-arena-center {
+        width: clamp(16rem, 30vw, 22rem);
     }
 
-    .spinly-duel-container.wheel-container {
-        --wheel-radius: max(6rem, min(34cqi, 11rem));
+    .tour-bracket {
+        --gap: 1.5rem;
+    }
+
+    .tour-bracket-round {
+        min-width: 8rem;
+    }
+
+    .tour-bar-actions .tour-tool span {
+        display: none;
+    }
+
+    .tour-bar-actions .tour-tool {
+        width: 2.3rem;
+        padding: 0;
+    }
+
+    .tour-bar-actions .tour-tool--on {
+        width: auto;
+        padding: 0 0.8rem;
+    }
+
+    .tour-bar-actions .tour-tool--on span {
+        display: inline;
     }
 }
 
+/* Narrow: both rivals side by side on top, the wheel below them */
 @media (max-width: 1000px) {
-    .spinly-tour-setup {
+    .tour-setup-grid {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .spinly-tour-stats {
+    .tour-arena-stage {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-areas:
+            "a b"
+            "center center";
+    }
+
+    .tour-arena-center {
+        justify-self: center;
+        width: min(100%, 26rem);
+    }
+
+    .tour-fighter {
+        padding: 1.1rem 0.75rem 1rem;
+    }
+
+    .tour-fighter-score {
+        font-size: 3rem;
+    }
+
+    .tour-duel-container.wheel-container {
+        --wheel-radius: max(6.5rem, min(44cqi, 11.5rem));
     }
 }
 
@@ -1620,79 +2326,135 @@ button.spinly-tour-start.spinly-btn-primary:disabled {
         overflow: visible;
     }
 
-    .spinly-tour-content {
+    .tour-content {
         overflow: visible;
-        padding: 1rem 1rem 2rem;
+        padding: 0.9rem 0.85rem 2rem;
     }
 
-    .spinly-tour-top,
-    .spinly-tour-controls {
-        width: 100%;
-    }
 
-    .spinly-tour-tabs.spinly-segmented {
-        flex: 1 1 100%;
-    }
 
-    .spinly-tour-tabs .spinly-segmented-btn {
-        padding: 0.5rem 0.4rem;
-        font-size: 0.72rem;
-    }
 
-    .spinly-tour-tabs .spinly-segmented-btn svg {
-        display: none;
-    }
 
-    .spinly-tour-tool {
-        flex: 1;
-    }
 
-    .spinly-duel-container.wheel-container {
-        --wheel-radius: max(6rem, min(38cqi, 10.5rem));
-    }
 
-    .spinly-tour-field-row,
-    .spinly-tour-choices,
-    .spinly-tour-styles,
-    .spinly-tour-preview {
+
+
+    .tour-roster,
+    .tour-styles,
+    .tour-steppers,
+    .tour-questions,
+    .tour-switches,
+    .tour-preview {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .spinly-tour-entries {
+    .tour-roster {
         max-height: none;
     }
 
-    .spinly-bracket {
-        --gap: 1.5rem;
+
+
+
+
+    .tour-champion {
+        padding: 2.5rem 1.25rem 1.5rem;
     }
 
-    .spinly-bracket-round {
-        width: 10.5rem;
+    .tour-bar-progress {
+        flex: 1 1 100%;
+        max-width: none;
     }
 
-    .spinly-duel-referee {
-        flex-wrap: wrap;
-        justify-content: center;
-    }
-
-    .spinly-duel-referee-label {
-        order: -1;
+    .tour-bar-actions {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         width: 100%;
-        text-align: center;
+    }
+
+    .tour-bar-actions .tour-tool,
+    .tour-bar-actions .tour-tool--on {
+        width: auto;
+        padding: 0 0.3rem;
+        border-color: var(--color-border);
+    }
+
+    .tour-bar-actions .tour-tool span {
+        display: inline;
+        font-size: 0.72rem;
+    }
+
+    .tour-arena {
+        padding: 0.9rem 0.75rem 1rem;
+    }
+
+    .tour-arena-stage {
+        gap: 0.6rem;
+    }
+
+    .tour-fighter-name {
+        font-size: 1.1rem;
+    }
+
+    .tour-fighter-score {
+        font-size: 2.5rem;
+    }
+
+    .tour-duel-container.wheel-container {
+        --wheel-radius: max(6rem, min(42cqi, 10.5rem));
+    }
+
+    .tour-board {
+        padding: 0.85rem 0.75rem;
+    }
+
+    .tour-tabs.spinly-segmented {
+        flex: 1 1 100%;
+    }
+
+    .tour-tabs .spinly-segmented-btn {
+        padding: 0.5rem 0.35rem;
+        font-size: 0.74rem;
+    }
+
+    .tour-tabs .spinly-segmented-btn svg {
+        display: none;
+    }
+
+    .tour-stats div {
+        align-items: flex-start;
+    }
+
+    .tour-bracket {
+        --gap: 1.25rem;
+        justify-content: flex-start;
+    }
+
+    .tour-history-round {
+        min-width: 0;
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .spinly-tour-bg-dots,
-    .spinly-tour-bg-glow,
-    .spinly-tour-chip--live i,
-    .spinly-match--live,
-    .spinly-champion--crowned .spinly-champion-icon,
-    .spinly-champion-burst i,
-    .spinly-tour-setup,
-    .spinly-tour-rules,
-    .spinly-tour-live,
-    .spinly-duel-status {
+    .tour-bg-beam,
+    .tour-bg-rings i,
+    .tour-bg-grid,
+    .tour-bg-floor-glow,
+    .tour-bg-sparks i,
+    .tour-confetti i,
+    .tour-champion,
+    .tour-champion-trophy,
+    .tour-segment--live,
+    .tour-match-state i,
+    .tour-crown--crowned .tour-crown-icon,
+    .tour-podium-trophy,
+    .tour-setup,
+    .tour-live,
+    .tour-arena-status {
         animation: none;
+    }
+
+    .tour-fighter,
+    .tour-fighter-pips i {
+        transition: none;
     }
 }

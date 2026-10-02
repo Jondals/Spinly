@@ -1,10 +1,13 @@
+/**
+ * useWheelColors: publishes the active theme's pointer and light colors as CSS variables.
+ */
 import { useEffect } from 'react';
 import type { WheelTheme } from '../types/theme-types';
 
 /**
- * Colores de flecha y luces del tema activo como variables CSS en <html>: así también los
- * heredan los diálogos en portal (editor de imagen). Sin color propio se quitan y
- * mandan los valores por defecto (index.css).
+ * Pointer and light colors of the active theme as CSS variables on <html>, so dialogs rendered in a
+ * portal (the image editor) inherit them too. Without a color of its own they are removed and the
+ * defaults (index.css) apply.
  */
 export function useWheelColors(theme: WheelTheme | null | undefined) {
     const pointer = theme?.pointerColor;

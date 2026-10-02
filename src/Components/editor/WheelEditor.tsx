@@ -1,7 +1,11 @@
+/**
+ * WheelEditor: the panel to edit the wheel's options (names, colors, images, order and limit).
+ */
 import React, { lazy, Suspense, useState, useRef } from 'react';
 import '../../css/Options.css';
 import Icon from '../common/Icon';
 import { useSortable } from '../../hooks/useSortable';
+import { selectOnFocus } from '../../hooks/selectOnFocus';
 import PanelHeader from '../common/PanelHeader';
 import { addOption, removeOption, updateOption, reorderOptions, DEFAULT_WHEEL_LIMIT, MAX_OPTION_LENGTH, MAX_WHEEL_OPTIONS, MIN_OPTIONS, type WheelOption } from '../../scripts/option-wheel';
 import { DEFAULT_IMAGE_FIT, DEFAULT_SEGMENT_COLOR, ensureSegments, type ImageFit, type WheelSegmentStyle, type WheelTheme } from '../../types/theme-types';
@@ -14,9 +18,9 @@ import { dictMessage, type LocalMessage } from '../../scripts/strings';
 const ColorPicker = lazy(() => import('./ColorPicker'));
 const ImageAdjustDialog = lazy(() => import('./ImageAdjustDialog'));
 
-/** base64 ≈ 4/3 del binario: por encima de esto no cabe con holgura en localStorage (~5MB). */
+/** base64 ≈ 4/3 of the binary: above this it does not fit comfortably in localStorage (~5 MB). */
 const MAX_DATA_URL_LENGTH = 2800000;
-// Lado mayor de una textura: de sobra para un sector de la ruleta incluso en pantallas densas.
+// Longest side of a texture: more than enough for a wheel sector, even on dense screens.
 const TEXTURE_MAX_SIDE = 1200;
 
 type ImageAdjustState = { optionId: string; index: number; image: string; fit: ImageFit; isNew: boolean };
@@ -30,24 +34,26 @@ interface WheelEditorProps {
     setWheelLimit: React.Dispatch<React.SetStateAction<number>>;
 }
 
+/** The option list with its color, image, rename, reorder and remove controls, plus the option limit. */
 function WheelEditor({ options, setOptions, activeTheme, setActiveTheme, wheelLimit, setWheelLimit }: WheelEditorProps) {
     const { t, tm } = useTranslation();
-    // LocalMessage y no string: el aviso se re-traduce si cambia el idioma mientras está visible.
+    // LocalMessage rather than string: the warning is translated again if the language changes while it is visible.
     const [imageWarning, setImageWarning] = useState<LocalMessage | null>(null);
     const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
     const [isEditingLimit, setIsEditingLimit] = useState<boolean>(false);
     const [limitDraft, setLimitDraft] = useState<string>('');
-    // Hasta la primera tecla, lo que se escribe sustituye al límite en vez de añadirse detrás.
+    // Until the first key press, typing replaces the limit instead of being appended to it.
     const limitFresh = useRef(true);
     const lim = Number.isFinite(wheelLimit) ? Math.min(Math.max(wheelLimit, MIN_OPTIONS), MAX_WHEEL_OPTIONS) : DEFAULT_WHEEL_LIMIT;
     const reachedLimit = options.length >= lim;
     const atMinimum = options.length <= MIN_OPTIONS;
     const segments = ensureSegments(activeTheme?.segments ?? [], Math.max(options.length, 1));
 
+    /** Applies a new option limit within [MIN_OPTIONS, MAX_WHEEL_OPTIONS]. */
     const handleLimit = (value: number) => {
         if (!Number.isFinite(value)) return;
         const next = Math.min(Math.max(Math.round(value), MIN_OPTIONS), MAX_WHEEL_OPTIONS);
-        // Bajar el límite nunca borra opciones: se bloquea por debajo de las que ya hay.
+        // Lowering the limit never deletes options: it is blocked below the current count.
         if (next < options.length) {
             setImageWarning(dictMessage('options', 'limitBlocked', { next, count: options.length }));
             return;
@@ -56,13 +62,14 @@ function WheelEditor({ options, setOptions, activeTheme, setActiveTheme, wheelLi
         setWheelLimit(next);
     };
 
+    /** Turns the limit badge into an input. */
     const startLimitEdit = (): void => {
         limitFresh.current = true;
         setLimitDraft(String(lim));
         setIsEditingLimit(true);
     };
 
-    // Sin selección resaltada: el cursor de texto va al final y la primera cifra reemplaza el valor.
+    /** Keeps only digits. With no highlighted selection, the caret goes to the end and the first digit replaces the value. */
     const handleLimitDraft = (rawValue: string): void => {
         const digits = rawValue.replace(/\D/g, '');
         const typedAfter = limitFresh.current && digits.length > limitDraft.length && digits.startsWith(limitDraft);
@@ -70,6 +77,7 @@ function WheelEditor({ options, setOptions, activeTheme, setActiveTheme, wheelLi
         setLimitDraft((typedAfter ? digits.slice(limitDraft.length) : digits).slice(0, 2));
     };
 
+    /** Saves the typed limit (or discards it if empty) and leaves edit mode. */
     const commitLimit = (rawValue: string): void => {
         if (rawValue.trim() === '' || !Number.isFinite(Number(rawValue))) {
             setIsEditingLimit(false);
@@ -79,21 +87,25 @@ function WheelEditor({ options, setOptions, activeTheme, setActiveTheme, wheelLi
         setIsEditingLimit(false);
     };
 
+    /** Sets a sector's color. */
     const handleColorChange = (index: number, color: string) => {
         syncSeg(index, { color });
     };
 
     const [colorPicker, setColorPicker] = useState<{ index: number; anchorEl: HTMLElement } | null>(null);
+    /** Opens the color picker for a sector (or closes it if it is already open for it). */
     const openColorPicker = (index: number, anchorEl: HTMLElement) => {
         setColorPicker((prev) => (prev && prev.index === index ? null : { index, anchorEl }));
     };
 
     const [adjusting, setAdjusting] = useState<ImageAdjustState | null>(null);
 
+    /** Opens the hidden file input of an option. */
     const openFilePicker = (id: string) => {
         fileInputs.current[id]?.click();
     };
 
+    /** The image button: picks a file if there is no image yet, else opens the fit editor. */
     const handleImageButton = (optionId: string, index: number) => {
         const image = segments[index]?.backgroundImage;
         if (!image) {
@@ -103,12 +115,14 @@ function WheelEditor({ options, setOptions, activeTheme, setActiveTheme, wheelLi
         setAdjusting({ optionId, index, image, fit: segments[index]?.imageFit ?? DEFAULT_IMAGE_FIT, isNew: false });
     };
 
+    /** Saves the image and its fit from the fit editor. */
     const applyImageFit = (fit: ImageFit) => {
         if (!adjusting) return;
         syncSeg(adjusting.index, { backgroundImage: adjusting.image, imageFit: fit });
         setAdjusting(null);
     };
 
+    /** Closes the fit editor and picks another file. */
     const replaceImage = () => {
         if (!adjusting) return;
         const { optionId } = adjusting;
@@ -116,10 +130,12 @@ function WheelEditor({ options, setOptions, activeTheme, setActiveTheme, wheelLi
         openFilePicker(optionId);
     };
 
+    /** Renames an option. */
     const renameOpt = (id: string, name: string) => {
         setOptions((prev) => updateOption(prev, id, name));
     };
 
+    /** Validates, shrinks and reads an uploaded image, then opens the fit editor with it. */
     const handleImageFile = (optionId: string, index: number, file: File | undefined) => {
         if (!file) return;
         if (!isAllowedImageMime(file.type)) {
@@ -145,7 +161,7 @@ function WheelEditor({ options, setOptions, activeTheme, setActiveTheme, wheelLi
         });
     };
 
-    // El color se calcula fuera de los updaters: deben ser puros porque StrictMode los ejecuta dos veces.
+    /** Adds an option with a random color. The color is computed outside the updaters: they must be pure because StrictMode runs them twice. */
     const handleAdd = () => {
         const next = addOption(options, lim, t('options', 'defaultName'));
         if (next.length === options.length) return;
@@ -160,7 +176,7 @@ function WheelEditor({ options, setOptions, activeTheme, setActiveTheme, wheelLi
         });
     };
 
-    // En el mínimo no se toca nada: quitar solo el sector desajustaría colores y opciones.
+    /** Removes an option and its sector. At the minimum nothing changes: removing only the sector would misalign colors and options. */
     const handleRemove = (id: string, index: number) => {
         const curLen = options.length;
         if (curLen <= MIN_OPTIONS) return;
@@ -173,7 +189,7 @@ function WheelEditor({ options, setOptions, activeTheme, setActiveTheme, wheelLi
         });
     };
 
-    // Cada sector viaja con su opción: se reordenan ambos a la vez.
+    /** Moves an option; each sector travels with its option, so both are reordered together. */
     const moveOption = (from: number, to: number) => {
         setOptions((prev) => reorderOptions(prev, from, to));
         setActiveTheme((prev) => {
@@ -186,6 +202,7 @@ function WheelEditor({ options, setOptions, activeTheme, setActiveTheme, wheelLi
     };
     const sortable = useSortable(moveOption);
 
+    /** Patches the style of one sector in the active theme. */
     const syncSeg = (index: number, patch: Partial<WheelSegmentStyle>) => {
         setActiveTheme((prev) => {
             if (!prev) return prev;
@@ -195,6 +212,7 @@ function WheelEditor({ options, setOptions, activeTheme, setActiveTheme, wheelLi
         });
     };
 
+    /** Removes a sector's image, keeping its color. */
     const removeSegImage = (index: number) => {
         setActiveTheme((prev) => {
             if (!prev) return prev;
@@ -274,7 +292,7 @@ function WheelEditor({ options, setOptions, activeTheme, setActiveTheme, wheelLi
                                 onClick={(event) => openColorPicker(index, event.currentTarget)}
                                 aria-label={t('options', 'colorOf', { name: option.name })}
                             />
-                            <input value={option.name} maxLength={MAX_OPTION_LENGTH} onChange={(event) => renameOpt(option.id, event.target.value)} aria-label={t('options', 'optName', { n: index + 1 })} />
+                            <input value={option.name} maxLength={MAX_OPTION_LENGTH} {...selectOnFocus} onChange={(event) => renameOpt(option.id, event.target.value)} aria-label={t('options', 'optName', { n: index + 1 })} />
                             <button type="button" className={`option-img-btn${hasImg ? ' option-img-btn--active' : ''}`} onClick={() => handleImageButton(option.id, index)} title={hasImg ? t('options', 'adjustImg') : t('options', 'addImg')} aria-label={t('options', 'imgAria', { n: index + 1 })}>
                                 <Icon name="image" />
                             </button>

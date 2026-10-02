@@ -1,3 +1,7 @@
+/**
+ * WheelManager: the section navigation (wheel editor, presets, themes, tournament), plus the language,
+ * the audio controls on mobile and the author credit. A fixed column on desktop, a drawer on mobile.
+ */
 import { useEffect, useRef, useState } from 'react';
 import Icon, { type IconName } from '../common/Icon';
 import LanguageSwitch from '../i18n/LanguageSwitch';
@@ -17,11 +21,12 @@ const SECTIONS: ReadonlyArray<{ id: WheelSectionId; icon: IconName; label: 'edit
     { id: 'tournament', icon: 'trophy', label: 'tournament' },
 ];
 
-// Preferencia del dispositivo, como el idioma: no viaja con la cuenta ni se borra al cerrar sesión.
+// A device preference, like the language: it does not travel with the account and survives signing out.
 const CREDIT_HIDDEN_KEY = 'spinly-credit-hidden';
-// Coincide con la transición de .wheelmanager-credit--closing (WheelManager.css).
+// Matches the .wheelmanager-credit--closing transition (WheelManager.css).
 const CREDIT_CLOSE_MS = 260;
 
+/** Whether the author credit was dismissed on this device. */
 const readCreditHidden = (): boolean => {
     try {
         return localStorage.getItem(CREDIT_HIDDEN_KEY) === '1';
@@ -38,10 +43,10 @@ interface WheelManagerProps {
     onClose: () => void;
 }
 
-/** Navegación entre secciones. En escritorio es una columna fija; en móvil, un drawer. */
+/** Navigation between sections. A fixed column on desktop; a drawer on mobile. */
 function WheelManager({ activeSection, onSectionChange, isOpen, isAnimated, onClose }: WheelManagerProps) {
     const { t } = useTranslation();
-    // El toque fuera lo gestiona el backdrop; aquí solo Escape.
+    // Clicks outside are handled by the backdrop; this only listens to Escape.
     useDismiss(isOpen, onClose);
     const isMobile = useMediaQuery(MOBILE_QUERY);
     const [creditHidden, setCreditHidden] = useState(readCreditHidden);
@@ -50,7 +55,7 @@ function WheelManager({ activeSection, onSectionChange, isOpen, isAnimated, onCl
 
     useEffect(() => () => window.clearTimeout(closeTimer.current), []);
 
-    // Primero la animación de salida; después se desmonta y se recuerda.
+    /** Hides the credit: first the exit animation, then it unmounts and the choice is remembered. */
     const hideCredit = () => {
         setCreditClosing(true);
         closeTimer.current = window.setTimeout(() => {
@@ -58,7 +63,7 @@ function WheelManager({ activeSection, onSectionChange, isOpen, isAnimated, onCl
             try {
                 localStorage.setItem(CREDIT_HIDDEN_KEY, '1');
             } catch {
-                // Sin acceso a storage: se oculta solo hasta recargar.
+                // No storage access: it stays hidden only until a reload.
             }
         }, CREDIT_CLOSE_MS);
     };
@@ -97,7 +102,7 @@ function WheelManager({ activeSection, onSectionChange, isOpen, isAnimated, onCl
                         <p className="wheelmanager-lang-title">{t('header', 'language')}</p>
                         <LanguageSwitch variant="choice" />
                     </div>
-                    {/* En escritorio la música y los sonidos están en la esquina de la ruleta */}
+                    {/* On desktop, music and sounds live in the wheel's corner */}
                     {isMobile && (
                         <div className="wheelmanager-audio">
                             <p className="wheelmanager-lang-title">{t('music', 'audio')}</p>

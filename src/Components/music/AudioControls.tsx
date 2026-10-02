@@ -1,3 +1,7 @@
+/**
+ * AudioControls: the entry point to music and sound effects (a corner dock on desktop, a section of
+ * the menu on mobile).
+ */
 import { lazy, Suspense, useEffect, useId, useRef, useState } from 'react';
 import Icon from '../common/Icon';
 import { useTranslation } from '../i18n/LanguageProvider';
@@ -6,25 +10,25 @@ import { useMusic } from './MusicProvider';
 import EqualizerBars from './EqualizerBars';
 import '../../css/Music.css';
 
-// La playlist solo hace falta al abrirla: fuera del JS inicial.
+// The playlist is only needed once it is opened: kept out of the initial JS.
 const MusicPanel = lazy(() => import('./MusicPanel'));
 
-// Coincide con la animación de salida de .spinly-audio-popover--closing (Music.css).
+// Matches the exit animation of .spinly-audio-popover--closing (Music.css).
 const CLOSE_MS = 180;
 
 interface AudioControlsProps {
-    /** dock: esquina de la ruleta en escritorio, con el botón de música y la playlist hacia arriba.
-        drawer: sección del menú en móvil, una fila que despliega el reproductor dentro del menú. */
+    /** dock: corner of the wheel on desktop, with the music button and the playlist opening upwards.
+        drawer: a section of the mobile menu, a row that unfolds the player inside the menu. */
     variant: 'dock' | 'drawer';
 }
 
-/** Acceso a la música: el reproductor con la playlist y los volúmenes de música y efectos. */
+/** Access to music: the player with the playlist and the music and effects volumes. */
 function AudioControls({ variant }: AudioControlsProps) {
     const { t } = useTranslation();
     const music = useMusic();
     const [open, setOpen] = useState(false);
     const [closing, setClosing] = useState(false);
-    // En el menú el reproductor se queda montado tras abrirlo una vez: así también se anima al plegar.
+    // In the menu the player stays mounted after it is opened once, so folding it is animated too.
     const [mounted, setMounted] = useState(false);
     const rootRef = useRef<HTMLDivElement>(null);
     const closeTimer = useRef<number | undefined>(undefined);
@@ -32,6 +36,7 @@ function AudioControls({ variant }: AudioControlsProps) {
     const isDock = variant === 'dock';
     const expanded = open && !closing;
 
+    /** Closes the player (in the dock, after its exit animation). */
     const close = () => {
         if (!isDock) {
             setOpen(false);
@@ -45,6 +50,7 @@ function AudioControls({ variant }: AudioControlsProps) {
         }, CLOSE_MS);
     };
 
+    /** Opens or closes the player. */
     const togglePanel = () => {
         if (expanded) {
             close();
@@ -84,8 +90,9 @@ function AudioControls({ variant }: AudioControlsProps) {
     }
 
     const empty = music.playlist.length === 0;
-    // Con la playlist vacía no hay nada que poner: el botón de música lleva a subir canciones.
+    // With an empty playlist there is nothing to play: the music button leads to uploading songs.
     const musicLabel = empty ? t('music', 'addMusic') : music.playing ? t('music', 'pauseMusic') : t('music', 'playMusic');
+    /** Plays or pauses, or opens the player to add songs when the playlist is empty. */
     const onMusic = () => {
         if (!empty) music.toggle();
         else if (!expanded) togglePanel();

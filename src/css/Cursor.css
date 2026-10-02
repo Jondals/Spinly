@@ -1,7 +1,7 @@
-/* Cursor propio (CustomCursor.tsx), solo con ratón. html.spinly-cursor llega con el primer
-   movimiento y oculta el cursor del sistema en la página y en lo clicable (!important: muchas
-   reglas fijan cursor: pointer). Lo que tiene un cursor con significado propio conserva el suyo:
-   texto, arrastrar (.drag, cabecera del selector), cuentagotas, deshabilitado. */
+/* Custom cursor (CustomCursor.tsx), mouse only. html.spinly-cursor arrives with the first movement and
+   hides the system cursor on the page and on clickable things (!important: many rules set
+   cursor: pointer). Anything with a meaningful cursor of its own keeps it: text, drag (.drag, the
+   picker's header), eyedropper, disabled. */
 html.spinly-cursor,
 html.spinly-cursor :is(a[href], button, [role="button"], [role="tab"], label, summary, select, input[type="checkbox"], input[type="radio"], input[type="range"], input[type="color"]):not(:disabled, [aria-disabled="true"], .drag, .cpicker-eyedropper--active) {
     cursor: none !important;
@@ -11,9 +11,9 @@ html.spinly-cursor :is(input:not([type="checkbox"], [type="radio"], [type="range
     cursor: text;
 }
 
-/* Como los cursores del sistema: trazo blanco con un contorno oscuro fino, visible sobre
-   cualquier fondo. Sin modo diferencia: sobre grises medios invertía el aro a casi el mismo tono
-   del fondo y se veía cortado. */
+/* Like system cursors: a white stroke with a thin dark outline, visible over any background. No
+   difference blend mode: over mid greys it inverted the ring to almost the background's tone and it
+   looked broken. */
 .spinly-cursor-layer {
     position: fixed;
     top: 0;
@@ -28,9 +28,9 @@ html.spinly-cursor .spinly-cursor-layer:not(.spinly-cursor-layer--native, .spinl
     opacity: 1;
 }
 
-/* JS mueve cada pieza con transform; el hijo centrado cambia de tamaño con transiciones. Sin
-   will-change: como capa aparte el navegador ampliaría un mapa de bits y el aro se vería con cortes;
-   así se redibuja nítido en cada frame (son piezas diminutas). */
+/* JS moves each piece with transform; the centred child changes size with transitions. No
+   will-change: as a separate layer the browser would scale a bitmap and the ring would look jagged;
+   this way it is redrawn crisp every frame (they are tiny pieces). */
 .spinly-cursor-dot,
 .spinly-cursor-ring,
 .spinly-cursor-ripple {
@@ -55,8 +55,8 @@ html.spinly-cursor .spinly-cursor-layer:not(.spinly-cursor-layer--native, .spinl
     transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* El aro cambia de tamaño de verdad (no con scale) y con borde de píxeles enteros: escalado o con
-   medio píxel, el modo diferencia dejaba rayas blancas en el trazo. */
+/* The ring really changes size (not with scale) and has a whole-pixel border: scaled or on half pixels,
+   the difference mode left white streaks in the stroke. */
 .spinly-cursor-ring span {
     --ring: 34px;
     width: var(--ring);
@@ -83,7 +83,7 @@ html.spinly-cursor .spinly-cursor-layer:not(.spinly-cursor-layer--native, .spinl
     opacity: 0;
 }
 
-/* Sobre lo clicable: el anillo crece y se rellena, el punto se encoge */
+/* Over clickable things: the ring grows and fills, the dot shrinks */
 .spinly-cursor-layer--hover .spinly-cursor-ring span {
     --ring: 48px;
     border-color: #ffffff;
@@ -94,7 +94,7 @@ html.spinly-cursor .spinly-cursor-layer:not(.spinly-cursor-layer--native, .spinl
     transform: scale(0.6);
 }
 
-/* Al pulsar: el anillo se cierra sobre el punto */
+/* On press: the ring closes over the dot */
 .spinly-cursor-layer--down .spinly-cursor-ring span {
     --ring: 26px;
 }
@@ -107,7 +107,7 @@ html.spinly-cursor .spinly-cursor-layer:not(.spinly-cursor-layer--native, .spinl
     transform: scale(1.3);
 }
 
-/* Modo claro: trazo oscuro con contorno claro, que destaca sobre los paneles blancos */
+/* Light mode: a dark stroke with a light outline, which stands out over white panels */
 :root[data-theme="light"] .spinly-cursor-dot span {
     background: #0f172a;
     box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.85);

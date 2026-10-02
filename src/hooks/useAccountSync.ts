@@ -1,3 +1,6 @@
+/**
+ * useAccountSync: keeps the signed-in account's data in sync with its private JSON file in Supabase Storage.
+ */
 import { useEffect, useRef } from 'react';
 import type { AccountSession } from '../scripts/profile';
 import {
@@ -15,50 +18,52 @@ import {
 } from '../scripts/account-data';
 
 const SAVE_DELAY_MS = 1500;
-// Datos de otro dispositivo: se aplican (App se vuelve a montar) una sola vez por versión, aunque
-// la marca local no se pudiera guardar (storage lleno), para no entrar en un bucle.
+// Data from another device is applied (App is remounted) only once per version, even if the local marker
+// could not be saved (full storage), to avoid a loop.
 const RELOAD_GUARD_KEY = 'spinly-sync-reloaded';
 
-// Subida pendiente, a nivel de módulo: el cierre de sesión (ProfileMenu) la vacía antes de salir.
+// Pending upload, at module level: signing out (ProfileMenu) flushes it before leaving.
 let pendingSave: (() => Promise<boolean>) | null = null;
 
-/** Sube ya lo que falte. false si no se pudo: cerrar sesión entonces perdería esos cambios. */
+/** Uploads whatever is pending right now. false if it failed: signing out would then lose those changes. */
 export async function flushAccountSync(): Promise<boolean> {
     const save = pendingSave;
     pendingSave = null;
     if (!save) return true;
     const saved = await save();
-    // Si falló, se queda pendiente para el siguiente intento.
+    // If it failed, it stays pending for the next attempt.
     if (!saved && !pendingSave) pendingSave = save;
     return saved;
 }
 
-/** Mismos datos de cuenta, sin contar la versión ni la fecha (el saneado fija el orden de claves).
-    Una cuenta sin música guardada equivale a una playlist vacía. */
+/** Same account data, ignoring version and date (sanitizing fixes the key order).
+    An account without saved music counts as an empty playlist. */
 const sameSnapshot = (remote: AccountData, local: AccountSnapshot): boolean => {
     const { version, updatedAt, ...data } = remote;
+    /** Comparable JSON of a snapshot (missing music = empty playlist). */
     const normalize = (snapshot: AccountSnapshot) => JSON.stringify({ ...snapshot, music: snapshot.music ?? { playlist: [] } });
     return normalize(data) === normalize(local);
 };
 
+/** Remounts App to apply cloud data, at most once per version (guarded in sessionStorage). */
 const applyOnce = (version: number) => {
     try {
         if (sessionStorage.getItem(RELOAD_GUARD_KEY) === String(version)) return;
         sessionStorage.setItem(RELOAD_GUARD_KEY, String(version));
     } catch {
-        // Sin sessionStorage no hay forma de protegerse del bucle: mejor no aplicarlos.
+        // Without sessionStorage there is no protection against a loop: better not to apply them.
         return;
     }
     remountApp();
 };
 
 /**
- * Mantiene la cuenta al día en la nube. Solo cuentas con contraseña: las anónimas no pueden
- * escribir en user-data (política del bucket) ni entrar desde otro dispositivo.
- * - Al empezar la sesión compara con la nube: si allí hay algo más reciente (hecho en otro
- *   dispositivo) lo aplica volviendo a montar App, sin recargar la página; si la cuenta aún no
- *   tenía datos, sube los locales.
- * - Después, cada cambio se sube con un pequeño retardo, y al ocultarse la pestaña al momento.
+ * Keeps the account up to date in the cloud. Password accounts only: anonymous ones cannot write to
+ * user-data (bucket policy) nor sign in from another device.
+ * - When the session starts it compares with the cloud: if there is something newer there (made on
+ *   another device) it applies it by remounting App, without reloading the page; if the account had no
+ *   data yet, it uploads the local data.
+ * - After that, every change is uploaded after a short delay, and immediately when the tab is hidden.
  */
 export function useAccountSync(session: AccountSession | null, snapshot: AccountSnapshot) {
     const uid = session && !session.isAnonymous ? session.userId : null;
@@ -75,8 +80,8 @@ export function useAccountSync(session: AccountSession | null, snapshot: Account
             if (!alive || !remote.ok || isSwitchingAccount()) return;
             const marker = readSyncMarker();
             const synced = marker?.uid === uid;
-            // La nube tiene exactamente lo mismo que este navegador (p. ej. la última subida acabó con la
-            // pestaña ya cerrada y no llegó a anotarse): solo se pone al día la marca, sin aplicar nada.
+            // The cloud has exactly what this browser has (e.g. the last upload finished after the tab was
+            // closed and was never recorded): only the marker is updated, nothing is applied.
             if (synced && remote.data && sameSnapshot(remote.data, readLocalData())) {
                 writeSyncMarker(uid, remote.data.updatedAt);
                 if (alive) readyRef.current = uid;
@@ -86,8 +91,8 @@ export function useAccountSync(session: AccountSession | null, snapshot: Account
                 const saved = await saveAccountData(uid, readLocalData());
                 if (alive && saved.ok) writeSyncMarker(uid, saved.data);
             } else if (!synced || remote.data.updatedAt > marker.updatedAt) {
-                // Otro dispositivo guardó después (o este navegador nunca sincronizó esta cuenta):
-                // manda la nube, conservando lo que este navegador tenga y la nube no.
+                // Another device saved later (or this browser never synced this account): the cloud wins,
+                // keeping whatever this browser has that the cloud does not.
                 const merged = synced ? remote.data : mergeGuestData(remote.data, readLocalData());
                 writeLocalData(merged);
                 const saved = synced ? { ok: true as const, data: remote.data.updatedAt } : await saveAccountData(uid, merged);
@@ -105,9 +110,10 @@ export function useAccountSync(session: AccountSession | null, snapshot: Account
     const { options, activeTheme, activePresetId, wheelLimit, themes, presets, music } = snapshot;
     useEffect(() => {
         if (!uid || readyRef.current !== uid || isSwitchingAccount()) return undefined;
+        /** Uploads the latest snapshot. */
         const save = async () => {
-            // La marca se anota antes de subir: si la pestaña se cierra con la subida en marcha, al
-            // volver no parece que la nube tenga algo más nuevo que aplicar. Si falla, se restaura.
+            // The marker is written before uploading: if the tab closes mid-upload, coming back does not look
+            // like the cloud has something newer to apply. If the upload fails, it is restored.
             const previous = readSyncMarker();
             const updatedAt = Date.now();
             writeSyncMarker(uid, updatedAt);
@@ -120,8 +126,9 @@ export function useAccountSync(session: AccountSession | null, snapshot: Account
         return () => window.clearTimeout(timer);
     }, [uid, options, activeTheme, activePresetId, wheelLimit, themes, presets, music]);
 
-    // Al ocultar la pestaña (cambiar de app, cerrar) no se espera al retardo.
+    // When the tab is hidden (switching apps, closing) the delay is skipped.
     useEffect(() => {
+        /** Uploads pending changes as soon as the tab is hidden. */
         const onHide = () => {
             if (document.visibilityState === 'hidden') void flushAccountSync();
         };

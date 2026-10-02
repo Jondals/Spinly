@@ -1,75 +1,77 @@
-// Motor de música con Web Audio. Cada canción suena en un <audio> enganchado a un grafo propio:
-// una ganancia por canción para los fundidos (entrar, salir y encadenar pistas sin cortes) y un
-// volumen general con limitador. Se carga bajo demanda: solo cuando el usuario enciende la música.
-// También da a music-pulse.ts el reloj de la canción y lo que mide el analizador, y analiza el pulso
-// de cada canción entera.
+/**
+ * Music engine built on Web Audio. Each song plays in an <audio> element wired into its own graph: one
+ * gain per song for fades (in, out, and chaining tracks without cuts) and a master volume with a
+ * limiter. It loads on demand, only when the user turns music on. It also gives music-pulse.ts the
+ * song clock and what the analyser measures, and analyses the beat of every whole song.
+ */
 import { BeatTracker, OnsetMeter, type BeatGrid } from './beat-analysis';
 import { analyzeInWorker } from './beat-client';
 import type { MusicBands, MusicClock } from './music-pulse';
 
 export interface MusicEngine {
-    /** Empieza una canción (URL blob:), con fundido desde lo que sonara. false si no se puede reproducir. */
+    /** Starts a song (blob: URL), crossfading from whatever was playing. false if it cannot be played. */
     playFile(url: string): Promise<boolean>;
     pause(): void;
     resume(): Promise<boolean>;
     setVolume(volume: number): void;
-    /** Energía por bandas de lo que suena ahora (0-1), sin contar el volumen: para las luces y el fondo. */
+    /** Energy per band of what is playing now (0-1), regardless of volume: for the lights and the background. */
     bands(): MusicBands;
-    /** Seguidor del pulso en tiempo real (ver PulseSource.live en music-pulse.ts). */
+    /** Real-time beat tracker (see PulseSource.live in music-pulse.ts). */
     live(analysis: number, at: number): { beat: number; period: number } | null;
-    /** Tiempo de la canción que se oye ahora y el que mide el analizador; null si no suena. */
+    /** Song time being heard now and the one the analyser measures; null when nothing plays. */
     clock(): MusicClock | null;
-    /** Rejilla de pulso de un archivo de audio completo (null si no se puede decodificar o analizar). */
+    /** Beat grid of a whole audio file (null if it cannot be decoded or analysed). */
     analyze(file: Blob): Promise<BeatGrid | null>;
-    /** Se llama cuando la canción actual termina sola (no al pausar ni al cambiar). */
+    /** Called when the current song ends by itself (not when paused or switched). */
     onEnded(listener: () => void): void;
     dispose(): void;
 }
 
 const FADE_IN_S = 0.8;
 const FADE_OUT_S = 0.45;
-// Frecuencia a la que se decodifica para analizar: sobra para el pulso y ocupa poco en memoria.
+// Sample rate used to decode for analysis: plenty for the beat and light on memory.
 const ANALYSIS_RATE = 22050;
 
 interface Session {
     element: HTMLAudioElement;
     gain: GainNode;
     pauseTimer: number;
-    /** Reloj del audio menos tiempo de la canción (s), suavizado; null hasta la primera lectura. */
+    /** Audio clock minus song time (s), smoothed; null until the first reading. */
     offset: number | null;
-    /** Seguidor del pulso en tiempo real de esta canción. */
+    /** Real-time beat tracker of this song. */
     tracker: BeatTracker;
 }
 
+/** Creates the engine (null without Web Audio support). */
 export function createMusicEngine(): MusicEngine | null {
     if (typeof window === 'undefined' || typeof window.AudioContext === 'undefined') return null;
     const ctx = new window.AudioContext();
     const master = ctx.createGain();
-    // Techo suave: canciones masterizadas muy fuerte no saturan al subir el volumen.
+    // Soft ceiling: very loud masters do not clip when the volume goes up.
     const limiter = ctx.createDynamicsCompressor();
     limiter.threshold.value = -6;
     limiter.ratio.value = 8;
     limiter.attack.value = 0.003;
     limiter.release.value = 0.25;
     master.connect(limiter).connect(ctx.destination);
-    // Las canciones pasan por un bus común antes del volumen: el analizador mide la música tal cual,
-    // así las luces laten igual con el volumen bajo.
+    // Songs go through a shared bus before the volume: the analyser measures the music as it is, so the
+    // lights pulse the same at low volume.
     const bus = ctx.createGain();
     bus.connect(master);
     const analyser = ctx.createAnalyser();
-    // 2048: casillas de ~23 Hz, finas para seguir la altura de la melodía y no solo los golpes.
+    // 2048: ~23 Hz bins, fine enough to follow the melody's pitch and not just the hits.
     analyser.fftSize = 2048;
     analyser.smoothingTimeConstant = 0.55;
     bus.connect(analyser);
     const spectrum = new Uint8Array(analyser.frequencyBinCount);
-    // Bandas del espectro: graves hasta ~180 Hz (bombo y bajo), medios hasta ~2 kHz (voces,
-    // acordes, melodía) y agudos hasta ~11 kHz (platos, brillo).
+    // Spectrum bands: lows up to ~180 Hz (kick and bass), mids up to ~2 kHz (vocals, chords, melody)
+    // and highs up to ~11 kHz (cymbals, brightness).
     const binHz = ctx.sampleRate / analyser.fftSize;
     const bassEnd = Math.max(2, Math.round(180 / binHz));
     const midEnd = Math.round(2000 / binHz);
     const highEnd = Math.min(analyser.frequencyBinCount - 1, Math.round(11000 / binHz));
-    // Altura de la melodía: centro de masas del espectro entre 200 Hz y 4 kHz en escala logarítmica
-    // (como un teclado), sin el ruido de fondo. 0 = grave, 1 = agudo.
+    // Melody pitch: centre of mass of the spectrum between 200 Hz and 4 kHz on a log scale (like a
+    // keyboard), ignoring the noise floor. 0 = low, 1 = high.
     const pitchFrom = Math.round(200 / binHz);
     const pitchTo = Math.round(4000 / binHz);
     const pitchOctaves = Math.log2(4000 / 200);
@@ -81,6 +83,7 @@ export function createMusicEngine(): MusicEngine | null {
     let endedListener: (() => void) | null = null;
     let disposed = false;
 
+    /** Linear gain ramp from the current value. */
     const ramp = (gain: GainNode, to: number, seconds: number) => {
         const now = ctx.currentTime;
         gain.gain.cancelScheduledValues(now);
@@ -88,6 +91,7 @@ export function createMusicEngine(): MusicEngine | null {
         gain.gain.linearRampToValueAtTime(to, now + seconds);
     };
 
+    /** Resumes the AudioContext if needed; false if the browser does not allow it. */
     const ensureRunning = async (): Promise<boolean> => {
         if (ctx.state !== 'running') {
             try {
@@ -99,7 +103,7 @@ export function createMusicEngine(): MusicEngine | null {
         return ctx.state === 'running';
     };
 
-    /** Fundido de salida y, al acabar, fuera del grafo: la siguiente entra a la vez (fundido cruzado). */
+    /** Fades a song out and then removes it from the graph; the next one fades in meanwhile (crossfade). */
     const retire = (session: Session | null) => {
         if (!session) return;
         window.clearTimeout(session.pauseTimer);
@@ -113,6 +117,7 @@ export function createMusicEngine(): MusicEngine | null {
     };
 
     return {
+        /** Starts a song in its own graph and crossfades from the current one. */
         async playFile(url) {
             if (disposed) return false;
             const element = new Audio();
@@ -139,6 +144,7 @@ export function createMusicEngine(): MusicEngine | null {
             if (current === session) ramp(gain, 1, FADE_IN_S);
             return true;
         },
+        /** Fades out and pauses. */
         pause() {
             const session = current;
             if (!session) return;
@@ -146,6 +152,7 @@ export function createMusicEngine(): MusicEngine | null {
             window.clearTimeout(session.pauseTimer);
             session.pauseTimer = window.setTimeout(() => session.element.pause(), FADE_OUT_S * 1000);
         },
+        /** Resumes the loaded song with a fade in. */
         async resume() {
             const session = current;
             if (!session) return false;
@@ -159,13 +166,16 @@ export function createMusicEngine(): MusicEngine | null {
             ramp(session.gain, 1, FADE_IN_S);
             return true;
         },
+        /** Sets the master volume (0-1). */
         setVolume(volume) {
-            // Curva cuadrática: el deslizador se percibe lineal.
+            // Squared curve: the slider feels linear.
             const level = Math.min(Math.max(volume, 0), 1) ** 2;
             master.gain.setTargetAtTime(level, ctx.currentTime, 0.05);
         },
+        /** Energy of the lows, mids and highs, plus the melody pitch. */
         bands() {
             analyser.getByteFrequencyData(spectrum);
+            /** Average level (0-1) of a range of bins. */
             const average = (from: number, to: number) => {
                 let sum = 0;
                 for (let k = from; k <= to; k++) sum += spectrum[k];
@@ -185,6 +195,7 @@ export function createMusicEngine(): MusicEngine | null {
                 pitch: weight > 0 ? Math.min(1, Math.max(0, weighted / weight)) : 0.5,
             };
         },
+        /** Feeds the real-time tracker and returns its prediction. */
         live(analysis, at) {
             const session = current;
             if (!session) return null;
@@ -193,20 +204,22 @@ export function createMusicEngine(): MusicEngine | null {
             const predicted = session.tracker.beatAt(at);
             return predicted && predicted.beat >= 0 ? predicted : null;
         },
+        /** Song time being heard and being analysed. */
         clock() {
             const session = current;
             if (!session || session.element.paused || ctx.state !== 'running') return null;
-            // El tiempo del <audio> avanza a saltos; el reloj del contexto, muestra a muestra. Se sigue
-            // la diferencia entre los dos, suavizada, y la canción se lee en el reloj del contexto.
+            // The <audio> time advances in jumps; the context clock, sample by sample. The difference between
+            // them is tracked, smoothed, and the song time is read on the context clock.
             const sample = ctx.currentTime - session.element.currentTime;
             if (session.offset === null || Math.abs(sample - session.offset) > 0.08) session.offset = sample;
             else session.offset += (sample - session.offset) * 0.05;
             const playing = ctx.currentTime - session.offset;
-            // Lo que se oye va por detrás de lo que se procesa: la latencia del contexto y de la salida.
+            // What is heard lags behind what is processed: the context and output latency.
             const latency = (ctx.baseLatency || 0) + (ctx.outputLatency || 0);
-            // El analizador ve una ventana de fftSize muestras que acaba ahora: su centro.
+            // The analyser sees a window of fftSize samples ending now: its centre.
             return { audible: playing - latency, analysis: playing - analyser.fftSize / 2 / ctx.sampleRate };
         },
+        /** Decodes a whole file and analyses its beat in a worker. */
         async analyze(file) {
             if (typeof OfflineAudioContext === 'undefined') return null;
             try {
@@ -217,9 +230,11 @@ export function createMusicEngine(): MusicEngine | null {
                 return null;
             }
         },
+        /** Registers the listener for a song ending on its own. */
         onEnded(listener) {
             endedListener = listener;
         },
+        /** Stops everything and closes the AudioContext. */
         dispose() {
             disposed = true;
             retire(current);

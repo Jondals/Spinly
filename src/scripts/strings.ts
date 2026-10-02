@@ -1,6 +1,11 @@
+/**
+ * UI texts in English and Spanish, grouped by section, plus the helpers that pick, fill in and build
+ * bilingual messages. Only fixed UI text lives here; user data is never translated.
+ * (Tournament texts live in tournament-strings.ts so they load with tournament mode.)
+ */
+
 export type SpinlyLang = 'en' | 'es';
 
-// Solo texto fijo de la UI; los datos del usuario nunca se traducen.
 type Entry = { en: string; es: string };
 
 export const STRINGS = {
@@ -356,11 +361,13 @@ export type DictSection = keyof typeof STRINGS;
 export type DictKey<S extends DictSection> = keyof (typeof STRINGS)[S] & string;
 export type TextVars = Record<string, string | number>;
 
+/** Replaces {placeholders} with their values (unknown ones are left as they are). */
 export function fillVars(text: string, vars?: TextVars): string {
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, (match, name: string) => (name in vars ? String(vars[name]) : match));
 }
 
+/** A dictionary text in a language, with its variables filled in (the key itself if it is missing). */
 export function pickText<S extends DictSection>(section: S, key: DictKey<S>, lang: SpinlyLang, vars?: TextVars): string {
     const entry = (STRINGS[section] as unknown as Record<string, Entry>)[key];
     if (!entry) return key;
@@ -368,11 +375,12 @@ export function pickText<S extends DictSection>(section: S, key: DictKey<S>, lan
 }
 
 /**
- * Mensaje en todos los idiomas. Lo que se guarda en estado usa esto y no un string ya resuelto,
- * para re-traducirse si cambia el idioma con el mensaje en pantalla. Se pinta con tm().
+ * A message in every language. State stores this rather than a resolved string, so it is translated again if
+ * the language changes while the message is on screen. It is rendered with tm().
  */
 export type LocalMessage = Readonly<Record<SpinlyLang, string>>;
 
+/** A dictionary text as a bilingual message. */
 export function dictMessage<S extends DictSection>(section: S, key: DictKey<S>, vars?: TextVars): LocalMessage {
     return {
         en: pickText(section, key, 'en', vars),
@@ -380,12 +388,13 @@ export function dictMessage<S extends DictSection>(section: S, key: DictKey<S>, 
     };
 }
 
-/** Como dictMessage, pero con variables que son a su vez mensajes localizados. */
+/** Like dictMessage, but with variables that are themselves localized messages. */
 export function dictMessageWith<S extends DictSection>(
     section: S,
     key: DictKey<S>,
     vars: Record<string, string | number | LocalMessage>,
 ): LocalMessage {
+    /** The variables resolved for one language. */
     const resolve = (lang: SpinlyLang): TextVars => {
         const out: TextVars = {};
         for (const [name, value] of Object.entries(vars)) {
@@ -399,7 +408,7 @@ export function dictMessageWith<S extends DictSection>(
     };
 }
 
-// El contenido semilla es texto de la app, no del usuario: sí se localiza. Clave = id.
+// Seed content is app text, not user text, so it is localized. Key = id.
 type SeedFields = { name?: Entry; description?: Entry; category?: Entry };
 
 const SEED_TEXT: Record<string, SeedFields> = {
@@ -418,6 +427,7 @@ const SEED_TEXT: Record<string, SeedFields> = {
     },
 };
 
+/** Localized text of a seed theme or preset field, if it has one. */
 export function seedText(id: string, field: keyof SeedFields, lang: SpinlyLang): string | undefined {
     const entry = SEED_TEXT[id]?.[field];
     return entry ? entry[lang] : undefined;

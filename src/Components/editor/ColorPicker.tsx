@@ -1,3 +1,7 @@
+/**
+ * ColorPicker: a floating HSV color picker (saturation/value square, hue bar, HEX and RGB fields and an
+ * eyedropper), anchored to the element that opened it and draggable by its header with a mouse.
+ */
 import React, { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import '../../css/ColorPicker.css';
 import { useTranslation } from '../i18n/LanguageProvider';
@@ -7,7 +11,7 @@ import Icon from '../common/Icon';
 import { clamp, hexToRgb, hsvToRgb, rgbToHex, rgbToHsv, type Hsv } from '../../scripts/color';
 import { captureScreenFrame, loadImageFile } from '../../scripts/screen-capture';
 
-// Solo en navegadores sin EyeDropper y solo al usar la pipeta.
+// Only loaded in browsers without EyeDropper, and only when the eyedropper is used.
 const ColorSampler = lazy(() => import('./ColorSampler'));
 
 interface ColorPickerProps {
@@ -16,22 +20,23 @@ interface ColorPickerProps {
     onClose: () => void;
     anchorEl: HTMLElement;
     /**
-     * below: bajo el ancla, o encima si no cabe. around: para anclas grandes como la ruleta;
-     * debajo, o si no a un lado, para que el ancla siga a la vista mientras se elige el color.
+     * below: under the anchor, or above it if it does not fit. around: for big anchors like the wheel;
+     * below, or otherwise to one side, so the anchor stays visible while the color is being picked.
      */
     placement?: 'below' | 'around';
 }
 
+/** Renders the picker and reports every color change through `onChange`. */
 function ColorPicker({ color, onChange, onClose, anchorEl, placement = 'below' }: ColorPickerProps) {
     const { t } = useTranslation();
-    // Solo al montar: el picker se re-monta por key en cada apertura.
+    // Only on mount: the picker is remounted (by key) every time it opens.
     const [hsv, setHsv] = useState<Hsv>(() => rgbToHsv(hexToRgb(color)));
     const dragAreaRef = useRef<'sv' | 'hue' | null>(null);
     const [hexDraft, setHexDraft] = useState<string | null>(null);
     const [rgbDrafts, setRgbDrafts] = useState<{ r: string | null; g: string | null; b: string | null }>({ r: null, g: null, b: null });
     const panelRef = useRef<HTMLDivElement>(null);
     const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
-    // Arrastrado con el ratón por la cabecera: deja de seguir al ancla y se queda donde se soltó.
+    // Once dragged by its header with a mouse, it stops following the anchor and stays where it was dropped.
     const movedRef = useRef(false);
     const grabRef = useRef<{ dx: number; dy: number } | null>(null);
     const [grabbing, setGrabbing] = useState(false);
@@ -39,7 +44,7 @@ function ColorPicker({ color, onChange, onClose, anchorEl, placement = 'below' }
     const rgb = hsvToRgb(hsv);
     const hex = rgbToHex(rgb);
 
-    // Ref para emitir solo cuando cambia el color, no en cada render del padre.
+    // A ref so the color is emitted only when it changes, not on every render of the parent.
     const onChangeRef = useRef(onChange);
     useEffect(() => {
         onChangeRef.current = onChange;
@@ -49,23 +54,25 @@ function ColorPicker({ color, onChange, onClose, anchorEl, placement = 'below' }
         onChangeRef.current(rgbToHex(hsvToRgb(hsv)));
     }, [hsv]);
 
-    // El swatch queda "dentro": su propio click ya alterna el selector.
+    // The swatch counts as "inside": its own click already toggles the picker.
     const anchorRef = useRef<HTMLElement>(anchorEl);
     anchorRef.current = anchorEl;
     const eyeDropper = useEyeDropper();
     const fileRef = useRef<HTMLInputElement>(null);
-    // Captura o imagen sobre la que se elige el color (modos screen e image).
+    // Capture or image the color is picked from (screen and image modes).
     const [sample, setSample] = useState<{ canvas: HTMLCanvasElement; fromFile: boolean } | null>(null);
     const [capturing, setCapturing] = useState(false);
     const eyedropperBusy = eyeDropper.picking || capturing || sample !== null;
-    // Con la pipeta abierta, el clic y el Escape son suyos: no deben cerrar el selector.
+    // While the eyedropper is open, clicks and Escape belong to it: they must not close the picker.
     useDismiss(!eyedropperBusy, onClose, [panelRef, anchorRef]);
 
+    /** Applies a color picked with the eyedropper. */
     const applyPicked = (picked: string) => {
         setHexDraft(null);
         setHsv(rgbToHsv(hexToRgb(picked)));
     };
 
+    /** Starts the eyedropper in the best mode available (native, screen capture or image). */
     const startEyedropper = async () => {
         if (eyeDropper.mode === 'native') {
             const picked = await eyeDropper.pickNative();
@@ -76,13 +83,14 @@ function ColorPicker({ color, onChange, onClose, anchorEl, placement = 'below' }
             setCapturing(true);
             const canvas = await captureScreenFrame();
             setCapturing(false);
-            // null: el usuario canceló el diálogo de compartir pantalla; no hay nada que avisar.
+            // null: the user cancelled the screen-share dialog; nothing to report.
             if (canvas) setSample({ canvas, fromFile: false });
             return;
         }
         fileRef.current?.click();
     };
 
+    /** Opens the sampler over an image chosen by the user. */
     const onImageChosen = async (file: File | undefined) => {
         if (!file) return;
         const canvas = await loadImageFile(file);
@@ -91,8 +99,9 @@ function ColorPicker({ color, onChange, onClose, anchorEl, placement = 'below' }
 
     const eyedropperLabel = t('colorPicker', eyeDropper.mode === 'native' ? 'eyedropper' : eyeDropper.mode === 'screen' ? 'eyedropperScreen' : 'eyedropperImage');
 
-    // Anclado, sigue scroll y resize sin salirse del viewport.
+    // While anchored, it follows scroll and resize without leaving the viewport.
     useLayoutEffect(() => {
+        /** Recomputes the position from the anchor (or keeps a dragged panel inside the viewport). */
         const update = () => {
             const rect = anchorEl.getBoundingClientRect();
             const pw = panelRef.current?.offsetWidth ?? 264;
@@ -129,6 +138,7 @@ function ColorPicker({ color, onChange, onClose, anchorEl, placement = 'below' }
         };
     }, [anchorEl, placement]);
 
+    /** Sets saturation and value from a point in the square. */
     const applySv = (clientX: number, clientY: number, el: HTMLElement) => {
         const rect = el.getBoundingClientRect();
         const s = clamp((clientX - rect.left) / rect.width, 0, 1);
@@ -136,16 +146,19 @@ function ColorPicker({ color, onChange, onClose, anchorEl, placement = 'below' }
         setHsv((prev) => ({ ...prev, s, v }));
     };
 
+    /** Sets the hue from a point in the bar. */
     const applyHue = (clientY: number, el: HTMLElement) => {
         const rect = el.getBoundingClientRect();
         const h = clamp((clientY - rect.top) / rect.height, 0, 1) * 360;
         setHsv((prev) => ({ ...prev, h }));
     };
 
+    /** Remembers which area is being dragged. */
     const setDrag = (area: 'sv' | 'hue' | null) => {
         dragAreaRef.current = area;
     };
 
+    /** Starts dragging in the saturation/value square. */
     const onSvPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
         e.preventDefault();
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -153,11 +166,13 @@ function ColorPicker({ color, onChange, onClose, anchorEl, placement = 'below' }
         applySv(e.clientX, e.clientY, e.currentTarget);
     };
 
+    /** Drags inside the saturation/value square. */
     const onSvPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
         if (dragAreaRef.current !== 'sv') return;
         applySv(e.clientX, e.clientY, e.currentTarget);
     };
 
+    /** Starts dragging in the hue bar. */
     const onHuePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
         e.preventDefault();
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -165,22 +180,25 @@ function ColorPicker({ color, onChange, onClose, anchorEl, placement = 'below' }
         applyHue(e.clientY, e.currentTarget);
     };
 
+    /** Drags inside the hue bar. */
     const onHuePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
         if (dragAreaRef.current !== 'hue') return;
         applyHue(e.clientY, e.currentTarget);
     };
 
+    /** Ends a drag in the square or the bar. */
     const endDrag = (e: React.PointerEvent<HTMLElement>) => {
         if (dragAreaRef.current) {
             try {
                 e.currentTarget.releasePointerCapture(e.pointerId);
             } catch {
-                // La captura ya se había perdido.
+                // The capture was already lost.
             }
         }
         setDrag(null);
     };
 
+    /** Mouse only: starts moving the panel by its header. */
     const onHeadPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
         if (event.pointerType !== 'mouse' || event.button !== 0 || !pos) return;
         if ((event.target as HTMLElement).closest('button')) return;
@@ -190,6 +208,7 @@ function ColorPicker({ color, onChange, onClose, anchorEl, placement = 'below' }
         setGrabbing(true);
     };
 
+    /** Moves the panel, kept inside the viewport. */
     const onHeadPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
         const grab = grabRef.current;
         const panel = panelRef.current;
@@ -201,11 +220,13 @@ function ColorPicker({ color, onChange, onClose, anchorEl, placement = 'below' }
         });
     };
 
+    /** Stops moving the panel. */
     const endHeadDrag = () => {
         grabRef.current = null;
         setGrabbing(false);
     };
 
+    /** Applies the typed HEX value if it is valid. */
     const commitHex = () => {
         if (hexDraft !== null) {
             const clean = hexDraft.trim().replace(/^#/, '');
@@ -216,6 +237,7 @@ function ColorPicker({ color, onChange, onClose, anchorEl, placement = 'below' }
         setHexDraft(null);
     };
 
+    /** Applies a typed R, G or B value (0-255). */
     const commitChannel = (ch: 'r' | 'g' | 'b') => {
         const raw = rgbDrafts[ch];
         if (raw !== null && raw.trim() !== '') {

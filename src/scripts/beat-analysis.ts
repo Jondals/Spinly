@@ -1,18 +1,22 @@
-// Análisis del pulso de una canción completa, sin DOM ni React: lo ejecuta un Web Worker
-// (beat-worker.ts) y los tests. De la señal de audio saca la rejilla de tiempos:
-// 1. Ataques (onsets): flujo espectral en escala logarítmica, a 100 fotogramas por segundo.
-// 2. Tempo: autocorrelación de los ataques entre 70 y 180 BPM, con preferencia suave por los tempos
-//    habituales y corrección de doble y mitad de tempo; también por tramos, para seguir cambios.
-// 3. Tiempos: programación dinámica (Ellis, 2007): cada tiempo cae en un ataque fuerte y a una
-//    distancia del anterior cercana al periodo. En silencios sigue marcando al mismo paso.
-// 4. Ajuste fino: cada tiempo se lleva al instante exacto del ataque (resolución de ~3 ms).
-// 5. Compás: el primer tiempo es el de la fase (de 4) con más ataque en los graves.
+/**
+ * Beat analysis of a whole song, without DOM or React: it runs in a Web Worker (beat-worker.ts) and in
+ * tests. From the audio signal it extracts the beat grid:
+ * 1. Onsets: spectral flux on a log scale, at 100 frames per second.
+ * 2. Tempo: autocorrelation of the onsets between 70 and 180 BPM, with a soft preference for common
+ *    tempos and double/half tempo correction; also per section, to follow tempo changes.
+ * 3. Beats: dynamic programming (Ellis, 2007): each beat lands on a strong onset at a distance from the
+ *    previous one close to the period. Through silences it keeps the same pace.
+ * 4. Fine tuning: each beat is moved to the exact onset instant (~3 ms resolution).
+ * 5. Bar: the first beat is the phase (out of 4) with the most bass onset strength.
+ *
+ * It also contains the real-time tracker (OnsetMeter + BeatTracker) used before the analysis is ready.
+ */
 
 export interface BeatGrid {
-    /** Tiempos de pulso en segundos desde el inicio de la canción. */
+    /** Beat times in seconds from the start of the song. */
     beats: number[];
     bpm: number;
-    /** Índice (0-3) del primer tiempo que abre compás: son primeros de compás downbeat, downbeat + 4… */
+    /** Index (0-3) of the first beat that starts a bar: bars start at downbeat, downbeat + 4… */
     downbeat: number;
 }
 
@@ -21,19 +25,20 @@ const FRAME = 512;
 const FPS = 100;
 const MIN_BPM = 70;
 const MAX_BPM = 180;
-// Rigidez del paso entre tiempos en la programación dinámica: más alto, más regular.
+// Stiffness of the step between beats in the dynamic programming: higher means more regular.
 const TIGHTNESS = 80;
-// Ventana y paso del tempo por tramos (s).
+// Window and hop of the per-section tempo (s).
 const LOCAL_WINDOW_S = 4;
 const LOCAL_HOP_S = 1;
 
-// Peso de cada banda en la fuerza de ataque (subida media por casilla de la banda): el bombo y el bajo
-// marcan el pulso; los platos y los hats, que muchas veces van a contratiempo, cuentan poco.
+// Weight of each band in the onset strength (average rise per bin of the band): kick and bass mark the
+// beat; cymbals and hats, often on the off-beat, count little.
 const BAND_EDGES_HZ = [200, 2000];
 const BAND_WEIGHTS = [1, 0.5, 0.2];
 
-/** Peso de cada casilla del espectro según su banda. */
+/** Weight of each spectrum bin according to its band. */
 function bandWeights(bins: number, binHz: number): Float64Array {
+    /** Band index (0-2) of a bin. */
     const bandOf = (k: number) => BAND_EDGES_HZ.filter((edge) => k * binHz >= edge).length;
     const counts = BAND_WEIGHTS.map(() => 0);
     for (let k = 1; k < bins; k++) counts[bandOf(k)] += 1;
@@ -42,7 +47,7 @@ function bandWeights(bins: number, binHz: number): Float64Array {
     return weights;
 }
 
-/** FFT compleja radix-2 en el sitio (n potencia de 2). */
+/** In-place radix-2 complex FFT (n must be a power of 2). */
 export function fft(re: Float64Array, im: Float64Array): void {
     const n = re.length;
     for (let i = 1, j = 0; i < n; i++) {
@@ -78,7 +83,7 @@ export function fft(re: Float64Array, im: Float64Array): void {
     }
 }
 
-/** Mono a ~11 kHz: promedio por bloques (filtra lo que no cabe en la frecuencia nueva). */
+/** Mono down to ~11 kHz: block averaging (it filters what does not fit the new rate). */
 export function downsample(samples: Float32Array, rate: number): { signal: Float32Array; rate: number } {
     const factor = Math.max(1, Math.round(rate / TARGET_RATE));
     const out = new Float32Array(Math.floor(samples.length / factor));
@@ -91,14 +96,15 @@ export function downsample(samples: Float32Array, rate: number): { signal: Float
 }
 
 interface Onsets {
-    /** Fuerza de ataque normalizada, un valor cada 10 ms. */
+    /** Normalised onset strength, one value every 10 ms. */
     env: Float32Array;
-    /** Ataque solo en graves (< 200 Hz), para el compás. */
+    /** Onset strength in the bass only (< 200 Hz), for the bar. */
     bass: Float32Array;
-    /** Segundos del fotograma 0. */
+    /** Time (s) of frame 0. */
     t0: number;
 }
 
+/** Onset strength envelope (all bands and bass only) of a mono signal. */
 function onsetEnvelope(signal: Float32Array, rate: number): Onsets {
     const hop = rate / FPS;
     const frames = Math.max(0, Math.floor((signal.length - FRAME) / hop));
@@ -134,7 +140,7 @@ function onsetEnvelope(signal: Float32Array, rate: number): Onsets {
         bass[f] = bassFlux;
         previous = current;
     }
-    // Sin la tendencia lenta (media de 0,5 s) y en unidades de desviación típica.
+    /** Removes the slow trend (0.5 s mean) and scales to standard deviation units. */
     const normalize = (series: Float32Array) => {
         const span = Math.round(FPS * 0.25);
         const out = new Float32Array(series.length);
@@ -157,11 +163,11 @@ function onsetEnvelope(signal: Float32Array, rate: number): Onsets {
         for (let i = 0; i < out.length; i++) out[i] /= sd;
         return out;
     };
-    // El fotograma f cubre [f·hop, f·hop + FRAME): su ataque se sitúa en el centro de la ventana.
+    // Frame f covers [f·hop, f·hop + FRAME): its onset is placed at the centre of the window.
     return { env: normalize(env), bass: normalize(bass), t0: FRAME / 2 / rate };
 }
 
-/** Autocorrelación de la serie para los retardos pedidos (en fotogramas). */
+/** Autocorrelation of the series for lags up to maxLag (in frames). */
 function autocorrelation(env: Float32Array, from: number, to: number, maxLag: number): Float64Array {
     const ac = new Float64Array(maxLag + 1);
     for (let lag = 1; lag <= maxLag; lag++) {
@@ -172,17 +178,19 @@ function autocorrelation(env: Float32Array, from: number, to: number, maxLag: nu
     return ac;
 }
 
+/** Beat period in frames for a BPM. */
 const bpmToLag = (bpm: number) => (60 * FPS) / bpm;
 
 /**
- * Periodo (en fotogramas, con decimales) del tramo [from, to). La puntuación de cada retardo suma
- * su doble y su mitad: así el pulso real gana a sus múltiplos (errores de doble o mitad de tempo).
- * `around`, si se da, favorece un periodo cercano (continuidad entre tramos).
+ * Period (in frames, fractional) of the [from, to) section. Each lag's score adds its double and its half,
+ * so the real beat beats its multiples (double or half tempo errors). `around`, when given, favours a
+ * nearby period (continuity between sections).
  */
 function estimatePeriod(env: Float32Array, from: number, to: number, around?: number): number {
     const minLag = Math.floor(bpmToLag(MAX_BPM));
     const maxLag = Math.ceil(bpmToLag(MIN_BPM));
     const ac = autocorrelation(env, from, to, maxLag * 2 + 2);
+    /** Autocorrelation at a fractional lag (linear interpolation). */
     const at = (lag: number) => {
         const lo = Math.floor(lag);
         const frac = lag - lo;
@@ -192,7 +200,7 @@ function estimatePeriod(env: Float32Array, from: number, to: number, around?: nu
     let bestScore = -Infinity;
     for (let lag = minLag; lag <= maxLag; lag++) {
         const bpm = (60 * FPS) / lag;
-        // Preferencia suave (log-normal) por ~115 BPM y, si hay un tramo anterior, por su tempo.
+        // Soft (log-normal) preference for ~115 BPM and, if there is a previous section, for its tempo.
         const prior = Math.exp(-0.5 * (Math.log2(bpm / 115) / 1.2) ** 2);
         const continuity = around ? Math.exp(-0.5 * (Math.log2(lag / around) / 0.18) ** 2) : 1;
         const score = (at(lag) + 0.5 * at(lag * 2) + 0.25 * at(lag / 2)) * prior * (0.35 + 0.65 * continuity);
@@ -201,7 +209,7 @@ function estimatePeriod(env: Float32Array, from: number, to: number, around?: nu
             bestLag = lag;
         }
     }
-    // Pico con decimales: parábola por los tres retardos vecinos.
+    // Fractional peak: a parabola through the three neighbouring lags.
     const a = at(bestLag - 1);
     const b = at(bestLag);
     const c = at(bestLag + 1);
@@ -210,9 +218,9 @@ function estimatePeriod(env: Float32Array, from: number, to: number, around?: nu
 }
 
 /**
- * Periodos locales (fotogramas) de cada fotograma, estimados por tramos: el del tramo centrado en él,
- * el del que acaba en él y el del que empieza en él. En un cambio de tempo el centrado mezcla los dos;
- * el de antes y el de después aciertan cada uno a un lado del cambio.
+ * Local periods (frames) of every frame, estimated per section: from the section centred on it, the one
+ * ending at it and the one starting at it. At a tempo change the centred one mixes both; the before and
+ * after ones are each right on their side of the change.
  */
 function localPeriods(env: Float32Array): Float32Array[] {
     const global = estimatePeriod(env, 0, env.length);
@@ -226,6 +234,7 @@ function localPeriods(env: Float32Array): Float32Array[] {
         values.push(previous);
     }
     const last = values.length - 1;
+    /** Section period by index, clamped to the known sections. */
     const pick = (k: number) => values[Math.min(last, Math.max(0, k))];
     const centered = new Float32Array(env.length);
     const before = new Float32Array(env.length);
@@ -238,7 +247,7 @@ function localPeriods(env: Float32Array): Float32Array[] {
     return [centered, before, after];
 }
 
-/** Programación dinámica: la mejor sucesión de tiempos (fotogramas) dado el periodo local. */
+/** Dynamic programming: the best sequence of beats (frames) given the local period. */
 function trackBeats(env: Float32Array, periods: Float32Array[]): number[] {
     const n = env.length;
     const score = new Float64Array(n);
@@ -250,7 +259,7 @@ function trackBeats(env: Float32Array, periods: Float32Array[]): number[] {
         let best = 0;
         let bestFrom = -1;
         for (let p = from; p <= to; p++) {
-            // La distancia al anterior se compara con el periodo que mejor le encaje.
+            // The distance to the previous beat is compared with whichever period fits it best.
             let penalty = Infinity;
             for (const period of candidates) penalty = Math.min(penalty, Math.log((t - p) / period) ** 2);
             const candidate = score[p] - TIGHTNESS * penalty;
@@ -262,7 +271,7 @@ function trackBeats(env: Float32Array, periods: Float32Array[]): number[] {
         score[t] = env[t] + (bestFrom >= 0 ? best : 0);
         back[t] = bestFrom;
     }
-    // El final: el mejor de los últimos fotogramas; de ahí hacia atrás.
+    // The end: the best of the last frames; backtrack from there.
     const tail = Math.round(periods[0][n - 1] ?? FPS / 2);
     let end = n - 1;
     for (let t = Math.max(0, n - tail); t < n; t++) if (score[t] > score[end]) end = t;
@@ -275,8 +284,8 @@ function trackBeats(env: Float32Array, periods: Float32Array[]): number[] {
 }
 
 /**
- * Lleva el tiempo al inicio exacto del ataque: donde más sube la energía (ventanas de ~3 ms) a
- * menos de 35 ms. Si no hay ataque claro (silencio), se queda donde estaba.
+ * Moves a beat to the exact start of its onset: where energy rises the most (~3 ms windows) within 35 ms.
+ * Without a clear onset (silence) it stays where it was.
  */
 function refine(signal: Float32Array, rate: number, time: number): number {
     const step = Math.max(1, Math.round(rate * 0.0029));
@@ -284,6 +293,7 @@ function refine(signal: Float32Array, rate: number, time: number): number {
     const center = Math.round(time * rate);
     const from = Math.max(step, center - reach);
     const to = Math.min(signal.length - 2 * step, center + reach);
+    /** Energy of one ~3 ms window. */
     const energy = (at: number) => {
         let sum = 0;
         for (let i = at; i < at + step; i++) sum += signal[i] * signal[i];
@@ -306,7 +316,7 @@ function refine(signal: Float32Array, rate: number, time: number): number {
     return bestAt >= 0 && bestRise > typical * 4 ? bestAt / rate : time;
 }
 
-/** Rejilla de pulso de una canción (muestras mono y su frecuencia). */
+/** Beat grid of a song (mono samples and their sample rate); null if it is too short or unclear. */
 export function analyzeBeats(samples: Float32Array, sampleRate: number): BeatGrid | null {
     const { signal, rate } = downsample(samples, sampleRate);
     if (signal.length < rate * 3) return null;
@@ -316,10 +326,10 @@ export function analyzeBeats(samples: Float32Array, sampleRate: number): BeatGri
     const frames = trackBeats(onsets.env, periods);
     if (frames.length < 4) return null;
     const beats = frames.map((f) => refine(signal, rate, onsets.t0 + f / FPS));
-    // Tempo típico: mediana de los intervalos.
+    // Typical tempo: median of the intervals.
     const gaps = beats.slice(1).map((t, i) => t - beats[i]).sort((a, b) => a - b);
     const bpm = 60 / gaps[Math.floor(gaps.length / 2)];
-    // Compás: la fase con más ataque en los graves abre cada compás.
+    // Bar: the phase with the most bass onset strength starts each bar.
     const votes = [0, 0, 0, 0];
     frames.forEach((f, i) => {
         let strongest = 0;
@@ -330,20 +340,21 @@ export function analyzeBeats(samples: Float32Array, sampleRate: number): BeatGri
     return { beats, bpm, downbeat };
 }
 
-// Seguimiento en tiempo real, para cuando no hay análisis previo (aún no ha terminado o el archivo
-// no se pudo decodificar). Recibe la fuerza de ataque de cada lectura del analizador y lleva un
-// reloj de pulso tipo PLL: predice el siguiente tiempo y corrige la fase poco a poco con cada ataque
-// que cae cerca de lo previsto. Sin ataques (silencio, pasajes sin percusión) sigue marcando al
-// mismo paso; si el tempo cambia, en pocos tiempos lo vuelve a enganchar.
+// Real-time tracking, for when there is no prior analysis (it has not finished yet, or the file could not
+// be decoded). It receives the onset strength of each analyser reading and runs a PLL-like beat clock: it
+// predicts the next beat and nudges the phase with every onset that lands near the prediction. Without
+// onsets (silence, passages without drums) it keeps the same pace; if the tempo changes, it relocks within
+// a few beats.
 
-/** Fuerza de ataque de un espectro en dB (getFloatFrequencyData): lo que sube respecto al anterior. */
+/** Onset strength of a spectrum in dB (getFloatFrequencyData): how much it rises over the previous one. */
 export class OnsetMeter {
     private previous: Float32Array | null = null;
     private weights: Float64Array | null = null;
 
-    /** `binHz`: ancho de cada casilla del espectro (frecuencia de muestreo / tamaño de la FFT). */
+    /** `binHz`: width of each spectrum bin (sample rate / FFT size). */
     constructor(private readonly binHz: number) {}
 
+    /** Measures the band-weighted rise of a new spectrum over the previous one. */
     measure(db: Float32Array): number {
         const previous = this.previous && this.previous.length === db.length ? this.previous : null;
         if (!this.weights || this.weights.length !== db.length) this.weights = bandWeights(db.length, this.binHz);
@@ -363,16 +374,17 @@ export class OnsetMeter {
 const LIVE_HISTORY_S = 8;
 const LIVE_ESTIMATE_EVERY = FPS / 2;
 const LIVE_MIN_HISTORY = 3 * FPS;
-// Ventana corta: ve antes un cambio de tempo y engancha la fase con lo más reciente.
+// Short window: it sees a tempo change earlier and locks the phase to the most recent material.
 const LIVE_SHORT = 2 * FPS;
-// Ventana alrededor del tiempo previsto dentro de la cual un ataque corrige la fase (fracción del periodo).
+// Window around the predicted beat within which an onset corrects the phase (fraction of the period).
 const LIVE_CAPTURE = 0.18;
 
+/** Real-time PLL-style beat clock fed with onset strengths. */
 export class BeatTracker {
-    /** Tempo actual (0 hasta enganchar). */
+    /** Current tempo (0 until locked). */
     bpm = 0;
     private env: number[] = [];
-    /** Segundos del fotograma env[0]. */
+    /** Time (s) of frame env[0]. */
     private envStart = 0;
     private lastTime = -1;
     private lastValue = 0;
@@ -388,12 +400,12 @@ export class BeatTracker {
     private emitted: number[] = [];
     private pending: number[] = [];
 
-    /** Fuerza de ataque medida en el instante `time` (s, en tiempo de la canción). */
+    /** Onset strength measured at `time` (s, in song time). */
     push(time: number, strength: number): void {
-        // Un salto (atrás: la canción vuelve a empezar; adelante: un corte largo) empieza de cero.
+        // A jump (backwards: the song restarted; forwards: a long gap) starts from scratch.
         if (this.lastTime >= 0 && (time < this.lastTime - 0.5 || time - this.lastTime > 1)) this.reset();
         if (this.lastTime >= 0 && time <= this.lastTime) return;
-        // Sin la tendencia lenta (~1 s) y relativo a la dispersión reciente (~4 s).
+        // Without the slow trend (~1 s) and relative to the recent spread (~4 s).
         const first = this.lastTime < 0;
         const dt = first ? 0 : time - this.lastTime;
         this.mean += (strength - this.mean) * (first ? 1 : 1 - Math.exp(-dt / 1));
@@ -416,23 +428,24 @@ export class BeatTracker {
         }
     }
 
-    /** Tiempos que ya han pasado desde la última llamada. */
+    /** Beats that have passed since the last call. */
     takeBeats(): number[] {
         const beats = this.pending;
         this.pending = [];
         return beats;
     }
 
-    /** El último tiempo en o antes de `time` y el periodo (s), previstos por el reloj; null sin enganche. */
+    /** The last beat at or before `time` and the period (s), as predicted by the clock; null when not locked. */
     beatAt(time: number): { beat: number; period: number } | null {
         if (!this.period) return null;
         let beat = this.nextBeat;
         for (let i = this.emitted.length - 1; i >= 0 && beat > time; i--) beat = this.emitted[i];
-        // Fuera de lo conocido (hacia delante o hacia atrás), al mismo paso.
+        // Beyond what is known (forwards or backwards), at the same pace.
         const steps = Math.floor((time - beat) / this.period);
         return { beat: beat + steps * this.period, period: this.period };
     }
 
+    /** Forgets everything (after a jump in song time). */
     private reset(): void {
         this.env = [];
         this.recent = [];
@@ -445,7 +458,7 @@ export class BeatTracker {
         this.sinceEstimate = 0;
     }
 
-    /** Guarda la serie a 100 fotogramas por segundo, interpolando entre lecturas. */
+    /** Stores the series at 100 frames per second, interpolating between readings. */
     private record(time: number, value: number): void {
         if (!this.env.length) {
             this.envStart = time;
@@ -466,7 +479,7 @@ export class BeatTracker {
         }
     }
 
-    /** Un máximo local claro es un ataque: corrige la fase si cae cerca del tiempo previsto. */
+    /** A clear local maximum is an onset: it corrects the phase if it lands near the predicted beat. */
     private detectPeak(time: number, value: number): void {
         this.recent.push({ time, value });
         if (this.recent.length > 3) this.recent.shift();
@@ -475,7 +488,7 @@ export class BeatTracker {
         if (!(b.value > a.value && b.value >= c.value && b.value > this.spread * 2.5)) return;
         this.peakLevel = Math.max(b.value, this.peakLevel * 0.97);
         if (!this.period) return;
-        // Instante del máximo con una parábola por los tres puntos.
+        // Instant of the maximum, from a parabola through the three points.
         const denom = a.value - 2 * b.value + c.value;
         const shift = denom < 0 ? Math.max(-0.5, Math.min(0.5, (0.5 * (a.value - c.value)) / denom)) : 0;
         const peak = b.time + shift * ((c.time - a.time) / 2);
@@ -483,17 +496,18 @@ export class BeatTracker {
         const nearest = Math.abs(peak - previous) < Math.abs(peak - this.nextBeat) ? previous : this.nextBeat;
         const error = peak - nearest;
         if (Math.abs(error) > this.period * LIVE_CAPTURE) return;
-        // Los ataques fuertes (el bombo) mandan; los flojos (hats, adornos) apenas mueven la fase.
+        // Strong onsets (the kick) lead; weak ones (hats, fills) barely move the phase.
         const weight = Math.min(1, (b.value / Math.max(this.peakLevel, 1e-9)) ** 2);
         this.nextBeat += error * 0.35 * weight;
         this.period += error * 0.04 * weight;
     }
 
+    /** Re-estimates the tempo every half second and relocks on a confirmed change. */
     private estimate(time: number): void {
         const env = Float32Array.from(this.env);
         const end = env.length;
         const from = Math.max(0, end - LOCAL_WINDOW_S * FPS);
-        // Silencio o sin percusión: el reloj sigue solo, sin reestimar con ruido.
+        // Silence or no drums: the clock runs on its own, without re-estimating from noise.
         let recent = 0;
         let whole = 0;
         for (let i = from; i < end; i++) {
@@ -512,7 +526,7 @@ export class BeatTracker {
             this.period += (seconds - this.period) * 0.2;
             this.candidateHits = 0;
         } else if (this.candidateHits && Math.abs(fresh / this.candidate - 1) < 0.04) {
-            // Dos estimaciones seguidas de acuerdo: el tempo ha cambiado de verdad.
+            // Two estimates in a row agree: the tempo has really changed.
             this.candidateHits += 1;
             if (this.candidateHits >= 2) this.lock(fresh, env, time);
         } else {
@@ -522,7 +536,7 @@ export class BeatTracker {
         this.bpm = 60 / this.period;
     }
 
-    /** Engancha tempo y fase: la fase es la que más ataque reúne en la ventana corta. */
+    /** Locks tempo and phase: the phase is the one that gathers the most onset strength in the short window. */
     private lock(seconds: number, env: Float32Array, time: number): void {
         const period = seconds * FPS;
         const end = env.length - 1;

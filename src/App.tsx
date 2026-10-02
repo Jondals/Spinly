@@ -1,3 +1,8 @@
+/**
+ * App: the root component. It owns the wheel's options, the active theme, the user's themes, presets and
+ * playlist (persisted in localStorage and synced with the account), and lays out the header, the section
+ * menu, the active panel, the wheel and tournament mode.
+ */
 import React, { lazy, startTransition, Suspense, useState, useEffect, type ComponentType } from 'react';
 import Header from './Components/layout/Header';
 import WheelManager, { type WheelSectionId } from './Components/layout/WheelManager';
@@ -37,12 +42,13 @@ import './css/index.css';
 
 type StorageWhat = 'whatThemes' | 'whatActiveTheme' | 'whatPresets';
 
-// Colores antiguos de flecha y aro de los temas semilla: si siguen intactos se sustituyen
-// por los actuales de la semilla; los que eligió el usuario se respetan.
+// Old pointer and rim colors of the seed themes: if still untouched they are replaced with the seed's
+// current ones; colors the user picked are kept.
 const LEGACY_SEED_COLORS: Record<string, { pointerColor: string; borderColor: string }> = {
     'theme-obsidian': { pointerColor: '#818cf8', borderColor: '#0b0f19' },
     'theme-neon': { pointerColor: '#ffffff', borderColor: '#0b0f19' },
 };
+/** Upgrades a seed theme saved with the old default colors. */
 const withoutLegacySeedColors = (theme: WheelTheme): WheelTheme => {
     const legacy = LEGACY_SEED_COLORS[theme.id];
     const seed = DEFAULT_THEMES.find((item) => item.id === theme.id);
@@ -57,16 +63,16 @@ const withoutLegacySeedColors = (theme: WheelTheme): WheelTheme => {
 };
 
 /**
- * lazy() que, una vez descargado el módulo, se sustituye por el componente real. Un lazy
- * que se monta por primera vez siempre suspende, y React retiene ~300 ms el contenido que
- * llega tras un fallback: cambiar de panel se notaba a tirones aunque ya estuviera precargado.
+ * A lazy() that is replaced by the real component once its module has been downloaded. A lazy component
+ * mounting for the first time always suspends, and React holds back content arriving after a fallback for
+ * ~300 ms: switching panels felt jerky even when they were already preloaded.
  */
 function preloadable<P extends object>(load: () => Promise<{ default: ComponentType<P> }>) {
-    // Se guarda el módulo y `default` se lee al renderizar, como hace React.lazy: leerlo al
-    // resolver la promesa rompe con el hot reload si el módulo aún se está evaluando.
+    // The module is stored and `default` is read at render time, like React.lazy does: reading it when the
+    // promise resolves breaks hot reload if the module is still being evaluated.
     let module: { default: ComponentType<P> } | null = null;
     const Lazy = lazy(load);
-    // Un fallo de precarga (red, recarga en caliente) no es un error: el panel lo reintenta al abrirse.
+    // A preload failure (network, hot reload) is not an error: the panel retries when it opens.
     const preload = () => load().then((loaded) => { module = loaded; }, () => undefined);
     return { preload, get Component(): ComponentType<P> { return module?.default ?? Lazy; } };
 }
@@ -75,8 +81,9 @@ const PresetsPanel = preloadable(() => import('./Components/presets/Presets'));
 const ThemesPanel = preloadable(() => import('./Components/themes/Themes'));
 const TournamentPanel = preloadable(() => import('./Components/tournament/Tournament'));
 
-/** Precarga los paneles secundarios cuando el navegador queda libre tras el primer pintado. */
+/** Preloads the secondary panels when the browser is idle after the first paint. */
 function prefetchPanels(): () => void {
+    /** Starts preloading every secondary panel. */
     const run = () => {
         void PresetsPanel.preload();
         void ThemesPanel.preload();
@@ -91,10 +98,10 @@ function prefetchPanels(): () => void {
 }
 
 /**
- * Con la pantalla de carga delante, la app se monta en dos pasos: primero la cabecera y la ruleta y,
- * tras pintarlas, el menú, el panel y el cursor. Montarlo todo junto era una sola tarea larga (sobre
- * todo de layout) que bloqueaba el hilo principal; así son dos cortas y la pantalla de carga lo tapa.
- * Sin pantalla de carga delante (al volver a montar tras cambiar de cuenta, o en los tests), todo a la vez.
+ * Behind the splash screen the app mounts in two steps: first the header and the wheel and, once they are
+ * painted, the menu, the panel and the cursor. Mounting everything at once was a single long task (mostly
+ * layout) that blocked the main thread; this way it is two short ones, hidden by the splash.
+ * Without a splash in front (remounting after an account switch, or in tests), everything mounts at once.
  */
 function useStagedMount(): boolean {
     const [ready, setReady] = useState(() => !document.getElementById('spinly-splash'));
@@ -112,20 +119,21 @@ function useStagedMount(): boolean {
     return ready;
 }
 
-// "Option"/"Opción": identifica las opciones con nombre por defecto que el usuario no ha editado.
+// "Option"/"Opción": identifies options that still have their untouched default name.
 const DEFAULT_OPTION_LABELS = Object.values(STRINGS.options.defaultName);
 
+/** Root component: state, persistence, account sync and layout. */
 function App() {
     const { lang, t } = useTranslation();
     const ready = useStagedMount();
-    // La ruleta vuelve tal como se dejó; las 4 opciones por defecto solo aparecen la primera vez.
+    // The wheel comes back as it was left; the 4 default options only appear the first time.
     const [options, setOptions] = useState<WheelOption[]>(() => {
         try {
             const stored = localStorage.getItem(OPTIONS_STORAGE_KEY);
             const clean = stored ? sanitizeOptions(JSON.parse(stored), 'stored').slice(0, MAX_WHEEL_OPTIONS) : [];
             if (clean.length >= MIN_OPTIONS) return clean;
         } catch {
-            // Storage corrupto o inaccesible: se empieza con las opciones por defecto.
+            // Broken or inaccessible storage: start with the default options.
         }
         return createDefaultOptions(t('options', 'defaultName'));
     });
@@ -136,11 +144,11 @@ function App() {
         const label = pickText('options', 'defaultName', lang);
         setOptions((prev) => relabelDefaultOptions(prev, DEFAULT_OPTION_LABELS, label));
     }, [lang]);
-    // Se guarda la clave de lo que falló y no el texto, para que el aviso se traduzca si cambia el idioma.
+    // The key of what failed is stored rather than the text, so the warning is translated if the language changes.
     const [storageWarning, setStorageWarning] = useState<StorageWhat | null>(null);
-    // Sin transición en la carga inicial: solo a partir de la primera interacción.
+    // No transition on the initial load: only from the first interaction on.
     const [isMenuAnimated, setIsMenuAnimated] = useState(false);
-    // Los borradores viven aquí y no en el panel para sobrevivir a una visita al editor.
+    // Drafts live here rather than in the panel so they survive a trip to the editor.
     const [themeDraft, setThemeDraft] = useState<ThemeDraft | null>(null);
     const [presetDraft, setPresetDraft] = useState<PresetDraft | null>(null);
 
@@ -152,7 +160,7 @@ function App() {
                 const clean = sanitizeTheme(JSON.parse(stored));
                 if (clean) return withoutLegacySeedColors(clean);
             }
-            // Formato antiguo: { activeTheme, savedThemes }.
+            // Old format: { activeTheme, savedThemes }.
             const legacy = localStorage.getItem(THEMES_STORAGE_KEY);
             if (legacy) {
                 const data = JSON.parse(legacy);
@@ -161,7 +169,7 @@ function App() {
                 if (cleanLegacy) return cleanLegacy;
             }
         } catch {
-            // Storage corrupto: se usan los valores por defecto.
+            // Broken storage: the defaults are used.
         }
         return DEFAULT_THEMES[0] ?? null;
     });
@@ -180,11 +188,11 @@ function App() {
                 }
             }
         } catch {
-            // Storage corrupto: se usan los valores por defecto.
+            // Broken storage: the defaults are used.
         }
         return [];
-        });
-    // Los temas y preajustes de ejemplo se pueden borrar: se recuerda cuáles para no mostrarlos.
+    });
+    // Sample themes and presets can be deleted: which ones is remembered so they stay hidden.
     const [hiddenDefaults, setHiddenDefaults] = useState<string[]>(() => {
         try {
             const raw: unknown = JSON.parse(localStorage.getItem(HIDDEN_DEFAULTS_STORAGE_KEY) ?? '[]');
@@ -197,9 +205,10 @@ function App() {
         try {
             localStorage.setItem(HIDDEN_DEFAULTS_STORAGE_KEY, JSON.stringify(hiddenDefaults));
         } catch {
-            // Sin acceso a storage: se olvida al recargar.
+            // No storage access: forgotten on reload.
         }
     }, [hiddenDefaults]);
+    /** Hides a sample theme or preset. */
     const hideDefault = (id: string) => setHiddenDefaults((prev) => (prev.includes(id) ? prev : [...prev, id]));
 
     const savedThemes: WheelTheme[] = [...DEFAULT_THEMES.filter((theme) => !hiddenDefaults.includes(theme.id)), ...userThemes];
@@ -214,7 +223,7 @@ function App() {
                 if (Array.isArray(list)) {
                     const out: WheelPreset[] = [];
                     for (const raw of list as unknown[]) {
-                        // Formatos anteriores a WheelPreset: se ignoran.
+                        // Formats older than WheelPreset are ignored.
                         if (raw && typeof raw === 'object' && Array.isArray((raw as { options?: unknown }).options)) {
                             const clean = sanitizePreset(raw);
                             if (clean && !clean.id.startsWith('default-preset-')) out.push(clean);
@@ -224,7 +233,7 @@ function App() {
                 }
             }
         } catch {
-            // Storage corrupto: se usan los valores por defecto.
+            // Broken storage: the defaults are used.
         }
         return [];
     });
@@ -236,21 +245,21 @@ function App() {
             const stored = localStorage.getItem(ACTIVE_PRESET_STORAGE_KEY);
             if (stored && typeof stored === 'string') return stored;
         } catch {
-            // Sin acceso a storage (modo privado): el estado sigue en memoria.
+            // No storage access (private mode): the state stays in memory.
         }
         return null;
     });
 
-    // Siempre 14 al abrir (ampliable hasta 25 en el editor, solo para esta visita). Nunca por
-    // debajo de las opciones que ya hay: una ruleta guardada con más de 14 sigue editable.
+    // Always 14 on open (it can go up to 25 in the editor, for this visit only). Never below the current
+    // number of options: a saved wheel with more than 14 stays editable.
     const [wheelLimit, setWheelLimit] = useState<number>(() => Math.max(DEFAULT_WHEEL_LIMIT, options.length));
 
-    // Un preset con más opciones que el límite lo sube lo justo, sin persistirlo.
+    // A preset with more options than the limit raises it just enough, without persisting it.
     useEffect(() => {
         setWheelLimit((prev) => Math.max(prev, options.length));
     }, [options.length]);
 
-    // setItem falla antes de escribir: con la cuota llena lo ya guardado sigue intacto y solo se avisa.
+    /** Shows a warning when storage is full. setItem fails before writing, so whatever was saved stays intact. */
     const reportStorageError = (error: unknown, what: StorageWhat): void => {
         const name = (error as { name?: string } | null)?.name;
         const code = (error as { code?: number } | null)?.code;
@@ -263,7 +272,7 @@ function App() {
         try {
             localStorage.setItem(OPTIONS_STORAGE_KEY, JSON.stringify(options));
         } catch {
-            // Sin acceso a storage (modo privado): la ruleta sigue en memoria.
+            // No storage access (private mode): the wheel stays in memory.
         }
     }, [options]);
 
@@ -300,15 +309,17 @@ function App() {
             if (activePresetId) localStorage.setItem(ACTIVE_PRESET_STORAGE_KEY, activePresetId);
             else localStorage.removeItem(ACTIVE_PRESET_STORAGE_KEY);
         } catch {
-            // Sin acceso a storage (modo privado): el estado sigue en memoria.
+            // No storage access (private mode): the state stays in memory.
         }
     }, [activePresetId]);
 
+    /** Switches section (and closes the mobile drawer). */
     const handleSectionChange = (section: WheelSectionId): void => {
         setActiveSection(section);
         setIsMenuOpen(false);
     };
 
+    /** Saves (or updates) a theme and applies it. */
     const handleSaveTheme = (theme: WheelTheme) => {
         const full: WheelTheme = {
             ...theme,
@@ -323,12 +334,13 @@ function App() {
         setActiveTheme(full);
     };
 
+    /** Deletes a user theme, or hides a sample one. */
     const handleDeleteTheme = (id: string) => {
         if (DEFAULT_THEMES.some((theme) => theme.id === id)) hideDefault(id);
         else setUserThemes((prev) => prev.filter((t) => t.id !== id));
     };
 
-    // Expande la paleta al número de opciones; los nombres no se tocan.
+    /** Applies a theme, expanding its palette to the number of options; option names are untouched. */
     const handleSetActiveTheme: React.Dispatch<React.SetStateAction<WheelTheme | null>> = (value) => {
         const base = typeof value === 'function'
             ? (value as (p: WheelTheme | null) => WheelTheme | null)(activeTheme)
@@ -341,6 +353,7 @@ function App() {
         setActiveTheme({ ...base, segments: expanded });
     };
 
+    /** Saves the current wheel (options + theme) as a new preset. */
     const handleSavePreset = (name: string, tags?: string[]) => {
         if (!activeTheme) return;
         const preset: WheelPreset = {
@@ -355,6 +368,7 @@ function App() {
         setActivePresetId(preset.id);
     };
 
+    /** Loads a preset's options and theme onto the wheel. */
     const handleLoadPreset = (preset: WheelPreset) => {
         setOptions(preset.options.map((o) => ({ ...o })));
         setActiveTheme(
@@ -368,13 +382,14 @@ function App() {
         setActivePresetId(preset.id);
     };
 
+    /** Deletes a user preset, or hides a sample one. */
     const handleDeletePreset = (id: string) => {
         if (id === activePresetId) setActivePresetId(null);
         if (DEFAULT_PRESETS.some((preset) => preset.id === id)) hideDefault(id);
         else setUserPresets((prev) => prev.filter((p) => p.id !== id));
     };
 
-    // Mismo id: nombre y tags del formulario, opciones y tema actuales de la ruleta.
+    /** Updates a preset in place: name and tags from the form, options and theme from the current wheel. */
     const handleUpdatePreset = (id: string, name: string, tags: string[]) => {
         if (!activeTheme) return;
         setUserPresets((prev) => prev.map((p) => (p.id === id
@@ -390,8 +405,10 @@ function App() {
         setActivePresetId(id);
     };
 
-    // Conserva el id de la comunidad: el contador de descargados compara por id y
-    // reimportar el mismo preset sustituye la copia en vez de duplicarla.
+    /**
+     * Imports a community preset and loads it. It keeps the community id: the downloaded counter compares by id
+     * and importing the same preset again replaces the copy instead of duplicating it.
+     */
     const handleImportPreset = (preset: WheelPreset) => {
         const copy: WheelPreset = {
             ...clonePreset(preset),
@@ -406,25 +423,28 @@ function App() {
         setActivePresetId(copy.id);
     };
 
-    // Flecha y luces forman parte del tema activo: se guardan con él en temas y presets.
+    /** Pointer and lights are part of the active theme, so they are saved with it in themes and presets. */
     const handleWheelColor = (field: WheelColorField, color: string) => {
         setActiveTheme((prev) => (prev ? { ...prev, [field]: color } : prev));
     };
 
+    /** Opens or closes the mobile drawer. */
     const toggleMenu = () => {
         setIsMenuAnimated(true);
         setIsMenuOpen(prev => !prev);
     };
 
+    /** Closes the mobile drawer. */
     const closeMenu = () => setIsMenuOpen(false);
 
     useEffect(prefetchPanels, []);
-    // La app ya está pintada: la pantalla de carga puede irse.
+    // The app is painted: the splash screen can go.
     useEffect(hideSplash, []);
 
-    // Sin el menú del clic derecho (ni el de la pulsación larga en táctil): la app no tiene nada que
-    // ofrecer ahí y rompe la sensación de app. En los campos de texto se mantiene para poder pegar.
+    // No right-click menu (nor the long-press one on touch): the app has nothing to offer there and it breaks
+    // the app feel. It is kept in text fields so pasting still works.
     useEffect(() => {
+        /** Blocks the context menu outside text fields. */
         const onContextMenu = (event: MouseEvent) => {
             if (event.target instanceof Element && event.target.closest('input, textarea, [contenteditable="true"]')) return;
             event.preventDefault();
@@ -434,13 +454,13 @@ function App() {
     }, []);
     useButtonSounds();
 
-    // Playlist de música: viaja con la cuenta; la reproducción la lleva MusicProvider.
+    // Music playlist: it travels with the account; playback is handled by MusicProvider.
     const [musicLibrary, setMusicLibrary] = useState<MusicLibrary>(readMusicLibrary);
     useEffect(() => {
         writeMusicLibrary(musicLibrary);
     }, [musicLibrary]);
 
-    // Con cuenta, la ruleta, los temas, los preajustes y la música viajan con ella (useAccountSync).
+    // With an account, the wheel, themes, presets and music travel with it (useAccountSync).
     const session = useAccountSession();
     useAccountSync(session, {
         options,
@@ -452,6 +472,7 @@ function App() {
         music: musicLibrary,
     });
 
+    /** The panel of the active section (tournament mode has none: it takes over the wheel area). */
     const renderPanel = (): React.ReactNode => {
         const Presets = PresetsPanel.Component;
         const Themes = ThemesPanel.Component;
@@ -515,7 +536,7 @@ function App() {
                             onClose={closeMenu}
                         />
                     ) : (
-                        // Reserva su columna del grid: la ruleta no cambia de sitio al llegar el menú.
+                        // Reserves its grid column so the wheel does not move when the menu arrives.
                         <div className="Wheelmanager" aria-hidden="true" />
                     )}
                     <div className="spinly-panel">
@@ -525,7 +546,7 @@ function App() {
                             </Suspense>
                         )}
                     </div>
-                    {/* Siempre montada: cambiar de sección no reinicia la ruleta (en el torneo queda oculta y quieta) */}
+                    {/* Always mounted: switching sections never resets the wheel (in the tournament it stays hidden and still) */}
                     <Wheel options={options} activeTheme={activeTheme} onColorChange={handleWheelColor} active={activeSection !== 'tournament'} />
                     {ready && activeSection === 'tournament' && (
                         <Suspense fallback={<div className="spinly-tournament" />}>

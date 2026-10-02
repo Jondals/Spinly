@@ -1,3 +1,7 @@
+/**
+ * UI and integration tests of the whole app, rendered with Testing Library. Supabase, the community, the
+ * account services and the music engine are mocked, so everything runs offline in jsdom.
+ */
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import App from './App';
 import { LanguageProvider } from './Components/i18n/LanguageProvider';
@@ -23,10 +27,12 @@ import {
 
 const TEXTURE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
-// Servidor de la comunidad simulado. Funciones planas y no jest.fn: CRA activa
-// resetMocks y borraría sus implementaciones entre tests.
+// Mocked community server. Plain functions rather than jest.fn: CRA enables resetMocks, which would wipe
+// their implementations between tests.
 const author = { username: 'ana', avatar_url: null };
+/** A community theme with the given id. */
 const sharedTheme = (id: string): WheelTheme => ({ ...DEFAULT_THEMES[1], id, name: `Shared ${id}` });
+/** A community preset with the given id. */
 const sharedPreset = (id: string): WheelPreset => ({ ...DEFAULT_PRESETS[1], id, name: `Shared ${id}` });
 const mockServer = {
     themes: [] as Array<{ id: string; authorId: string }>,
@@ -35,20 +41,20 @@ const mockServer = {
     deletes: [] as Array<{ table: string; id: string }>,
 };
 
-// Sesión simulada: una cuenta con contraseña por defecto; los tests de invitado la ponen a null.
+// Mocked session: a password account by default; guest tests set it to null.
 const mockAuth = { session: { userId: 'me', isAnonymous: false } as { userId: string; isAnonymous: boolean } | null };
 jest.mock('./hooks/useSessionUserId', () => ({
     useAccountSession: () => mockAuth.session,
     useSessionUserId: () => mockAuth.session?.userId ?? null,
 }));
 
-// Servicios de cuenta simulados: sin red. validatePassword es la real.
+// Mocked account services: no network. validatePassword is the real one.
 const mockAccount = {
     profile: null as { id: string; username: string; avatar_url: string | null } | null,
     calls: [] as string[],
     signInResult: null as unknown,
     reloads: 0,
-    // Lo que devuelve la nube al arrancar con sesión (null: la cuenta aún no tiene datos).
+    // What the cloud returns at startup with a session (null: the account has no data yet).
     remote: null as unknown,
 };
 jest.mock('./scripts/profile', () => ({
@@ -112,7 +118,7 @@ jest.mock('./scripts/community', () => ({
     },
 }));
 
-// Música simulada: jsdom no tiene Web Audio ni IndexedDB. Registra lo que suena y lo que se sube.
+// Mocked music: jsdom has neither Web Audio nor IndexedDB. It records what plays and what is uploaded.
 const mockMusic = {
     played: [] as string[],
     files: new Map<string, Blob>(),
@@ -164,13 +170,15 @@ jest.mock('./scripts/music-files', () => ({
     },
 }));
 
+/** Renders the whole app with its language provider. */
 const renderApp = () => render(<LanguageProvider><App /></LanguageProvider>);
 
+/** The active theme as saved in localStorage. */
 const storedActiveTheme = (): WheelTheme => JSON.parse(localStorage.getItem(ACTIVE_THEME_STORAGE_KEY) ?? 'null');
 
 beforeEach(() => {
     localStorage.clear();
-    // Cerrar sesión marca el cambio de cuenta y lo deshace la recarga, que aquí es simulada.
+    // Signing out marks the account switch, and the reload (mocked here) undoes it.
     (jest.requireActual('./scripts/account-data') as typeof import('./scripts/account-data')).endAccountSwitch();
     mockMusic.played = [];
     mockMusic.files.clear();
@@ -189,15 +197,15 @@ beforeEach(() => {
     mockServer.deletes = [];
 });
 
-describe('modelo de temas y presets', () => {
-    test('clonar y expandir sectores conserva las texturas', () => {
+describe('theme and preset model', () => {
+    test('cloning and expanding sectors keeps the textures', () => {
         const theme = { id: 't', name: 'T', segments: [{ color: '#6366f1', backgroundImage: TEXTURE }, { color: '#a78bfa' }] };
         expect(cloneTheme(theme).segments[0].backgroundImage).toBe(TEXTURE);
         const expanded = ensureSegments(theme.segments, 5);
         expect(expanded.map((segment) => Boolean(segment.backgroundImage))).toEqual([true, false, true, false, true]);
     });
 
-    test('un preset sobrevive al JSON de localStorage con sus texturas', () => {
+    test('a preset survives the localStorage JSON round trip with its textures', () => {
         const preset = sanitizePreset(JSON.parse(JSON.stringify({
             id: 'p', name: 'P', updatedAt: 1, tags: [],
             options: [{ id: 'o', name: 'Alpha', color: 'indigo' }],
@@ -207,7 +215,7 @@ describe('modelo de temas y presets', () => {
         expect(preset?.options[0].name).toBe('Alpha');
     });
 
-    test('sanitizeTheme solo admite colores hex e imágenes raster en data:', () => {
+    test('sanitizeTheme only accepts hex colors and raster data: images', () => {
         const clean = sanitizeTheme({
             id: 'x', name: 'X',
             segments: [
@@ -221,7 +229,7 @@ describe('modelo de temas y presets', () => {
         expect(clean?.segments[2].backgroundImage).toBeUndefined();
     });
 
-    test('el encaje de imagen se acota, se clona y desaparece sin imagen', () => {
+    test('the image fit is clamped, cloned, and dropped without an image', () => {
         expect(sanitizeImageFit({ x: 9, y: -9, scale: 99, rotate: 999 })).toEqual({
             x: IMAGE_FIT_LIMITS.maxOffset, y: -IMAGE_FIT_LIMITS.maxOffset, scale: IMAGE_FIT_LIMITS.maxScale, rotate: IMAGE_FIT_LIMITS.maxRotate,
         });
@@ -235,14 +243,14 @@ describe('modelo de temas y presets', () => {
     });
 });
 
-describe('geometría de la ruleta', () => {
-    test('sin encaje la imagen cubre la ruleta; con encaje se mueve, escala y gira', () => {
+describe('wheel geometry', () => {
+    test('without a fit the image covers the wheel; with one it moves, scales and rotates', () => {
         expect(getImageBox(undefined)).toEqual({ x: 0, y: 0, width: WHEEL_VIEWBOX, height: WHEEL_VIEWBOX, transform: undefined });
         expect(getImageBox({ x: 0.25, y: -0.1, scale: 0.5, rotate: 30 }, 400))
             .toEqual({ x: 200, y: 60, width: 200, height: 200, transform: 'rotate(30 300 160)' });
     });
 
-    test('centrar en el sector cubre el sector entero y queda derecha al ganar', () => {
+    test('fitting to the sector covers the whole sector and is upright when it wins', () => {
         const count = 4;
         const index = 1;
         const fit = fitImageToSector(index, count);
@@ -260,14 +268,14 @@ describe('geometría de la ruleta', () => {
         expect(fitImageToSector(0, 1)).toEqual({ x: 0, y: 0, scale: 1, rotate: 0 });
     });
 
-    test('el color aleatorio es hsl(h, 70%, 55%) y se aleja del sector anterior', () => {
+    test('the random color is hsl(h, 70%, 55%) and differs from the previous sector', () => {
         expect(randomSegmentColor(undefined, () => 0)).toBe('#dd3c3c');
         expect(randomSegmentColor('#dd3c3c', () => 0)).not.toBe('#dd3c3c');
     });
 });
 
-describe('ruleta y editor', () => {
-    test('añadir una opción crea un sector con color propio', () => {
+describe('wheel and editor', () => {
+    test('adding an option creates a sector with its own color', () => {
         const { container } = renderApp();
         const before = container.querySelectorAll('.option-swatch').length;
         fireEvent.click(screen.getByRole('button', { name: 'Add option' }));
@@ -276,9 +284,10 @@ describe('ruleta y editor', () => {
         expect(swatches[before].style.backgroundColor).not.toBe('');
     });
 
-    test('en el mínimo de 2 opciones no se puede eliminar y cada sector conserva su color', () => {
+    test('at the minimum of 2 options nothing can be removed and every sector keeps its color', () => {
         const { container } = renderApp();
         fireEvent.click(screen.getByRole('button', { name: 'Add option' }));
+        /** Colors of the option swatches, in order. */
         const colors = () => Array.from(container.querySelectorAll<HTMLElement>('.option-swatch')).map((el) => el.style.backgroundColor);
         while (container.querySelectorAll('.option-swatch').length > 2) {
             fireEvent.click(screen.getByRole('button', { name: 'Remove option 1' }));
@@ -293,7 +302,7 @@ describe('ruleta y editor', () => {
         expect(storedActiveTheme().segments.map((segment) => segment.color)).toHaveLength(2);
     });
 
-    test('el resultado se muestra en un diálogo fuera de la ruleta y se cierra con Escape', async () => {
+    test('the result shows in a dialog outside the wheel and closes with Escape', async () => {
         jest.useFakeTimers();
         try {
             const { container } = renderApp();
@@ -311,7 +320,7 @@ describe('ruleta y editor', () => {
         }
     });
 
-    test('subir una imagen abre el editor de encaje y Aplicar la guarda centrada en su sector', async () => {
+    test('uploading an image opens the fit editor and Apply saves it centred on its sector', async () => {
         renderApp();
         const file = new File([Uint8Array.from([137, 80, 78, 71])], 'foto.png', { type: 'image/png' });
         fireEvent.change(screen.getByLabelText('Image file for option 2'), { target: { files: [file] } });
@@ -324,6 +333,7 @@ describe('ruleta y editor', () => {
         expect(storedActiveTheme().segments[1].imageFit).toEqual(fitImageToSector(1, count));
     });
 
+    /** Opens a color picker from its trigger and types a hex value into it. */
     const pickColor = async (trigger: string, hex: string) => {
         fireEvent.click(screen.getByRole('button', { name: trigger }));
         const input = await screen.findByLabelText('Color in hex');
@@ -331,9 +341,10 @@ describe('ruleta y editor', () => {
         fireEvent.keyDown(input, { key: 'Enter' });
         fireEvent.keyDown(input, { key: 'Escape' });
     };
+    /** A CSS variable set on <html>. */
     const rootVar = (name: string) => document.documentElement.style.getPropertyValue(name);
 
-    test('la flecha y la ruleta abren su propio selector de color (flecha y luces)', async () => {
+    test('the pointer and the wheel open their own color pickers (pointer and lights)', async () => {
         renderApp();
         await pickColor('Change the pointer color', '#22c55e');
         expect(rootVar('--wheel-pointer-color')).toBe('#22c55e');
@@ -345,7 +356,7 @@ describe('ruleta y editor', () => {
         expect(storedActiveTheme().pointerColor).toBe('#22c55e');
     });
 
-    test('la pipeta toma un color de la pantalla; cancelarla no cambia nada ni cierra el selector', async () => {
+    test('the eyedropper picks a color from the screen; cancelling changes nothing and keeps the picker open', async () => {
         const results: Array<() => Promise<{ sRGBHex: string }>> = [
             async () => ({ sRGBHex: 'rgb(255, 0, 0)' }),
             async () => { throw new DOMException('The user canceled the selection.', 'AbortError'); },
@@ -372,7 +383,7 @@ describe('ruleta y editor', () => {
         }
     });
 
-    test('sin EyeDropper ni captura de pantalla (móvil) la pipeta toma el color de una imagen', async () => {
+    test('without EyeDropper or screen capture (mobile) the eyedropper picks from an image', async () => {
         renderApp();
         fireEvent.click(screen.getByRole('button', { name: 'Change the pointer color' }));
         const dropper = await screen.findByRole('button', { name: 'Pick a color from an image or screenshot' });
@@ -385,7 +396,7 @@ describe('ruleta y editor', () => {
         expect(opened).toEqual(['file']);
     });
 
-    test('sin EyeDropper pero con captura de pantalla (Firefox, Safari) pide qué capturar; cancelar no cierra nada', async () => {
+    test('without EyeDropper but with screen capture (Firefox, Safari) it asks what to capture; cancelling closes nothing', async () => {
         let requests = 0;
         const nav = navigator as unknown as { mediaDevices?: unknown };
         const win = window as unknown as { isSecureContext?: boolean };
@@ -411,7 +422,7 @@ describe('ruleta y editor', () => {
         }
     });
 
-    test('la ruleta recuerda sus opciones; las 4 por defecto solo salen la primera vez', () => {
+    test('the wheel remembers its options; the 4 defaults only appear the first time', () => {
         const first = renderApp();
         expect(first.container.querySelectorAll('.option-swatch')).toHaveLength(4);
         fireEvent.click(screen.getByRole('button', { name: 'Remove option 1' }));
@@ -424,8 +435,16 @@ describe('ruleta y editor', () => {
         expect(screen.getAllByLabelText(/^Option name/).map((input) => (input as HTMLInputElement).value)).toEqual(names);
     });
 
-    test('el límite por defecto es 14 y se puede subir hasta 25', () => {
+    test('editing an option selects its name, so typing replaces it', () => {
         renderApp();
+        const input = screen.getByDisplayValue('Option 1') as HTMLInputElement;
+        fireEvent.focus(input);
+        expect([input.selectionStart, input.selectionEnd]).toEqual([0, 'Option 1'.length]);
+    });
+
+    test('the default limit is 14 and it can go up to 25', () => {
+        renderApp();
+        /** The option limit button. */
         const limitButton = () => screen.getByTitle('Click to edit the limit');
         expect(limitButton()).toHaveTextContent('14');
         for (let i = 0; i < 12; i++) fireEvent.click(screen.getByRole('button', { name: 'Add option' }));
@@ -438,7 +457,7 @@ describe('ruleta y editor', () => {
         expect(limitButton()).toHaveTextContent('25');
         expect(screen.getByRole('button', { name: 'Add option' })).toBeEnabled();
 
-        // Solo dos cifras en el campo.
+        // Only two digits in the field.
         fireEvent.click(limitButton());
         const field = screen.getByLabelText('Option limit (max 25)');
         fireEvent.change(field, { target: { value: '1a23' } });
@@ -446,12 +465,12 @@ describe('ruleta y editor', () => {
         fireEvent.keyDown(field, { key: 'Escape' });
     });
 
-    test('al editar el límite la primera cifra sustituye al valor; después se escribe detrás', () => {
+    test('when editing the limit the first digit replaces the value; later ones are appended', () => {
         renderApp();
         fireEvent.click(screen.getByTitle('Click to edit the limit'));
         const field = screen.getByLabelText('Option limit (max 25)');
         expect(field).toHaveValue('14');
-        // El cursor está al final: lo tecleado llega detrás de "14" y se queda solo la cifra nueva.
+        // The caret is at the end: what is typed arrives after "14" and only the new digit is kept.
         fireEvent.change(field, { target: { value: '142' } });
         expect(field).toHaveValue('2');
         fireEvent.change(field, { target: { value: '20' } });
@@ -460,7 +479,7 @@ describe('ruleta y editor', () => {
         expect(screen.getByTitle('Click to edit the limit')).toHaveTextContent('20');
     });
 
-    test('el límite vuelve a 14 en cada visita, salvo que la ruleta ya tenga más opciones', () => {
+    test('the limit goes back to 14 on every visit, unless the wheel already has more options', () => {
         const first = renderApp();
         fireEvent.click(screen.getByTitle('Click to edit the limit'));
         const input = screen.getByLabelText('Option limit (max 25)');
@@ -473,7 +492,7 @@ describe('ruleta y editor', () => {
         expect(screen.getByTitle('Click to edit the limit')).toHaveTextContent('14');
     });
 
-    test('los colores de flecha y luces se guardan en temas y presets', async () => {
+    test('pointer and light colors are saved in themes and presets', async () => {
         renderApp();
         await pickColor('Change the pointer color', '#22c55e');
         await pickColor('Change the lights color', '#7c3aed');
@@ -492,55 +511,66 @@ describe('ruleta y editor', () => {
         expect(theme).toMatchObject({ pointerColor: '#22c55e', lightColor: '#7c3aed' });
     });
 
-    test('modo torneo: se configura con las opciones de la ruleta, se juega y corona a un campeón', async () => {
+    test('tournament mode: set up from the wheel options, played and won by a champion', async () => {
         renderApp();
-        // El idioma muestra su código junto a la bandera.
+        // The language shows its code next to the flag.
         expect(screen.getByRole('button', { name: /Cambiar a español/ })).toHaveTextContent('EN');
         fireEvent.click(screen.getByRole('button', { name: 'Tournament' }));
-        // Los participantes salen de la ruleta.
+        // The participants come from the wheel.
         expect(await screen.findByDisplayValue('Option 1')).toBeInTheDocument();
         expect(screen.getByDisplayValue('Option 4')).toBeInTheDocument();
-        fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Duels' })).getByRole('radio', { name: '1' }));
-        fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Final' })).getByRole('radio', { name: '1' }));
+        // Every rule is in view: best of 1 for every duel and the final.
+        fireEvent.change(screen.getByRole('spinbutton', { name: 'Every duel' }), { target: { value: '1' } });
+        fireEvent.change(screen.getByRole('spinbutton', { name: 'The final' }), { target: { value: '1' } });
         fireEvent.click(screen.getByRole('checkbox', { name: 'Referee mode (force wins)' }));
         fireEvent.click(screen.getByRole('button', { name: /START TOURNAMENT/ }));
 
-        expect(await screen.findByText('Knockout bracket')).toBeInTheDocument();
+        expect(await screen.findByRole('tab', { name: 'Bracket' })).toHaveAttribute('aria-selected', 'true');
         expect(screen.getByRole('button', { name: /SPIN DUEL/ })).toBeEnabled();
         expect(screen.getByText(/Semifinals · Duel 1 of 3/)).toBeInTheDocument();
-        // Tres duelos decididos por el árbitro: dos semifinales y la final.
+        // Three duels decided by the referee: two semifinals and the final.
         for (let duel = 0; duel < 3; duel++) {
-            fireEvent.click(screen.getAllByRole('button', { name: /^Give the duel to .* without spinning$/ })[0]);
+            fireEvent.click(screen.getAllByRole('button', { name: /^Give to / })[0]);
         }
         expect(await screen.findByText('CHAMPION')).toBeInTheDocument();
         const saved = JSON.parse(localStorage.getItem('spinly-tournament') ?? 'null') as { events: unknown[] } | null;
         expect(saved?.events).toHaveLength(3);
-        // El historial cuenta las decisiones del árbitro.
+        // The history lists the referee's decisions.
         fireEvent.click(screen.getByRole('button', { name: 'View bracket' }));
         fireEvent.click(screen.getByRole('tab', { name: 'History' }));
         expect(screen.getAllByText(/Referee gives the duel to/)).toHaveLength(3);
     });
 
-    test('configurar un torneo: los estilos rellenan las reglas y la vista previa muestra los cruces', async () => {
+    test('tournament setup: styles fill in the rules and the preview shows the pairings', async () => {
         renderApp();
         fireEvent.click(screen.getByRole('button', { name: 'Tournament' }));
         await screen.findByDisplayValue('Option 1');
         fireEvent.click(screen.getByRole('button', { name: /Epic/ }));
-        expect(within(screen.getByRole('radiogroup', { name: 'Duels' })).getByRole('radio', { name: '5' })).toBeChecked();
-        expect(within(screen.getByRole('radiogroup', { name: 'Final' })).getByRole('radio', { name: '7' })).toBeChecked();
+        expect(screen.getByRole('spinbutton', { name: 'Every duel' })).toHaveValue(5);
+        expect(screen.getByRole('spinbutton', { name: 'The final' })).toHaveValue(7);
         expect(screen.getByRole('checkbox', { name: 'Third place match' })).toBeChecked();
-        expect(screen.getByText('First to 3 spin wins takes the duel')).toBeInTheDocument();
-        // Tocar una regla a mano lo deja en "Personalizado".
-        fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Duels' })).getByRole('radio', { name: '3' }));
+        expect(screen.getByText('First to 3 points wins · 5 spins at most')).toBeInTheDocument();
+        // Changing a rule by hand turns it into "Custom"; best of goes up to 10 and no further.
+        fireEvent.click(screen.getByRole('button', { name: 'Every duel: one spin fewer' }));
+        expect(screen.getByRole('spinbutton', { name: 'Every duel' })).toHaveValue(4);
         expect(screen.getByText('Custom')).toBeInTheDocument();
-        // Con orden de lista, la primera ronda se ve antes de empezar: 1 contra 4 y 2 contra 3.
+        fireEvent.change(screen.getByRole('spinbutton', { name: 'The final' }), { target: { value: '10' } });
+        expect(screen.getByRole('button', { name: 'The final: one spin more' })).toBeDisabled();
+        expect(screen.getByText('First to 6 points wins · 11 spins at most')).toBeInTheDocument();
+        // With list order, the first round shows before starting: 1 against 4 and 2 against 3.
         fireEvent.click(screen.getByRole('radio', { name: /List order/ }));
         const preview = screen.getByText('First round').parentElement as HTMLElement;
         expect(within(preview).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Option 1vsOption 4', 'Option 2vsOption 3']);
-        expect(screen.getByText('4 participants · 4 duels · 4-slot bracket')).toBeInTheDocument();
+        expect(screen.getByText('4 participants · 4 duels · final best of 10')).toBeInTheDocument();
+        // The fixed field adds a participant with the typed name and empties itself.
+        fireEvent.change(screen.getByRole('textbox', { name: 'New participant name' }), { target: { value: 'Tacos' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+        expect(screen.getByDisplayValue('Tacos')).toBeInTheDocument();
+        expect(screen.getByRole('textbox', { name: 'New participant name' })).toHaveValue('');
+        expect(screen.getByText('5 participants · 5 duels · final best of 10')).toBeInTheDocument();
     });
 
-    test('aplicar un tema pone sus propios colores de flecha y luces', async () => {
+    test('applying a theme sets its own pointer and light colors', async () => {
         renderApp();
         await pickColor('Change the pointer color', '#22c55e');
         fireEvent.click(screen.getByRole('button', { name: 'Themes' }));
@@ -550,9 +580,9 @@ describe('ruleta y editor', () => {
         expect(storedActiveTheme()).toMatchObject({ pointerColor: '#22d3ee', lightColor: '#f472b6' });
     });
 
-    test('el volumen de los efectos se regula en la playlist: a 0 los apaga y se recuerda', async () => {
+    test('the effects volume is set in the playlist: 0 mutes them and it is remembered', async () => {
         renderApp();
-        // En escritorio no hay botón de silenciar: el volumen vive en el mezclador de la playlist.
+        // On desktop there is no mute button: the volume lives in the playlist mixer.
         expect(screen.queryByRole('button', { name: 'Sounds' })).toBeNull();
         fireEvent.click(screen.getByRole('button', { name: 'Open playlist' }));
         const slider = await screen.findByRole('slider', { name: 'Sound effects volume' });
@@ -561,13 +591,13 @@ describe('ruleta y editor', () => {
         expect(localStorage.getItem('spinly-sound-volume')).toBe('0.4');
         fireEvent.change(slider, { target: { value: '0' } });
         expect(localStorage.getItem('spinly-sound')).toBe('off');
-        // Apagados no pierden el volumen: al subirlo de nuevo vuelven a sonar.
+        // Muting keeps the volume: raising it again brings the sounds back.
         expect(localStorage.getItem('spinly-sound-volume')).toBe('0.4');
         fireEvent.change(slider, { target: { value: '0.7' } });
         expect(localStorage.getItem('spinly-sound')).toBe('on');
     });
 
-    test('los botones suenan salvo con el sonido silenciado, también si cambian su icono', async () => {
+    test('buttons play a sound unless muted, even when their icon changes', async () => {
         const played: number[] = [];
         const param = { setValueAtTime: () => undefined, exponentialRampToValueAtTime: () => undefined };
         class FakeAudioContext {
@@ -592,7 +622,7 @@ describe('ruleta y editor', () => {
             await screen.findByRole('button', { name: 'Create new preset' });
             expect(played.length).toBeGreaterThan(0);
 
-            // La bandera se sustituye al cambiar de idioma: el clic debe sonar igualmente.
+            // The flag is replaced when the language changes: the click must still play.
             played.length = 0;
             fireEvent.click(screen.getByRole('button', { name: /Cambiar a español/ }).querySelector('svg *') as Element);
             expect(played.length).toBeGreaterThan(0);
@@ -608,15 +638,16 @@ describe('ruleta y editor', () => {
         }
     });
 
-    test('el asa de cada opción la reordena (también con las flechas del teclado)', () => {
+    test('each option\'s handle reorders it (also with the arrow keys)', () => {
         renderApp();
+        /** Names of the options in the editor, in order. */
         const names = () => screen.getAllByLabelText(/^Option name/).map((input) => (input as HTMLInputElement).value);
         const [first, second] = names();
         fireEvent.keyDown(screen.getByRole('button', { name: /^Move option 1/ }), { key: 'ArrowDown' });
         expect(names().slice(0, 2)).toEqual([second, first]);
     });
 
-    test('cargar un preset restaura las texturas en la ruleta y en el editor', async () => {
+    test('loading a preset restores its textures on the wheel and in the editor', async () => {
         const preset: WheelPreset = {
             id: 'con-textura', name: 'Preset con textura', updatedAt: Date.now(), tags: [],
             options: [{ id: 'a', name: 'Uno', color: 'indigo' }, { id: 'b', name: 'Dos', color: 'indigo' }],
@@ -634,7 +665,7 @@ describe('ruleta y editor', () => {
         expect(container.querySelectorAll('.option-item--has-img')).toHaveLength(1);
     });
 
-    test('la probabilidad se muestra con dos decimales como mucho y el separador de cada idioma', () => {
+    test('odds show at most two decimals with each language\'s separator', () => {
         renderApp();
         fireEvent.click(screen.getByRole('button', { name: 'Remove option 4' }));
         expect(screen.getByText('Each option has a 33.33% chance (3 options).')).toBeInTheDocument();
@@ -642,15 +673,15 @@ describe('ruleta y editor', () => {
         expect(screen.getByText('Cada opción tiene un 33,33% de probabilidad (3 opciones).')).toBeInTheDocument();
     });
 
-    test('el clic derecho no abre el menú del navegador, salvo en los campos de texto', () => {
+    test('right click does not open the browser menu, except in text fields', () => {
         renderApp();
-        // fireEvent devuelve false cuando el evento se cancela con preventDefault.
+        // fireEvent returns false when the event is cancelled with preventDefault.
         expect(fireEvent.contextMenu(screen.getByRole('button', { name: 'Presets' }))).toBe(false);
         expect(fireEvent.contextMenu(document.body)).toBe(false);
         expect(fireEvent.contextMenu(screen.getAllByLabelText(/^Option name/)[0])).toBe(true);
     });
 
-    test('la firma se puede ocultar y sigue oculta al volver', async () => {
+    test('the author credit can be hidden and stays hidden', async () => {
         const first = renderApp();
         expect(screen.getByRole('link', { name: /Developed by\s*Jondals/ })).toHaveAttribute('href', 'https://github.com/Jondals');
         fireEvent.click(screen.getByRole('button', { name: 'Hide credit' }));
@@ -662,8 +693,8 @@ describe('ruleta y editor', () => {
     });
 });
 
-describe('idioma', () => {
-    test('la bandera de la cabecera y el selector del drawer cambian el idioma', () => {
+describe('language', () => {
+    test('the header flag and the drawer selector change the language', () => {
         renderApp();
         fireEvent.click(screen.getByRole('button', { name: /Cambiar a español/ }));
         expect(screen.getByRole('button', { name: 'Editor de ruleta' })).toBeInTheDocument();
@@ -677,10 +708,11 @@ describe('idioma', () => {
     });
 });
 
-describe('comunidad', () => {
-    // La lista se recarga tras cada escritura: esperar a que termine evita actualizaciones fuera de act().
+describe('community', () => {
+    /** The list reloads after every write: waiting for it avoids updates outside act(). */
     const settle = () => waitFor(() => expect(screen.queryByText('Loading community…')).toBeNull());
 
+    /** Opens a panel's Community view and waits for it to load. */
     const openCommunity = async (section: 'Themes' | 'Presets') => {
         const view = renderApp();
         fireEvent.click(screen.getByRole('button', { name: section }));
@@ -689,7 +721,7 @@ describe('comunidad', () => {
         return view;
     };
 
-    test('el contador de temas compara por id lo descargado con lo disponible', async () => {
+    test('the theme counter compares downloaded and available items by id', async () => {
         localStorage.setItem(THEMES_STORAGE_KEY, JSON.stringify([sharedTheme('t2')]));
         await openCommunity('Themes');
         expect(await screen.findByTitle('1 downloaded / 3 available')).toHaveTextContent('1/3 Downloaded');
@@ -699,7 +731,7 @@ describe('comunidad', () => {
         await settle();
     });
 
-    test('un tema ya descargado no se descarga otra vez: se aplica la copia guardada, con sus cambios', async () => {
+    test('a downloaded theme is not downloaded again: the saved copy is applied, with its changes', async () => {
         const local = { ...sharedTheme('t2'), name: 'Mi versión de t2', pointerColor: '#123456' };
         localStorage.setItem(THEMES_STORAGE_KEY, JSON.stringify([local]));
         await openCommunity('Themes');
@@ -711,7 +743,7 @@ describe('comunidad', () => {
         expect(stored).toEqual([local]);
     });
 
-    test('"Usar" un preset conserva su id; la segunda vez usa la copia guardada sin descargarlo', async () => {
+    test('"Use" keeps a preset\'s id; the second time it uses the saved copy without downloading it', async () => {
         await openCommunity('Presets');
         const use = await screen.findByRole('button', { name: 'Use preset Shared p1' });
         fireEvent.click(use);
@@ -725,7 +757,7 @@ describe('comunidad', () => {
         expect(second.filter((preset) => preset.id === 'p1')).toHaveLength(1);
     });
 
-    test('editar y borrar en la nube solo aparece en las filas propias', async () => {
+    test('cloud edit and delete only appear on the user\'s own rows', async () => {
         await openCommunity('Themes');
         expect(await screen.findByRole('button', { name: 'Edit Shared t1 in the cloud' })).toBeInTheDocument();
         for (const other of ['t2', 't3']) {
@@ -734,7 +766,7 @@ describe('comunidad', () => {
         }
     });
 
-    test('borrar en la nube pide un segundo clic y actualiza lista y contador', async () => {
+    test('cloud delete asks for a second click and updates the list and the counter', async () => {
         await openCommunity('Themes');
         fireEvent.click(await screen.findByRole('button', { name: 'Delete Shared t1 from the cloud' }));
         expect(mockServer.deletes).toHaveLength(0);
@@ -746,7 +778,7 @@ describe('comunidad', () => {
         await settle();
     });
 
-    test('las tarjetas de preajuste muestran sus etiquetas, no sus opciones', async () => {
+    test('preset cards show their tags, not their options', async () => {
         const preset: WheelPreset = {
             ...sharedPreset('rgb'),
             name: 'RGB',
@@ -762,11 +794,11 @@ describe('comunidad', () => {
         expect(within(card).queryByText('Rojo')).toBeNull();
     });
 
-    test('editar en la nube abre el formulario en el sitio de la tarjeta y actualiza la misma fila', async () => {
+    test('cloud edit opens the form in place of the card and updates the same row', async () => {
         const { container } = await openCommunity('Presets');
         fireEvent.click(await screen.findByRole('button', { name: 'Edit Shared p2 in the cloud' }));
 
-        // La tarjeta editada se sustituye por el formulario, dentro de la lista y no al final.
+        // The edited card is replaced by the form, inside the list rather than at the end.
         const panel = container.querySelector('#presets-form-edit') as HTMLElement;
         expect(panel).toHaveClass('spinly-collapse--open');
         expect(panel.closest('.presets-presets-grid')).not.toBeNull();
@@ -783,19 +815,22 @@ describe('comunidad', () => {
     });
 });
 
-describe('cuenta', () => {
+describe('account', () => {
     const actualAccountData = jest.requireActual('./scripts/account-data') as typeof import('./scripts/account-data');
+    /** Opens the profile menu. */
     const openProfile = async () => {
         fireEvent.click(screen.getByRole('button', { name: /^(Open profile|Profile of)/ }));
         return screen.findByRole('dialog', { name: 'User profile' });
     };
 
-    test('crear cuenta exige una contraseña segura, sin el nombre de usuario y repetida igual', async () => {
+    test('creating an account requires a strong password, without the username and repeated identically', async () => {
         mockAuth.session = null;
         renderApp();
         const menu = await openProfile();
         const weak = 'The password is not secure enough: it needs at least 10 characters with lowercase, uppercase, a number and a symbol, and it cannot contain your username.';
+        /** Submits the create-account form. */
         const submit = () => fireEvent.submit(within(menu).getByRole('button', { name: 'Create account' }));
+        /** Types the password and its repetition. */
         const type = (pass: string, repeat = pass) => {
             fireEvent.change(within(menu).getByLabelText('Password'), { target: { value: pass } });
             fireEvent.change(within(menu).getByLabelText('Repeat the password'), { target: { value: repeat } });
@@ -824,7 +859,7 @@ describe('cuenta', () => {
         await waitFor(() => expect(mockAccount.calls).toEqual(['createAccount']));
     });
 
-    test('requisitos de contraseña: longitud, minúscula, mayúscula, número, símbolo y sin el nombre', () => {
+    test('password requirements: length, lowercase, uppercase, digit, symbol and no username', () => {
         const { passwordChecks, validatePassword } = jest.requireActual('./scripts/profile') as typeof import('./scripts/profile');
         expect(passwordChecks('abc', 'ana')).toEqual({ length: false, lower: true, upper: false, digit: false, symbol: false, noName: true });
         expect(Object.values(passwordChecks('Lluvia#Roja77', 'ana')).every(Boolean)).toBe(true);
@@ -834,7 +869,7 @@ describe('cuenta', () => {
         expect(validatePassword('A#1' + 'b'.repeat(80))).not.toBeNull();
     });
 
-    test('un perfil sin contraseña ofrece crearla y no deja cerrar sesión (se perdería)', async () => {
+    test('a passwordless profile offers to set one and cannot sign out (it would be lost)', async () => {
         mockAuth.session = { userId: 'me', isAnonymous: true };
         mockAccount.profile = { id: 'me', username: 'ana', avatar_url: null };
         renderApp();
@@ -844,7 +879,7 @@ describe('cuenta', () => {
         expect(within(menu).queryByRole('button', { name: 'Sign out' })).toBeNull();
     });
 
-    test('credenciales incorrectas: error genérico y no se recarga nada', async () => {
+    test('wrong credentials: a generic error and nothing reloads', async () => {
         mockAuth.session = null;
         mockAccount.signInResult = { ok: false, error: { en: 'Wrong username or password.', es: 'Usuario o contraseña incorrectos.' } };
         renderApp();
@@ -856,7 +891,7 @@ describe('cuenta', () => {
         expect(await within(menu).findByText('Wrong username or password.')).toBeInTheDocument();
         expect(mockAccount.reloads).toBe(0);
 
-        // Al tercer fallo seguido, pausa antes de poder volver a intentarlo.
+        // After the third failure in a row, a pause before trying again.
         for (let attempt = 2; attempt <= 3; attempt++) {
             fireEvent.change(within(menu).getByLabelText('Password'), { target: { value: 'Otra#prueba1' } });
             fireEvent.submit(within(menu).getByRole('button', { name: 'Sign in' }));
@@ -866,7 +901,7 @@ describe('cuenta', () => {
         expect(within(menu).getByRole('button', { name: 'Sign in' })).toBeDisabled();
     });
 
-    test('cerrar sesión deja la app como la primera vez pero conserva el idioma', async () => {
+    test('signing out leaves the app as on a first visit but keeps the language', async () => {
         mockAccount.profile = { id: 'me', username: 'ana', avatar_url: null };
         mockMusic.files.set('cancion-0001', new Blob(['x']));
         sessionStorage.setItem('spinly-splash', '1');
@@ -883,11 +918,11 @@ describe('cuenta', () => {
         expect(localStorage.getItem('spinly-lang')).toBe('es');
         expect(localStorage.getItem('spinly-music')).toBeNull();
         expect(mockMusic.files.size).toBe(0);
-        // Como la primera vez: la próxima carga vuelve a mostrar la pantalla de carga.
+        // Like a first visit: the next load shows the splash screen again.
         expect(sessionStorage.getItem('spinly-splash')).toBeNull();
     });
 
-    test('sin sesión no hay avisos fijos: se puede descargar y compartir avisa al intentarlo', async () => {
+    test('without a session there are no permanent warnings: downloading works and sharing warns when tried', async () => {
         mockAuth.session = null;
         localStorage.setItem(THEMES_STORAGE_KEY, JSON.stringify([{ ...sharedTheme('mio'), name: 'Mío' }]));
         renderApp();
@@ -898,7 +933,7 @@ describe('cuenta', () => {
         expect(await screen.findByRole('button', { name: 'Download theme Shared t1' })).toBeInTheDocument();
     });
 
-    test('los temas y preajustes de ejemplo se pueden borrar y no vuelven al recargar', async () => {
+    test('sample themes and presets can be deleted and do not come back on reload', async () => {
         const first = renderApp();
         fireEvent.click(screen.getByRole('button', { name: 'Themes' }));
         fireEvent.click(await screen.findByRole('button', { name: 'Delete Neon Nights' }));
@@ -911,17 +946,17 @@ describe('cuenta', () => {
         expect(screen.queryByText('Neon Nights')).toBeNull();
     });
 
-    test('al arrancar solo se aplican los datos de la nube si de verdad cambian (sin remontar por nada)', async () => {
+    test('at startup cloud data is only applied when it really changed (no needless remount)', async () => {
         const accountData = jest.requireActual('./scripts/account-data') as typeof import('./scripts/account-data');
         accountData.setAppRemount(() => { mockAccount.reloads += 1; });
         try {
             const options = [{ id: 'a', name: 'A', color: 'indigo' }, { id: 'b', name: 'B', color: 'coral' }];
             localStorage.setItem('spinly-options', JSON.stringify(options));
-            // Una primera visita sin sesión deja en storage lo que la app guarda al arrancar.
+            // A first visit without a session leaves in storage what the app saves at startup.
             mockAuth.session = null;
             renderApp().unmount();
             mockAuth.session = { userId: 'me', isAnonymous: false };
-            // La última subida acabó con la pestaña cerrada: la nube es "más nueva" pero idéntica.
+            // The last upload finished with the tab closed: the cloud is "newer" but identical.
             localStorage.setItem('spinly-account-sync', JSON.stringify({ uid: 'me', updatedAt: 1 }));
             mockAccount.remote = accountData.sanitizeAccountData({ ...accountData.readLocalData(), music: null, updatedAt: 5 });
             const first = renderApp();
@@ -929,7 +964,7 @@ describe('cuenta', () => {
             expect(mockAccount.reloads).toBe(0);
             first.unmount();
 
-            // Otro dispositivo cambió las opciones: esas sí se aplican.
+            // Another device changed the options: those are applied.
             mockAccount.remote = accountData.sanitizeAccountData({ ...accountData.readLocalData(), options: [...options, { id: 'c', name: 'C', color: 'teal' }], updatedAt: 9 });
             renderApp();
             await waitFor(() => expect(mockAccount.reloads).toBe(1));
@@ -939,7 +974,7 @@ describe('cuenta', () => {
         }
     });
 
-    test('los datos de la cuenta se sanean y al entrar se suman los del invitado sin duplicar', () => {
+    test('account data is sanitized and on sign-in the guest\'s data is added without duplicates', () => {
         const clean = actualAccountData.sanitizeAccountData({
             updatedAt: 5,
             options: [{ name: 'A' }, { name: 'B' }, { name: 42 }],
@@ -961,10 +996,11 @@ describe('cuenta', () => {
     });
 });
 
-describe('música', () => {
+describe('music', () => {
+    /** A fake audio file. */
     const song = (name: string, type = 'audio/mpeg') => new File(['audio'], name, { type });
 
-    // El panel se carga bajo demanda: se espera a que esté pintado, no solo el diálogo.
+    /** Opens the playlist. The panel loads on demand: it waits for it to be painted, not just the dialog. */
     const openPlaylist = async () => {
         fireEvent.click(screen.getByRole('button', { name: 'Open playlist' }));
         const panel = await screen.findByRole('dialog', { name: 'Playlist' });
@@ -972,6 +1008,7 @@ describe('música', () => {
         return panel;
     };
 
+    /** Uploads files through the playlist's file input. */
     const upload = async (panel: HTMLElement, ...files: File[]) => {
         fireEvent.change(within(panel).getByLabelText('Upload songs'), { target: { files } });
         await within(panel).findByRole('button', { name: `Play ${files[files.length - 1].name.replace(/\.[^.]+$/, '')}` });
@@ -983,7 +1020,7 @@ describe('música', () => {
     });
     afterEach(() => canPlay.mockRestore());
 
-    test('sin canciones de serie: la playlist empieza vacía y el botón de música lleva a subirlas', async () => {
+    test('no built-in songs: the playlist starts empty and the music button leads to uploading', async () => {
         renderApp();
         fireEvent.click(screen.getByRole('button', { name: 'Open playlist' }));
         const panel = await screen.findByRole('dialog', { name: 'Playlist' });
@@ -992,7 +1029,7 @@ describe('música', () => {
         expect(mockMusic.played).toEqual([]);
     });
 
-    test('subir canciones: se validan, entran en la playlist, se guardan en la cuenta y se pueden quitar', async () => {
+    test('uploading songs: they are validated, added to the playlist, saved to the account and removable', async () => {
         renderApp();
         const panel = await openPlaylist();
         const big = new File(['x'], 'Enorme.mp3', { type: 'audio/mpeg' });
@@ -1013,7 +1050,7 @@ describe('música', () => {
         expect(await within(panel).findByText(/Your playlist is empty/)).toBeInTheDocument();
     });
 
-    test('reproducir: encender, pausar y reanudar, pasar de canción y reordenar', async () => {
+    test('playback: play, pause and resume, skip tracks and reorder', async () => {
         renderApp();
         const panel = await openPlaylist();
         await upload(panel, song('Uno.mp3'), song('Dos.ogg', 'audio/ogg'), song('Tres.wav', 'audio/wav'));
@@ -1026,7 +1063,7 @@ describe('música', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Pause music' }));
         expect(mockMusic.played).toEqual(['file', 'pause']);
         expect(localStorage.getItem('spinly-music-on')).toBe('off');
-        // Volver a encenderla reanuda la misma canción en vez de empezar otra.
+        // Turning it back on resumes the same song instead of starting another one.
         fireEvent.click(screen.getByRole('button', { name: 'Play music' }));
         await waitFor(() => expect(mockMusic.played).toEqual(['file', 'pause', 'resume']));
 
@@ -1038,7 +1075,7 @@ describe('música', () => {
         expect(JSON.parse(localStorage.getItem('spinly-music') ?? '{}').playlist.map((track: { name: string }) => track.name)).toEqual(['Uno', 'Tres', 'Dos']);
     });
 
-    test('sin sesión la canción se queda en el dispositivo y se sube al entrar en la cuenta', async () => {
+    test('without a session the song stays on the device and uploads after signing in', async () => {
         mockAuth.session = null;
         const first = renderApp();
         const panel = await openPlaylist();
@@ -1054,7 +1091,7 @@ describe('música', () => {
         expect(localStorage.getItem('spinly-music-pending')).toBeNull();
     });
 
-    /** El seguidor en tiempo real del motor, alimentado con la fuerza de ataque dada. */
+    /** The engine's real-time tracker, fed with the given onset strength. */
     const liveTracker = (onset: () => number) => {
         const tracker = new BeatTracker();
         return (analysis: number, at: number) => {
@@ -1065,8 +1102,8 @@ describe('música', () => {
     };
 
     /**
-     * Canción sintética a 120 BPM (un tiempo cada 500 ms, compás en el primero) con el reparto de
-     * bandas dado. Con `grid`, el análisis previo ya está listo; sin él, solo el seguidor en tiempo real.
+     * Synthetic song at 120 BPM (a beat every 500 ms, the bar starting on the first one) with the given band
+     * levels. With `grid`, the prior analysis is ready; without it, only the real-time tracker runs.
      */
     const fakeSong = ({ mid = 0.1, high = 0.05, grid = true, bass = true, period = 0.5 }: { mid?: number; high?: number; grid?: boolean; bass?: boolean; period?: number } = {}) => {
         let songTime = 0;
@@ -1084,10 +1121,11 @@ describe('música', () => {
         };
     };
 
-    test('el latido cae en cada tiempo, más fuerte al empezar compás, y se apaga sin música', () => {
-        // Reloj propio por delante del real: otros tests ya leyeron el pulso con performance.now().
+    test('the pulse lands on every beat, stronger on the first beat of a bar, and fades without music', () => {
+        // A clock ahead of the real one: other tests already read the pulse with performance.now().
         let time = performance.now() + 1e6;
         const song = fakeSong();
+        /** Reads the music state ms milliseconds into the song. */
         const at = (ms: number) => {
             for (let t = 0; t < ms; t += 4) {
                 song.advance(4);
@@ -1097,7 +1135,7 @@ describe('música', () => {
             return readMusic(time);
         };
         at(3992);
-        // 4 s: primer tiempo de compás (el noveno tiempo); medio tiempo después, casi apagado.
+        // 4 s: first beat of a bar (the ninth beat); half a beat later, almost off.
         const bar = at(8);
         expect(bar.downbeat).toBe(true);
         expect(bar.sinceBeat).toBeLessThan(20);
@@ -1115,9 +1153,9 @@ describe('música', () => {
         expect(readPulse(time + 16)).toBeLessThan(0.01);
     });
 
-    test('el latido se adapta a la velocidad: seco en una canción rápida, largo en una lenta', () => {
+    test('the pulse adapts to the tempo: dry in a fast song, long in a slow one', () => {
         let time = performance.now() + 1.5e6;
-        // Pulso 120 ms después del quinto tiempo de compás (a 4 tiempos por compás, el tiempo 8).
+        // Pulse 120 ms after the fifth bar's first beat (at 4 beats per bar, beat 8).
         const pulseAfterBeat = (period: number) => {
             const song = fakeSong({ period });
             const target = 8 * period + 0.12;
@@ -1134,8 +1172,9 @@ describe('música', () => {
         setPulseSource(null);
     });
 
-    test('la música marca los tiempos, el tempo y un patrón según cómo suena', () => {
+    test('music reports the beats, the tempo and a pattern based on how it sounds', () => {
         let time = performance.now() + 2e6;
+        /** Plays a fake song with the given levels and returns the pattern it picks. */
         const play = (mid: number, high: number) => {
             const song = fakeSong({ mid, high });
             for (let i = 0; i < 375; i++) {
@@ -1146,7 +1185,7 @@ describe('música', () => {
             return readMusic(time);
         };
         const bassy = play(0.06, 0.02);
-        // 6 s a 120 BPM: los tiempos de 0 a 6 s, ambos incluidos.
+        // 6 s at 120 BPM: the beats from 0 to 6 s, both included.
         expect(bassy.beats).toBe(13);
         expect(bassy.beatMs).toBe(500);
         expect(bassy.pattern).toBe('rings');
@@ -1155,7 +1194,7 @@ describe('música', () => {
         setPulseSource(null);
     });
 
-    test('el patrón cambia cada cuatro compases, justo al empezar compás, y con fundido', () => {
+    test('the pattern changes every four bars, right on the first beat of a bar, with a crossfade', () => {
         let time = performance.now() + 3e6;
         const song = fakeSong({ mid: 0.5 });
         const changes: { beats: number; downbeat: boolean; changed: boolean }[] = [];
@@ -1165,20 +1204,20 @@ describe('música', () => {
             song.advance(16);
             time += 16;
             const frame = readMusic(time);
-            // Un cambio: el fundido vuelve a empezar.
+            // A change: the crossfade starts over.
             if (frame.patternBlend < blend) changes.push({ beats: frame.beats, downbeat: frame.downbeat, changed: frame.pattern !== pattern });
             blend = frame.patternBlend;
             pattern = frame.pattern;
         }
-        // El primero en el compás que sigue a los 2,2 s (a los 4 s, noveno tiempo); después, cada 16
-        // tiempos (8 s a 120 BPM), siempre en el primer tiempo de un compás y a un efecto distinto.
+        // The first one on the bar after 2.2 s (at 4 s, the ninth beat); then every 16 beats (8 s at 120 BPM),
+        // always on the first beat of a bar and to a different effect.
         expect(changes.map((change) => change.beats)).toEqual([9, 25, 41, 57]);
         expect(changes.every((change) => change.downbeat)).toBe(true);
         expect(changes.slice(1).every((change) => change.changed)).toBe(true);
         setPulseSource(null);
     });
 
-    test('sin análisis previo, el seguidor en tiempo real engancha el pulso y lo mantiene en un silencio', () => {
+    test('without prior analysis, the real-time tracker locks onto the beat and keeps it through a silence', () => {
         let time = performance.now() + 4e6;
         let hits = true;
         let songTime = 0;
@@ -1188,6 +1227,7 @@ describe('música', () => {
             clock: () => ({ audible: songTime, analysis: songTime }),
             grid: () => null,
         });
+        /** Advances the fake song to ms milliseconds. */
         const run = (ms: number) => {
             for (let t = 0; t < ms; t += 16) {
                 songTime += 0.016;
@@ -1198,8 +1238,8 @@ describe('música', () => {
         };
         const locked = run(6000);
         expect(Math.abs(locked.beatMs - 500)).toBeLessThan(10);
-        // El reloj va a la par que la canción: lo que se ve (un fotograma, 16 ms, por delante de lo que
-        // suena) está a la misma altura del tiempo. Distancia circular dentro del tiempo de 500 ms.
+        // The clock keeps pace with the song: what is shown (one frame, 16 ms, ahead of what is heard) lines
+        // up with the beat. Circular distance within the 500 ms beat.
         const offPhase = (frame: { sinceBeat: number }) => {
             const d = Math.abs(frame.sinceBeat - (((songTime + 0.016) % 0.5) * 1000));
             return Math.min(d, 500 - d);
@@ -1213,11 +1253,12 @@ describe('música', () => {
         setPulseSource(null);
     });
 
-    test('la playlist que llega de la cuenta o del storage se sanea y al entrar se suman las del invitado', () => {
+    test('playlists from the account or storage are sanitized and the guest\'s songs are added on sign-in', () => {
+        /** A playlist track. */
         const track = (id: string, name = 'Canción') => ({ id, name, mime: 'audio/mpeg', size: 1000 });
         const clean = sanitizeMusicLibrary({
             playlist: [
-                // Las pistas de serie de versiones anteriores ya no existen.
+                // Built-in tracks from older versions no longer exist.
                 { kind: 'builtin', builtin: 'neon', id: 'builtin-neon' },
                 track('../../otra-carpeta'),
                 { ...track('cancion-0001'), kind: 'upload' },

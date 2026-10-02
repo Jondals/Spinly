@@ -1,6 +1,8 @@
-// Archivos de las canciones subidas. En el navegador, IndexedDB (localStorage no admite archivos
-// de varios MB); en la cuenta, el bucket privado user-data: user-data/<uid>/music/<id>, con las
-// mismas políticas que el JSON de la cuenta (solo la carpeta propia y solo con contraseña).
+/**
+ * Files of the uploaded songs. In the browser they live in IndexedDB (localStorage cannot hold files of
+ * several MB); in the account, in the private user-data bucket at user-data/<uid>/music/<id>, with the
+ * same policies as the account's JSON (only the user's own folder, and only with a password account).
+ */
 import { getSupabase, notConfiguredError, supabaseErrorMessage, type ServiceResult } from './supabaseClient';
 import { dictMessage, type LocalMessage } from './strings';
 import { USER_DATA_BUCKET, isAccountUid } from './account-data';
@@ -11,6 +13,7 @@ const STORE = 'files';
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
 
+/** Opens (once) the IndexedDB database of song files; null when IndexedDB is unavailable. */
 function openDb(): Promise<IDBDatabase | null> {
     if (typeof indexedDB === 'undefined') return Promise.resolve(null);
     if (!dbPromise) {
@@ -20,7 +23,7 @@ function openDb(): Promise<IDBDatabase | null> {
                 request.onupgradeneeded = () => request.result.createObjectStore(STORE);
                 request.onsuccess = () => {
                     const db = request.result;
-                    // Otra pestaña borra la base (cerrar sesión): esta suelta su conexión y la reabre al usarla.
+                    // Another tab deletes the database (sign-out): this one drops its connection and reopens it when needed.
                     db.onversionchange = () => {
                         db.close();
                         dbPromise = null;
@@ -37,6 +40,7 @@ function openDb(): Promise<IDBDatabase | null> {
     return dbPromise;
 }
 
+/** Runs one request on the files store; resolves with its result, or null on any failure. */
 function run<T>(mode: IDBTransactionMode, action: (store: IDBObjectStore) => IDBRequest<T>): Promise<T | null> {
     return openDb().then((db) => new Promise<T | null>((resolve) => {
         if (!db) {
@@ -53,21 +57,23 @@ function run<T>(mode: IDBTransactionMode, action: (store: IDBObjectStore) => IDB
     }));
 }
 
+/** Reads a song file from the local cache. */
 export async function readTrackFile(id: string): Promise<Blob | null> {
     const result = await run<unknown>('readonly', (store) => store.get(id));
     return result instanceof Blob ? result : null;
 }
 
-/** false si el navegador no deja guardarlo (sin IndexedDB, modo privado estricto o sin espacio). */
+/** Saves a song file locally; false if the browser does not allow it (no IndexedDB, strict private mode or no space). */
 export async function saveTrackFile(id: string, file: Blob): Promise<boolean> {
     return (await run('readwrite', (store) => store.put(file, id))) !== null;
 }
 
+/** Deletes a song file from the local cache. */
 export async function deleteTrackFile(id: string): Promise<void> {
     await run('readwrite', (store) => store.delete(id));
 }
 
-/** Cerrar sesión: el navegador queda como la primera vez, también sin canciones. */
+/** Sign-out: the browser is left as on a first visit, songs included. */
 export function clearTrackFiles(): Promise<void> {
     return new Promise((resolve) => {
         if (typeof indexedDB === 'undefined') {
@@ -90,18 +96,20 @@ export function clearTrackFiles(): Promise<void> {
     });
 }
 
-// La ruta sale del uid de la sesión y de un id validado, nunca del nombre del archivo.
+/** Cloud path of a song. It is built from the session's uid and a validated id, never from the file name. */
 const cloudPath = (uid: string, id: string): string | null =>
     isAccountUid(uid) && TRACK_ID_PATTERN.test(id) ? `${uid}/music/${id}` : null;
 
+/** Maps a Storage error to a user-facing message, spotting a missing bucket or a bucket without audio types. */
 const cloudError = (fallback: LocalMessage, error: unknown): LocalMessage => {
     const message = String((error as { message?: unknown } | null)?.message ?? '');
     if (/bucket not found/i.test(message)) return dictMessage('errors', 'accountBucketMissing');
-    // El bucket aún no admite audio: falta el SQL de la música (README).
+    // The bucket does not accept audio yet: the music SQL is missing (README).
     if (/mime type|not supported/i.test(message)) return dictMessage('errors', 'musicBucketMime');
     return supabaseErrorMessage(fallback, error);
 };
 
+/** Uploads a song to the user's private folder. */
 export async function uploadTrackFile(uid: string, id: string, file: Blob, mime: string): Promise<ServiceResult<true>> {
     const supabase = await getSupabase();
     if (!supabase) return { ok: false, error: notConfiguredError() };
@@ -116,6 +124,7 @@ export async function uploadTrackFile(uid: string, id: string, file: Blob, mime:
     }
 }
 
+/** Downloads a song from the user's private folder. */
 export async function downloadTrackFile(uid: string, id: string): Promise<ServiceResult<Blob>> {
     const supabase = await getSupabase();
     if (!supabase) return { ok: false, error: notConfiguredError() };
@@ -130,6 +139,7 @@ export async function downloadTrackFile(uid: string, id: string): Promise<Servic
     }
 }
 
+/** Deletes a song from the user's private folder. */
 export async function deleteCloudTrackFile(uid: string, id: string): Promise<ServiceResult<true>> {
     const supabase = await getSupabase();
     if (!supabase) return { ok: false, error: notConfiguredError() };

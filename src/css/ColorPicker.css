@@ -1,3 +1,5 @@
+/* Floating color picker (ColorPicker.tsx): saturation/value square, hue bar, HEX/RGB fields and eyedropper. */
+
 .cpicker {
     position: fixed;
     z-index: 60;
@@ -19,7 +21,7 @@
     justify-content: space-between;
 }
 
-/* Con ratón se arrastra por la cabecera (ColorPicker.tsx); en táctil sigue anclado. */
+/* With a mouse it is dragged by its header (ColorPicker.tsx); on touch it stays anchored. */
 @media (pointer: fine) {
     .cpicker-head {
         cursor: grab;
@@ -155,12 +157,12 @@
     display: block;
 }
 
-/* Solo lo abre la pipeta en modo imagen (móvil o sin captura de pantalla). */
+/* Only opened by the eyedropper in image mode (mobile, or without screen capture). */
 .cpicker-file {
     display: none;
 }
 
-/* Pipeta abierta: el botón queda marcado hasta que se elige o se cancela */
+/* Eyedropper open: the button stays highlighted until a color is picked or it is cancelled */
 .cpicker-eyedropper--active,
 .cpicker-eyedropper--active:disabled {
     color: #ffffff;

@@ -1,51 +1,54 @@
-// Cómo se ve la música en las luces de la ruleta y en el fondo de puntos. Se carga bajo demanda,
-// la primera vez que suena una canción: quien no pone música no descarga nada de esto.
+/**
+ * How music looks on the wheel lights and on the dot background. It loads on demand, the first time a
+ * song plays: visitors who never play music never download any of this.
+ */
 import { readMusic, type MusicFrame, type MusicPattern } from './music-pulse';
 
-// Todo se mide en tiempos de la canción, no en milisegundos: cada animación va a su BPM, como un
-// visualizador. Con una canción rápida todo va rápido y con una lenta, despacio, siempre a compás.
-// La vuelta avanza 3 luces por tiempo: una vuelta de 24 luces cada dos compases.
+// Everything is measured in song beats, not milliseconds: every animation runs at the song's BPM, like a
+// visualizer. A fast song makes everything fast and a slow one slow, always in time.
+// The chase moves 3 lights per beat: one lap of 24 lights every two bars.
 const CHASE_STEPS_PER_BEAT = 3;
-// Cometas: tres, una vuelta completa por compás.
+// Comets: three, one full lap per bar.
 const COMETS = 3;
-// Radio de las luces del aro en Wheel.tsx (viewBox de 100).
+// Radius of the rim lights in Wheel.tsx (viewBox of 100).
 const RIM_RADIUS = 0.75;
-// Pétalos de la flor en el aro y en el fondo.
+// Bloom petals on the rim and on the background.
 const BLOOM_RIM_PETALS = 4;
 const BLOOM_PETALS = 8;
 
-/** Distancia entre dos posiciones de un anillo de n luces, por el camino corto. */
+/** Distance between two positions on a ring of n lights, the short way round. */
 const ringDistance = (a: number, b: number, n: number): number => {
     const d = (((a - b) % n) + n) % n;
     return Math.min(d, n - d);
 };
 
-/** Pseudoaleatorio estable por luz y golpe: el mismo golpe enciende siempre las mismas bombillas. */
+/** Stable pseudo-random per light and beat: the same beat always lights the same bulbs. */
 const hash = (i: number, beat: number): number => {
     const x = Math.sin(i * 12.9898 + beat * 78.233) * 43758.5453;
     return x - Math.floor(x);
 };
 
+/** Cubic ease-out. */
 const easeOut = (t: number): number => 1 - (1 - t) ** 3;
 
-/** Brillo (0-1) de la luz i de un anillo de n con un patrón dado, al ritmo de los golpes. */
+/** Brightness (0-1) of light i on a ring of n for a given pattern, in time with the beats. */
 function patternLevel(pattern: MusicPattern, frame: MusicFrame, i: number, n: number): number {
     const { pulse, beats, sinceBeat, beatMs, sparkle } = frame;
     const progress = Math.min(1, sinceBeat / beatMs);
     switch (pattern) {
         case 'rings':
-            // El aro entero late con cada golpe.
+            // The whole rim pulses with every beat.
             return 0.1 + pulse * 0.9;
         case 'bloom': {
-            // La flor: cuatro pétalos que en cada tiempo nacen como puntos y se abren hasta llenar el
-            // aro mientras se apagan; cada tiempo giran medio pétalo, y el que abre compás, más fuerte.
+            // The bloom: four petals born as points on every beat that open to fill the rim as they fade; each
+            // beat they turn half a petal, and the first beat of the bar is stronger.
             const open = easeOut(Math.min(1, progress / 0.6));
             const turn = (beats * Math.PI) / BLOOM_RIM_PETALS;
             const petal = 0.5 + 0.5 * Math.cos(BLOOM_RIM_PETALS * ((i / n) * Math.PI * 2 - turn));
             return petal ** (1 + 10 * (1 - open)) * (0.35 + pulse * 0.65);
         }
         case 'comets': {
-            // Cometas: tres cabezas dan una vuelta al aro por compás, a velocidad constante, con estela.
+            // Comets: three heads go round the rim once per bar, at a constant speed, with a tail.
             const head = ((beats + progress) / 4) * n;
             let level = 0;
             for (let k = 0; k < COMETS; k++) {
@@ -55,19 +58,18 @@ function patternLevel(pattern: MusicPattern, frame: MusicFrame, i: number, n: nu
             return level * (0.45 + pulse * 0.55);
         }
         case 'rays': {
-            // Marquesina: en cada tiempo se encienden las bombillas pares o las impares; al abrir
-            // compás, todas.
+            // Marquee: on each beat either the even or the odd bulbs light up; on the first beat of a bar, all of them.
             const on = frame.downbeat || i % 2 === beats % 2;
             return on ? (1 - progress) ** 0.7 * (0.35 + pulse * 0.65) : 0;
         }
         case 'equalizer': {
-            // Vúmetro: el aro se llena desde abajo por los dos lados hasta la altura del latido.
+            // VU meter: the rim fills from the bottom up both sides to the height of the pulse.
             const height = 1 - ringDistance(i, 0, n) / (n / 2);
             const fill = 0.15 + 0.85 * pulse;
             return height <= fill ? 0.35 + 0.65 * pulse * (1 - (fill - height) * 0.5) : 0;
         }
         case 'fireworks': {
-            // Dos chispazos por tiempo en sitios al azar del aro, que se abren y se apagan.
+            // Two sparks per beat at random spots of the rim, which open and fade.
             const open = easeOut(progress);
             let level = 0;
             for (let k = 0; k < 2; k++) {
@@ -77,18 +79,18 @@ function patternLevel(pattern: MusicPattern, frame: MusicFrame, i: number, n: nu
             return level * (1 - progress);
         }
         case 'tunnel': {
-            // Tres ondas de luz que avanzan por el aro un tercio de vuelta por compás.
+            // Three light waves moving along the rim a third of a lap per bar.
             const wave = 0.5 + 0.5 * Math.cos(Math.PI * 2 * ((i / n) * 3 - (beats + progress) / 4));
             return wave ** 3 * (0.35 + pulse * 0.65);
         }
         case 'sparkle': {
-            // Destellos: en cada golpe se enciende un tercio al azar y titilan con los agudos.
+            // Sparkles: on every beat a random third lights up, and they twinkle with the highs.
             const flash = hash(i, beats) < 0.34 ? 1 - progress : 0;
             return Math.max(sparkle * 0.55 * hash(i, beats + 0.5), flash);
         }
         case 'spin':
         default: {
-            // La vuelta: dos cabezas opuestas dan la vuelta al aro a compás, con una estela.
+            // The chase: two opposite heads go round the rim in time, with a tail.
             const head = (beats + easeOut(progress)) * CHASE_STEPS_PER_BEAT;
             const distance = Math.min(ringDistance(i, head, n), ringDistance(i, head + n / 2, n));
             return Math.max(0, 1 - distance / 3.5) * (0.4 + pulse * 0.6);
@@ -96,7 +98,7 @@ function patternLevel(pattern: MusicPattern, frame: MusicFrame, i: number, n: nu
     }
 }
 
-/** Un solo efecto a la vez; al cambiar, el anterior se funde con el nuevo. */
+/** Brightness of a rim light: one effect at a time; when it changes, the old one crossfades into the new one. */
 export function lightLevel(frame: MusicFrame, i: number, n: number): number {
     const from = patternLevel(frame.previousPattern, frame, i, n);
     const to = patternLevel(frame.pattern, frame, i, n);
@@ -104,17 +106,18 @@ export function lightLevel(frame: MusicFrame, i: number, n: number): number {
 }
 
 /**
- * Mueve las luces de la ruleta con la música hasta que se llama a la función devuelta: golpes,
- * melodía y un patrón que va cambiando. También escribe --pulse (0-1) en el contenedor para el
- * brillo del aro y el patrón en data-music-pattern. Al parar devuelve las luces a su estado normal.
+ * Drives a wheel's lights with the music until the returned function is called: beats, melody and a
+ * changing pattern. It also writes --pulse (0-1) on the container for the rim glow and the pattern in
+ * data-music-pattern. When stopped, it puts the lights back to normal.
  */
 export function startWheelLights(element: HTMLElement): () => void {
     const rim = Array.from(element.querySelectorAll<SVGElement>('.wheel-light--rim'));
     const hub = Array.from(element.querySelectorAll<SVGElement>('.wheel-light--hub'));
     const halos = Array.from(element.querySelectorAll<SVGElement>('.wheel-light-halo'));
-    // Los iconos del reproductor (barras de ecualizador y disco) también van al tiempo de la canción
-    // mientras suena: se buscan en cada frame porque se montan y desmontan al abrir los menús.
+    // The player icons (equalizer bars and disc) also move in time with the song while it plays: they are
+    // looked up every frame because they mount and unmount as menus open.
     let player: HTMLElement[] = [];
+    /** Moves the player's equalizer bars and disc with the music. */
     const syncPlayer = (music: MusicFrame) => {
         const current = Array.from(document.querySelectorAll<HTMLElement>('.spinly-eq span, .spinly-music-disc--spinning'));
         player.forEach((node) => { if (!current.includes(node)) node.style.removeProperty('transform'); });
@@ -123,7 +126,7 @@ export function startWheelLights(element: HTMLElement): () => void {
         let bar = 0;
         for (const node of player) {
             if (node.classList.contains('spinly-music-disc--spinning')) {
-                // Una vuelta por compás.
+                // One turn per bar.
                 const turn = ((music.beats + Math.min(1, music.sinceBeat / music.beatMs)) / 4) * 360;
                 node.style.transform = `rotate(${(turn % 360).toFixed(1)}deg)`;
             } else {
@@ -134,6 +137,7 @@ export function startWheelLights(element: HTMLElement): () => void {
     };
     document.documentElement.classList.add('spinly-music-synced');
     let frame = 0;
+    /** Animation frame: updates every light from the current music state. */
     const tick = (time: number) => {
         const music = readMusic(time);
         element.style.setProperty('--pulse', Math.max(music.pulse, music.melody * 0.5).toFixed(3));
@@ -142,13 +146,13 @@ export function startWheelLights(element: HTMLElement): () => void {
         rim.forEach((light, i) => {
             const level = lightLevel(music, i, rim.length);
             light.style.opacity = level.toFixed(3);
-            // Encendida también crece un poco: se lee como una bombilla que se enciende.
+            // When lit it also grows a little: it reads as a bulb turning on.
             light.setAttribute('r', (RIM_RADIUS + level * 0.4).toFixed(3));
-            // El halo solo se nota con la luz bien encendida: sin él, el aro se vería lavado.
+            // The halo only shows when the light is well lit: otherwise the rim would look washed out.
             const halo = halos[i];
             if (halo) halo.style.opacity = (level ** 1.6).toFixed(3);
         });
-        // El centro late con cada tiempo y respira con la melodía.
+        // The hub pulses with every beat and breathes with the melody.
         const hubLevel = Math.max(0.3 + music.pulse * 0.7, music.melody).toFixed(3);
         hub.forEach((light) => {
             light.style.opacity = hubLevel;
@@ -167,50 +171,50 @@ export function startWheelLights(element: HTMLElement): () => void {
     };
 }
 
-// Fondo de puntos (DotField.tsx)
-// Con música: distancia que recorre en un tiempo la onda que sale de la ruleta (px) y su grosor.
+// Dot background (DotField.tsx)
+// With music: how far the wave leaving the wheel travels in one beat (px), and its thickness.
 const RING_REACH = 380;
 const RING_WIDTH = 70;
-// Largo máximo de los pétalos desde el borde de la ruleta (px) y grosor de su contorno.
+// Maximum petal length from the wheel's edge (px) and the thickness of their outline.
 const BLOOM_REACH = 330;
 const BLOOM_EDGE = 30;
-// Cometas: distancia de sus órbitas al borde de la ruleta, grosor y largo de la estela (radianes).
+// Comets: distance of their orbits from the wheel's edge, thickness and tail length (radians).
 const COMET_ORBITS = [70, 140, 210];
 const COMET_WIDTH = 26;
 const COMET_TAIL = 1.3;
-// Rayos: cuántos, cuánto crecen en un tiempo (px) y su grosor.
+// Rays: how many, how much they grow in one beat (px) and their thickness.
 const RAYS = 8;
 const RAY_REACH = 320;
 const RAY_WIDTH = 16;
 const TAU = Math.PI * 2;
-// Ecualizador circular: barras, largo máximo (px) y grosor.
+// Circular equalizer: bars, maximum length (px) and thickness.
 const EQ_BARS = 32;
 const EQ_REACH = 260;
 const EQ_WIDTH = 12;
-// Fuegos artificiales: por tiempo, radio máximo de cada estallido (px) y grosor de su anillo.
+// Fireworks: per beat, maximum radius of each burst (px) and the thickness of its ring.
 const FIREWORKS = 3;
 const FIREWORK_RADIUS = 120;
 const FIREWORK_WIDTH = 16;
-// Túnel: separación entre anillos (px, un anillo por tiempo), cuántos y grosor.
+// Tunnel: spacing between rings (px, one ring per beat), how many and their thickness.
 const TUNNEL_SPACING = 95;
 const TUNNEL_RINGS = 5;
 const TUNNEL_WIDTH = 18;
 
-/** Pseudoaleatorio estable por punto y golpe: el mismo golpe enciende siempre los mismos puntos. */
+/** Stable pseudo-random per dot and beat: the same beat always lights the same dots. */
 const dotHash = (ix: number, iy: number, beat: number): number => {
     const v = Math.sin(ix * 127.1 + iy * 311.7 + beat * 74.7) * 43758.5453;
     return v - Math.floor(v);
 };
 
-/** Centro de la ruleta en el fondo y su radio (px). */
+/** The wheel's centre on the background and its radius (px). */
 export type WheelArea = { x: number; y: number; radius: number };
 
 /**
- * Cuánto enciende cada efecto el punto (x, y):
- * rings: un anillo sale de la ruleta en cada golpe · spin: tres brazos en espiral giran desde la
- * ruleta · sparkle: destellos al azar, más cuantos más agudos · bloom: una flor que se abre desde
- * la ruleta en cada tiempo · comets: cometas en órbita · rays: rayos desde la ruleta · equalizer:
- * ecualizador circular · fireworks: fuegos artificiales · tunnel: anillos que caen hacia la ruleta.
+ * How much each effect lights up the dot at (x, y):
+ * rings: a ring leaves the wheel on every beat · spin: three spiral arms turn around the wheel · sparkle:
+ * random sparkles, more with more highs · bloom: a flower opening from the wheel on every beat · comets:
+ * orbiting comets · rays: rays from the wheel · equalizer: circular equalizer · fireworks: fireworks ·
+ * tunnel: rings falling into the wheel.
  */
 export function patternLift(pattern: MusicPattern, music: MusicFrame, x: number, y: number, ix: number, iy: number, wave: number, center: WheelArea): number {
     const { pulse, sinceBeat, beatMs, beats, sparkle } = music;
@@ -243,7 +247,7 @@ export function patternLift(pattern: MusicPattern, music: MusicFrame, x: number,
             const dy = y - center.y;
             const d = Math.hypot(dx, dy);
             const turn = ((beats + Math.min(1, sinceBeat / beatMs)) / 3) * Math.PI * 2;
-            // Brazos curvados: el ángulo se retuerce con la distancia.
+            // Curved arms: the angle twists with distance.
             const arm = 0.5 + 0.5 * Math.cos(3 * (Math.atan2(dy, dx) - turn) + d * 0.012);
             return arm ** 8 * Math.max(0, 1 - d / 900) * (0.55 + pulse * 0.45);
         }
@@ -251,13 +255,12 @@ export function patternLift(pattern: MusicPattern, music: MusicFrame, x: number,
 }
 
 /**
- * La flor: en cada tiempo se abre desde el borde de la ruleta una roseta de ocho pétalos (el borde
- * brilla y el interior se ilumina suave) que se desvanece al crecer. Cada tiempo gira medio pétalo,
- * así las flores se alternan; la del primer tiempo del compás llega más lejos y trae una segunda
- * capa de pétalos por dentro.
+ * The bloom: on every beat an eight-petal rosette opens from the wheel's edge (its outline glows and its
+ * inside lights up softly) and fades as it grows. Each beat it turns half a petal, so the flowers alternate;
+ * the one on the first beat of the bar reaches further and brings a second inner layer of petals.
  */
 function bloomLift(music: MusicFrame, dx: number, dy: number, base: number, wave: number): number {
-    // Cada flor dura exactamente un tiempo: nace con él y se ha ido cuando llega el siguiente.
+    // Each flower lasts exactly one beat: it is born with it and gone when the next one arrives.
     const progress = Math.min(1, music.sinceBeat / music.beatMs);
     if (progress >= 1) return music.pulse * 0.1;
     const open = easeOut(progress);
@@ -265,8 +268,9 @@ function bloomLift(music: MusicFrame, dx: number, dy: number, base: number, wave
     const angle = Math.atan2(dy, dx) - (music.beats * Math.PI) / BLOOM_PETALS;
     const reach = (music.downbeat ? BLOOM_REACH * 1.35 : BLOOM_REACH) * (0.15 + 0.85 * open);
     const fade = 1 - progress;
+    /** Lift of a layer of petals of a given length and rotation. */
     const petals = (length: number, turn: number) => {
-        // Cada pétalo: del borde de la ruleta hacia fuera, redondeado en la punta.
+        // Each petal: from the wheel's edge outwards, rounded at the tip.
         const shape = Math.abs(Math.cos((BLOOM_PETALS / 2) * (angle + turn)));
         const edge = base * 0.9 + length * shape ** 0.6;
         const rim = Math.max(0, 1 - Math.abs(d - edge) / BLOOM_EDGE);
@@ -279,8 +283,8 @@ function bloomLift(music: MusicFrame, dx: number, dy: number, base: number, wave
 }
 
 /**
- * Cometas: tres, cada uno en su órbita alrededor de la ruleta, dan una vuelta por compás (el de en
- * medio en sentido contrario) con una estela que se apaga; brillan más en cada tiempo.
+ * Comets: three, each on its own orbit around the wheel, go round once per bar (the middle one the other
+ * way) with a fading tail; they shine brighter on every beat.
  */
 function cometLift(music: MusicFrame, dx: number, dy: number, base: number): number {
     const d = Math.hypot(dx, dy);
@@ -292,7 +296,7 @@ function cometLift(music: MusicFrame, dx: number, dy: number, base: number): num
         if (across > COMET_WIDTH) return;
         const direction = k % 2 ? -1 : 1;
         const head = direction * turn + (k * TAU) / COMET_ORBITS.length;
-        // Cuánto queda el punto por detrás de la cabeza, en el sentido de la marcha.
+        // How far the dot is behind the head, in the direction of travel.
         const behind = ((((head - angle) * direction) % TAU) + TAU) % TAU;
         if (behind > COMET_TAIL) return;
         lift = Math.max(lift, (1 - behind / COMET_TAIL) ** 1.5 * (1 - (across / COMET_WIDTH) ** 2));
@@ -301,8 +305,8 @@ function cometLift(music: MusicFrame, dx: number, dy: number, base: number): num
 }
 
 /**
- * Rayos: en cada tiempo salen de la ruleta ocho rayos (dieciséis al abrir compás) que crecen y se
- * apagan, más brillantes en la punta; cada tiempo giran medio rayo.
+ * Rays: on every beat eight rays (sixteen on the first beat of a bar) leave the wheel, growing and fading,
+ * brighter at the tip; each beat they turn half a ray.
  */
 function rayLift(music: MusicFrame, dx: number, dy: number, base: number): number {
     const progress = Math.min(1, music.sinceBeat / music.beatMs);
@@ -319,8 +323,8 @@ function rayLift(music: MusicFrame, dx: number, dy: number, base: number): numbe
 }
 
 /**
- * Ecualizador circular: barras alrededor de la ruleta que en cada tiempo saltan a una altura distinta
- * (más en el primero del compás) y caen hasta el siguiente, con la punta más brillante.
+ * Circular equalizer: bars around the wheel that jump to a different height on every beat (higher on the
+ * first beat of the bar) and fall until the next one, with a brighter tip.
  */
 function equalizerLift(music: MusicFrame, dx: number, dy: number, base: number): number {
     const progress = Math.min(1, music.sinceBeat / music.beatMs);
@@ -338,8 +342,8 @@ function equalizerLift(music: MusicFrame, dx: number, dy: number, base: number):
 }
 
 /**
- * Fuegos artificiales: en cada tiempo estallan tres alrededor de la ruleta, en sitios al azar; cada
- * uno es un anillo de chispas que se abre y se apaga, con un destello en el centro al empezar.
+ * Fireworks: on every beat three burst around the wheel at random spots; each one is a ring of sparks that
+ * opens and fades, with a flash at its centre at first.
  */
 function fireworksLift(music: MusicFrame, dx: number, dy: number, base: number): number {
     const progress = Math.min(1, music.sinceBeat / music.beatMs);
@@ -358,8 +362,8 @@ function fireworksLift(music: MusicFrame, dx: number, dy: number, base: number):
 }
 
 /**
- * Túnel: anillos que nacen lejos y caen hacia la ruleta a un anillo por tiempo, cada vez más
- * brillantes al acercarse; el latido los hace destellar.
+ * Tunnel: rings born far away fall into the wheel at one ring per beat, brighter as they get closer; the
+ * pulse makes them flash.
  */
 function tunnelLift(music: MusicFrame, dx: number, dy: number, base: number): number {
     const phase = Math.min(1, music.sinceBeat / music.beatMs);

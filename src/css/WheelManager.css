@@ -1,3 +1,5 @@
+/* Section menu (WheelManager.tsx): a fixed column on desktop and a side drawer on mobile, plus the author credit. */
+
 .Wheelmanager {
     width: 100%;
     height: 100%;
@@ -25,8 +27,8 @@
     display: none;
 }
 
-/* Hueco fijo antes de la firma: su margin-top: auto se queda en 0 cuando el menú no cabe
-   (reproductor abierto en móvil) y la X de ocultarla pisaría lo de encima. */
+/* Fixed gap before the credit: its margin-top: auto drops to 0 when the menu does not fit (player open on
+   mobile) and the X that hides it would overlap what is above. */
 .wheelmanager-body {
     display: flex;
     flex-direction: column;
@@ -75,7 +77,7 @@
     color: var(--color-focus-text);
 }
 
-/* El menú tiene su propio tono de hover, más suave que el del panel */
+/* The menu has its own hover tone, softer than the panel's */
 .button-menu:hover {
     background-color: var(--menu-hover-bg);
     color: var(--font-color);
@@ -91,7 +93,7 @@
 }
 
 
-/* En escritorio el idioma está en la cabecera */
+/* On desktop the language lives in the header */
 .wheelmanager-lang {
     display: none;
 }
@@ -103,8 +105,8 @@
     font-weight: 600;
 }
 
-/* Firma al pie (margin-top: auto la baja al fondo del menú): tarjeta enlazada a GitHub con un
-   destello que recorre el borde. La X la oculta en este dispositivo. */
+/* Credit at the bottom (margin-top: auto pushes it to the end of the menu): a card linking to GitHub with a
+   shine running along its border. The X hides it on this device. */
 @property --credit-angle {
     syntax: '<angle>';
     inherits: false;
@@ -123,7 +125,7 @@
     transform: translateY(0.6rem) scale(0.96);
 }
 
-/* Tres capas de fondo: relleno, destello cónico que gira y el borde normal debajo */
+/* Three background layers: fill, a rotating conic shine and the normal border below */
 .wheelmanager-credit-link {
     --credit-fill: var(--bg-card-color);
     display: flex;
@@ -209,9 +211,9 @@
     transform: translate(2px, -2px);
 }
 
-/* Aparece al pasar por la tarjeta; en táctil siempre visible */
-/* 24 px y justo encima de la tarjeta, sin pisar el enlace: objetivo táctil con tamaño y separación
-   suficientes (auditoría de accesibilidad) para no pulsar uno queriendo el otro. */
+/* Shows on hovering the card; always visible on touch */
+/* 24 px and right above the card, without overlapping the link: a touch target with enough size and
+   spacing (accessibility audit) so one is not hit when aiming for the other. */
 .wheelmanager-credit-close {
     position: absolute;
     top: -28px;
@@ -262,7 +264,7 @@
     }
 }
 
-/* Los iconos dibujan con currentColor: la regla global `* { color }` los pintaría del color de texto */
+/* Icons draw with currentColor: the global `* { color }` rule would paint them in the text color */
 .wheelmanager-credit svg * {
     color: inherit;
 }
@@ -282,7 +284,7 @@
     }
 }
 
-/* Móvil: drawer lateral desde la derecha */
+/* Mobile: a side drawer from the right */
 @media (max-width: 750px) {
     .Wheelmanager {
         position: fixed;
@@ -291,7 +293,7 @@
         bottom: 0;
         left: auto;
         width: min(18rem, 85vw);
-        /* height auto y no 100vh: iOS cortaría el final del panel */
+        /* height auto rather than 100vh: iOS would cut off the end of the panel */
         height: auto;
         padding: 4.75rem 1.25rem 1.5rem;
         border-right: none;
@@ -300,7 +302,7 @@
         overscroll-behavior: contain;
         z-index: 60;
 
-        /* Sin transición en el estado base: nunca se anima en la carga inicial */
+        /* No transition in the base state: it never animates on the initial load */
         transform: translateX(100%);
         visibility: hidden;
     }

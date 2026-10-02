@@ -1,9 +1,14 @@
+/**
+ * Wheel geometry and spinning: the conic-gradient background, SVG sector paths, picking a winner, image
+ * fitting inside a sector and color helpers for the sectors.
+ */
 import type { WheelOption } from './option-wheel';
 import { hexToHue, hslToHex } from './color';
 import { IMAGE_FIT_LIMITS, type ImageFit } from '../types/theme-types';
 
 type WheelColors = Record<string, string>;
 
+// Palette color names mapped to their CSS variables.
 const COLORS: WheelColors = {
     indigo: 'var(--item-indigo)',
     coral: 'var(--item-coral)',
@@ -15,8 +20,10 @@ const COLORS: WheelColors = {
     mint: 'var(--item-mint)',
 };
 
+// Palette colors light enough to need dark label text.
 const LIGHT_COLORS: string[] = ['coral', 'amber', 'teal', 'pink', 'violet', 'sky', 'mint'];
 
+/** Duration of a spin of the main wheel (ms). */
 export const SPIN_DURATION = 4200;
 
 export type SpinResult = {
@@ -26,6 +33,7 @@ export type SpinResult = {
 
 type PolarPoint = { x: number; y: number };
 
+/** The wheel's background: one conic-gradient with a slice per option (or a flat color for one option). */
 export function getWheelBackground(
     options: WheelOption[],
     segmentColors?: Array<string | undefined>,
@@ -34,6 +42,7 @@ export function getWheelBackground(
         return undefined;
     }
 
+    /** A segment's own color if the theme sets one, else the option's palette color. */
     const getColor = (option: WheelOption, index: number): string => {
         if (segmentColors?.[index] && segmentColors[index] !== option.color) {
             return segmentColors[index] as string;
@@ -61,6 +70,7 @@ export function getWheelBackground(
     })`;
 }
 
+/** SVG path of a circular sector between two angles (0 = top, clockwise). */
 export function describeSector(cx: number, cy: number, r: number, startDeg: number, endDeg: number): string {
     const start = polar(cx, cy, r, endDeg);
     const end = polar(cx, cy, r, startDeg);
@@ -68,11 +78,16 @@ export function describeSector(cx: number, cy: number, r: number, startDeg: numb
     return `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${large} 0 ${end.x} ${end.y} Z`;
 }
 
+/** Point at a given angle (0 = top, clockwise) and radius from the centre. */
 function polar(cx: number, cy: number, r: number, deg: number): PolarPoint {
     const rad = ((deg - 90) * Math.PI) / 180;
     return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
 }
 
+/**
+ * Spins the main wheel: picks the winner first, then a random point inside its sector plus five to seven
+ * full turns, and returns the final rotation for the CSS transition.
+ */
 export function spinWheel(options: WheelOption[], rotation: number): SpinResult {
     const segmentAngle = 360 / options.length;
     const randomIndex = Math.floor(Math.random() * options.length);
@@ -90,19 +105,19 @@ export function spinWheel(options: WheelOption[], rotation: number): SpinResult 
 
 export type OptionProbability = { id: string; name: string; probability: number };
 
-/** Probabilidad de cada opción; debe cambiar a la vez que spinWheel si algún día hay pesos. */
+/** Probability of each option; it must change together with spinWheel if weights are ever added. */
 export function getOptionProbabilities(options: WheelOption[]): OptionProbability[] {
     if (options.length === 0) return [];
     const share = 1 / options.length;
     return options.map((option) => ({ id: option.id, name: option.name, probability: share }));
 }
 
-/** Lado del viewBox SVG de la ruleta; toda la geometría de imágenes se expresa en él. */
+/** Side of the wheel's SVG viewBox; all image geometry is expressed in it. */
 export const WHEEL_VIEWBOX = 480;
 
 export type SectorAngles = { start: number; end: number; mid: number };
 
-/** Ángulos en grados (0 = arriba, sentido horario) del sector `index` de `count`. */
+/** Angles in degrees (0 = top, clockwise) of sector `index` out of `count`. */
 export function getSectorAngles(index: number, count: number): SectorAngles {
     const size = 360 / Math.max(count, 1);
     const start = index * size;
@@ -111,7 +126,7 @@ export function getSectorAngles(index: number, count: number): SectorAngles {
 
 export type ImageBox = { x: number; y: number; width: number; height: number; transform?: string };
 
-/** Caja del <image> (preserveAspectRatio slice) para un encaje en un viewBox de lado `size`. */
+/** Box of the <image> (preserveAspectRatio slice) for a fit inside a viewBox of side `size`. */
 export function getImageBox(fit: ImageFit | undefined, size = WHEEL_VIEWBOX): ImageBox {
     const scale = fit?.scale ?? 1;
     const side = size * scale;
@@ -127,12 +142,12 @@ export function getImageBox(fit: ImageFit | undefined, size = WHEEL_VIEWBOX): Im
     };
 }
 
-/** Punto de la ruleta que queda bajo el puntero cuando gana este sector. */
+/** Point of the wheel (as a fraction of the radius) that ends up under the pointer when the sector wins. */
 const SECTOR_FOCUS_RADIUS = 0.55;
 
 /**
- * Encaje inicial para una imagen nueva: centrada en el sector, derecha cuando el
- * sector queda arriba (al ganar) y lo justo de grande para cubrirlo entero.
+ * Initial fit for a new image: centred on the sector, upright when the sector is at the top (when it
+ * wins) and just big enough to cover it entirely.
  */
 export function fitImageToSector(index: number, count: number): ImageFit {
     if (count <= 1) return { x: 0, y: 0, scale: 1, rotate: 0 };
@@ -155,30 +170,32 @@ export function fitImageToSector(index: number, count: number): ImageFit {
     };
 }
 
-/** Grados en el rango (-180, 180]. */
+/** Degrees in the (-180, 180] range. */
 export function normalizeDegrees(deg: number): number {
     const d = ((deg % 360) + 360) % 360;
     return d > 180 ? d - 360 : d;
 }
 
+/** CSS rotation that places an option's label in the middle of its sector. */
 export function getLabelTransform(index: number, total: number): string {
     const segmentAngle = 360 / total;
     const angle = index * segmentAngle + segmentAngle / 2;
     return `rotate(${angle}deg)`;
 }
 
-// Saturación y luminosidad fijas: cualquier tono sale vivo y legible.
+// Fixed saturation and lightness: any hue comes out vivid and readable.
 const RANDOM_SATURATION = 70;
 const RANDOM_LIGHTNESS = 55;
-// Separación mínima de tono con el sector anterior para que no se confundan.
+// Minimum hue distance from the previous sector so they are not confused.
 const MIN_HUE_DISTANCE = 40;
 
+/** Shortest distance between two hues around the color wheel. */
 const hueDistance = (a: number, b: number): number => {
     const diff = Math.abs(a - b) % 360;
     return diff > 180 ? 360 - diff : diff;
 };
 
-/** Color de sector aleatorio y distinguible del anterior. `random` se inyecta en los tests. */
+/** A random sector color that is distinguishable from the previous one. `random` is injected in tests. */
 export function randomSegmentColor(previousColor?: string, random: () => number = Math.random): string {
     const previousHue = hexToHue(previousColor);
     let hue = Math.floor(random() * 360);
@@ -191,6 +208,7 @@ export function randomSegmentColor(previousColor?: string, random: () => number 
     return hslToHex(hue, RANDOM_SATURATION, RANDOM_LIGHTNESS);
 }
 
+/** Whether a sector color is light enough to need dark text on it. */
 export function isLightColor(color: string | undefined): boolean {
     if (!color) return false;
     if (LIGHT_COLORS.includes(color)) return true;

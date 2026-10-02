@@ -1,3 +1,5 @@
+/* Wheel editor panel (WheelEditor.tsx): option rows with drag handle, color swatch, name, image and remove buttons. */
+
 .option-color-indigo { background-color: var(--item-indigo); }
 .option-color-coral { background-color: var(--item-coral); }
 .option-color-amber { background-color: var(--item-amber); }
@@ -18,7 +20,7 @@
     overflow: hidden;
 
     .options-title {
-        /* Misma caja que .options-limit-inline: al editar no se mueve nada */
+        /* Same box as .options-limit-inline: nothing moves when editing */
         .options-limit-value,
         .options-limit-inline {
             display: inline-block;
@@ -48,7 +50,7 @@
             color: var(--font-color);
         }
 
-        /* Al editar solo cambia el subrayado: de punteado a una línea, con el cursor de texto */
+        /* When editing only the underline changes: from dotted to solid, with the text cursor */
         .options-limit-inline {
             outline: 0;
             border-radius: 0;
@@ -85,7 +87,7 @@
             min-height: 3.25rem;
             padding: 0 1rem;
 
-            /* touch-action: none → el dedo arrastra la fila en vez de desplazar la página */
+            /* touch-action: none → a finger drags the row instead of scrolling the page */
             .drag {
                 display: inline-flex;
                 align-items: center;
@@ -387,14 +389,14 @@
     }
 }
 
-/* Modo claro: sobre el panel tintado, el botón de añadir se eleva como una tarjeta blanca */
+/* Light mode: over the tinted panel, the add button rises as a white card */
 :root[data-theme="light"] .Options .options-bottom .add-option-button:not(:hover, :disabled) {
     background-color: var(--bg-card-color);
     border-color: var(--color-border-light);
     box-shadow: var(--card-shadow);
 }
 
-/* Columna estrecha (751-1000 px): menos hueco entre controles para que se lea el nombre */
+/* Narrow column (751-1000 px): less space between controls so the name stays readable */
 @media (min-width: 751px) and (max-width: 1000px) {
     .Options .container-options .option-item {
         gap: 0.5rem;

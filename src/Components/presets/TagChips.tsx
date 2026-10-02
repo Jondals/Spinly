@@ -1,3 +1,6 @@
+/**
+ * TagChips: a preset's tags on a single line, with the overflow grouped as "+N".
+ */
 import { useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from '../i18n/LanguageProvider';
 
@@ -5,12 +8,12 @@ interface TagChipsProps {
     tags: string[];
 }
 
-// Sin medidas reales (primer pintado o entorno sin layout).
+/** How many tags to show without real measurements (first paint, or an environment without layout). */
 const fallbackCount = (total: number): number => (total <= 4 ? total : 3);
 
 /**
- * Etiquetas de un preajuste en una sola fila: se muestran las que caben, medidas en una capa
- * invisible, y el resto se agrupa en "+N". Se recalcula con ResizeObserver al cambiar el ancho.
+ * A preset's tags on one row: the ones that fit are shown (measured on an invisible layer) and the rest
+ * are grouped as "+N". It is recalculated with a ResizeObserver when the width changes.
  */
 function TagChips({ tags }: TagChipsProps) {
     const { t } = useTranslation();
@@ -26,6 +29,7 @@ function TagChips({ tags }: TagChipsProps) {
         const measure = measureRef.current;
         if (!row || !measure) return undefined;
 
+        /** Measures the tags and decides how many fit next to the "+N" chip. */
         const compute = () => {
             const available = row.clientWidth;
             const nodes = Array.from(measure.children) as HTMLElement[];
@@ -48,7 +52,7 @@ function TagChips({ tags }: TagChipsProps) {
                 used += gap + width;
                 count += 1;
             }
-            // Siempre al menos una; si no cabe se recorta con ellipsis.
+            // Always at least one; if it does not fit it is cut with an ellipsis.
             setVisible(Math.max(1, count));
         };
 

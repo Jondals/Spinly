@@ -1,4 +1,7 @@
-/* isolation: la trama de puntos (DotField, z-index -1) queda sobre el fondo y bajo el contenido */
+/* Main wheel (Wheel.tsx) and its pieces, also reused by the tournament duel wheel: disc, rim, lights,
+   pointer, labels, spin button, odds tooltip and the winner dialog. */
+
+/* isolation: the dot grid (DotField, z-index -1) stays above the background and below the content */
 .Wheel {
     position: relative;
     isolation: isolate;
@@ -7,7 +10,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    /* safe: si no cabe (ventanas muy bajas) se desplaza en vez de recortar la flecha */
+    /* safe: if it does not fit (very short windows) it scrolls instead of clipping the pointer */
     justify-content: safe center;
     gap: 2.75rem;
     width: 100%;
@@ -17,11 +20,11 @@
     padding: 1.75rem 0 1rem;
     overflow-x: hidden;
     overflow-y: auto;
-    /* La ruleta se mide también contra el ancho de su propia columna (cqi) */
+    /* The wheel is also sized against its own column's width (cqi) */
     container-type: inline-size;
 }
 
-/* Trama animada de fondo: la dibuja DotField.tsx a la medida del panel */
+/* Animated background grid: drawn by DotField.tsx to the panel's size */
 .wheel-dots {
     position: absolute;
     top: 0;
@@ -31,8 +34,8 @@
     pointer-events: none;
 }
 
-/* Todo el tamaño de la ruleta se deriva de este radio. En escritorio lo limita también el
-   alto: cabecera (5rem) + flecha, separación, botón de girar y aviso (~13.5rem) deben caber. */
+/* The whole wheel size derives from this radius. On desktop the height limits it too: the header (5rem)
+   plus pointer, spacing, spin button and hint (~13.5rem) must fit. */
 .wheel-container {
     --wheel-radius: max(6rem, min(34vmin, 15rem, calc((100vh - 18.5rem) / 2)));
     --wheel-radius: max(6rem, min(34vmin, 15rem, calc((100dvh - 18.5rem) / 2), 44cqi));
@@ -46,14 +49,14 @@
     transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Columna estrecha: los controles de audio van bajo la leyenda (Music.css) y restan ~3rem de alto */
+/* Narrow column: the audio controls go below the hint (Music.css) and take ~3rem of height */
 @container (max-width: 33rem) {
     .wheel-container {
         --wheel-radius: max(6rem, min(34vmin, 15rem, calc((100dvh - 21.5rem) / 2), 44cqi));
     }
 }
 
-/* Botón invisible sobre la flecha: tocarla abre el selector de color */
+/* Invisible button over the pointer: clicking it opens the color picker */
 .wheel-pointer-btn {
     position: absolute;
     top: -1.5rem;
@@ -83,7 +86,7 @@
     transform: translateX(-50%) translateY(-2px);
 }
 
-/* Aro fijo sobre el borde del disco: no gira, como el marco de una ruleta real */
+/* Fixed rim over the disc's edge: it does not turn, like the frame of a real wheel */
 .wheel-rim {
     position: absolute;
     inset: 0;
@@ -115,7 +118,7 @@
     stroke-width: 0.35;
 }
 
-/* Capa transparente sobre el disco: tocar la ruleta abre el color de las luces */
+/* Transparent layer over the disc: clicking the wheel opens the lights color */
 .wheel-lights-btn {
     position: absolute;
     inset: 0;
@@ -133,8 +136,8 @@
     outline-offset: 4px;
 }
 
-/* Como la flecha, la ruleta avisa de que se puede tocar: crece un poco y el aro y las luces
-   brillan con el color de las luces. También mientras su selector está abierto. */
+/* Like the pointer, the wheel shows it can be clicked: it grows a little and the rim and lights glow in
+   the lights color. Also while its picker is open. */
 @media (hover: hover) {
     .wheel-container:has(.wheel-lights-btn:hover) {
         transform: scale(1.006);
@@ -163,7 +166,7 @@
     stroke-width: 1.8;
 }
 
-/* Luces del aro y del centro: una onda de brillo recorre el círculo (retardo por luz en Wheel.tsx) */
+/* Rim and hub lights: a brightness wave runs around the circle (per-light delay in Wheel.tsx) */
 .wheel-light {
     fill: var(--wheel-light-color);
     animation: wheel-light 2.4s ease-in-out infinite;
@@ -173,8 +176,8 @@
     animation-duration: 0.6s;
 }
 
-/* Con música: useMusicPulse da a cada luz su brillo en cada frame según el patrón de la canción
-   (el aro que late, la vuelta a compás, destellos o la flor) y --pulse (0-1) hace brillar el aro. */
+/* With music: useMusicPulse sets each light's brightness every frame from the song's pattern (pulsing
+   rim, chase in time, sparkles or bloom) and --pulse (0-1) makes the rim glow. */
 .wheel-container--music .wheel-light {
     animation: none;
 }
@@ -186,7 +189,7 @@
     transition: none;
 }
 
-/* Halo de cada luz del aro (degradado radial, sin filtros por luz): apagado salvo con música */
+/* Halo of each rim light (a radial gradient, no per-light filters): off except with music */
 .wheel-light-halo {
     fill: url(#wheel-light-halo);
     opacity: 0;
@@ -208,7 +211,7 @@
     50% { opacity: 1; }
 }
 
-/* Lengüeta en ámbar: contrasta con cualquier paleta de sectores; la punta marca el ganador */
+/* Amber flapper: it contrasts with any sector palette; its tip marks the winner */
 .wheel-pointer {
     position: absolute;
     top: -1.35rem;
@@ -288,7 +291,7 @@
 }
 
 .wheel-label-text {
-    /* Depende del sector y no del modo claro/oscuro: blanco salvo sobre colores claros */
+    /* Depends on the sector, not on light/dark mode: white except over light colors */
     color: #ffffff;
     display: inline-block;
     overflow: hidden;
@@ -299,10 +302,10 @@
     letter-spacing: 0.1rem;
     text-transform: uppercase;
 
-    /* Sin sin(): el postcss-calc del build de Vercel no lo soporta */
+    /* No sin(): the postcss-calc of the Vercel build does not support it */
     font-size: clamp(0.55rem, calc(1.05rem - var(--option-count) * 0.045rem), 0.95rem);
 
-    /* --label-max-width = cuerda del sector: 2R · sin(π / n) · 0.72 - 0.4rem (JS) */
+    /* --label-max-width = the sector's chord: 2R · sin(π / n) · 0.72 - 0.4rem (JS) */
     max-width: var(--label-max-width, 7rem);
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
@@ -330,7 +333,7 @@
     padding: 0 1rem;
 }
 
-/* Solo lo propio del botón principal; la base está en .spinly-btn-primary */
+/* Only what is specific to the spin button; the base lives in .spinly-btn-primary */
 .wheel-spin-button {
     display: flex;
     align-items: center;
@@ -342,7 +345,7 @@
     white-space: nowrap;
 }
 
-/* Especificidad igual o mayor que button.spinly-btn-primary, o gana la base */
+/* Specificity equal to or higher than button.spinly-btn-primary, or the base wins */
 .wheel-spin-button.spinly-btn-primary {
     font-weight: 800;
     letter-spacing: 0.14rem;
@@ -434,7 +437,7 @@
 .wheel-overlay {
     position: fixed;
     inset: 0;
-    /* Sobre el header (100) y el drawer (60), bajo el aviso de cuota (200) */
+    /* Above the header (100) and the drawer (60), below the storage warning (200) */
     z-index: 150;
     display: flex;
     align-items: center;
@@ -446,7 +449,7 @@
     animation: wheel-overlay-in 0.22s ease-out;
 }
 
-/* Sin backdrop-filter: fondo casi opaco para que siga siendo legible */
+/* Without backdrop-filter: an almost opaque background so it stays readable */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     .wheel-overlay {
         background: color-mix(in srgb, var(--bg-color) 90%, transparent);
@@ -536,7 +539,7 @@ button.wheel-overlay-spin.spinly-btn-primary {
     display: block;
 }
 
-/* Escritorio: nombre contenido y más aire entre insignia, nombre y botón */
+/* Desktop: a contained name and more space between badge, name and button */
 @media (min-width: 751px) {
     .wheel-overlay-card {
         width: min(30rem, 100%);
@@ -564,7 +567,7 @@ button.wheel-overlay-spin.spinly-btn-primary {
     to { opacity: 1; transform: none; }
 }
 
-/* Ventanas bajas de escritorio: menos aire entre ruleta y botón para que quepa todo */
+/* Short desktop windows: less space between wheel and button so everything fits */
 @media (min-width: 751px) and (max-height: 640px) {
     .Wheel {
         gap: 1.5rem;
@@ -591,7 +594,7 @@ button.wheel-overlay-spin.spinly-btn-primary {
     }
 
     .wheel-container {
-        /* Acotado por vw y vh: ~84% del ancho sin cortarse en móviles bajos o en horizontal */
+        /* Bounded by vw and vh: ~84% of the width without clipping on short phones or in landscape */
         --wheel-radius: min(42vw, 36vh, 15rem);
         --wheel-radius: min(42vw, 36dvh, 15rem);
         width: calc(var(--wheel-radius) * 2);

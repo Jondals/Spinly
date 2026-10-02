@@ -1,11 +1,13 @@
+/**
+ * useCommunity: loads a community list (shared themes or presets) with its loading and error state.
+ */
 import { useCallback, useEffect, useState } from 'react';
 import type { ServiceResult } from '../scripts/supabaseClient';
 import type { LocalMessage } from '../scripts/strings';
 
 /**
- * Lista de la comunidad con su estado de carga. Solo se pide con la vista visible
- * (así el SDK de Supabase no se descarga sin necesidad): cada entrada recarga, igual
- * que `refresh()` tras una escritura.
+ * Community list with its loading state. It is only fetched while the view is visible (so the
+ * Supabase SDK is not downloaded needlessly): every visit reloads it, as does `refresh()` after a write.
  */
 export function useCommunity<T>(fetchItems: () => Promise<ServiceResult<T[]>>, enabled: boolean) {
     const [items, setItems] = useState<T[]>([]);
@@ -29,9 +31,10 @@ export function useCommunity<T>(fetchItems: () => Promise<ServiceResult<T[]>>, e
         };
     }, [fetchItems, enabled, refreshToken]);
 
+    /** Fetches the list again. */
     const refresh = useCallback(() => setRefreshToken((token) => token + 1), []);
 
-    /** Quita un elemento al instante; la siguiente recarga confirma con el servidor. */
+    /** Removes an item right away; the next reload confirms it with the server. */
     const removeLocally = useCallback((keep: (item: T) => boolean) => {
         setItems((prev) => prev.filter(keep));
     }, []);

@@ -1,8 +1,11 @@
+/**
+ * useMusicPulse: makes a wheel's lights follow the music that is playing.
+ */
 import { useEffect, type RefObject } from 'react';
 
 /**
- * Mientras `active`, las luces de la ruleta siguen a la música (music-visuals.ts, que se descarga la
- * primera vez que hace falta). Al desactivarse vuelven a su animación de siempre.
+ * While `active`, the wheel lights follow the music (music-visuals.ts, downloaded the first time it is
+ * needed). When it turns off they go back to their usual animation.
  */
 export function useMusicPulse(ref: RefObject<HTMLElement | null>, active: boolean) {
     useEffect(() => {

@@ -1,3 +1,6 @@
+/**
+ * WinnerOverlay: the dialog that announces the winner of a spin of the main wheel.
+ */
 import { useId, useRef } from 'react';
 import Icon from '../common/Icon';
 import Modal from '../common/Modal';
@@ -9,7 +12,7 @@ interface WinnerOverlayProps {
     onSpinAgain: () => void;
 }
 
-/** Resultado del giro sobre un fondo desenfocado; "Girar de nuevo" cierra y lanza otro giro. */
+/** Spin result over a blurred backdrop; "Spin again" closes it and starts another spin. */
 function WinnerOverlay({ winner, onClose, onSpinAgain }: WinnerOverlayProps) {
     const { t } = useTranslation();
     const titleId = useId();

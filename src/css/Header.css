@@ -1,3 +1,5 @@
+/* Top header (Header.tsx): logo, language and theme buttons, the profile menu (ProfileMenu.tsx) and the mobile hamburger. */
+
 .Header {
     background-color: var(--bg-header-color);
     display: flex;
@@ -33,7 +35,7 @@
         flex-shrink: 0;
     }
 
-    /* En escritorio el gestor siempre está visible */
+    /* On desktop the manager is always visible */
     .spinly-menu-button {
         display: none;
         width: 2.5rem;
@@ -155,7 +157,7 @@
         border: none;
     }
 
-    /* Sin foto: solo el icono, como el resto de botones de la cabecera */
+    /* Without a photo: just the icon, like the other header buttons */
     .spinly-profile-button .spinly-avatar--placeholder {
         background: transparent;
         color: var(--font-color);
@@ -166,7 +168,7 @@
         top: calc(100% + 0.6rem);
         right: 0;
         width: min(20rem, calc(100vw - 2rem));
-        /* Con los campos de contraseña puede no caber: se desplaza dentro */
+        /* With the password fields it may not fit: it scrolls inside */
         max-height: calc(100vh - 6rem);
         max-height: calc(100dvh - 6rem);
         overflow-y: auto;
@@ -189,7 +191,7 @@
         pointer-events: none;
     }
 
-    /* Vista, crear cuenta, entrar, editar...: cada paso aparece con un fundido corto */
+    /* View, create account, sign in, edit…: every step appears with a short fade */
     .spinly-profile-step {
         display: flex;
         flex-direction: column;
@@ -201,7 +203,7 @@
         margin: 0;
     }
 
-    /* Vista del perfil: tarjeta con avatar, nombre y estado de la cuenta */
+    /* Profile view: a card with the avatar, the name and the account status */
     .spinly-profile-card {
         display: flex;
         flex-direction: column;
@@ -270,7 +272,7 @@
         background: var(--color-border);
     }
 
-    /* Formularios */
+    /* Forms */
     .spinly-profile-form {
         gap: 0.95rem;
     }
@@ -406,7 +408,7 @@
         color: var(--font-color-light);
     }
 
-    /* La regla global `* { color }` pisaría el color heredado de los textos e iconos */
+    /* The global `* { color }` rule would override the inherited color of texts and icons */
     .spinly-profile-rule *,
     .spinly-profile-badge *,
     .spinly-profile-sync svg * {
@@ -417,7 +419,7 @@
         color: var(--item-mint);
     }
 
-    /* El estado solo lo lee el lector de pantalla; a la vista lo dice el icono */
+    /* The state is only for screen readers; visually the icon says it */
     .spinly-profile-rule-state {
         position: absolute;
         width: 1px;
@@ -453,7 +455,7 @@
         display: block;
     }
 
-    /* Oculto pero enfocable: el teclado llega al input y el foco se ve en su botón */
+    /* Hidden but focusable: the keyboard reaches the input and the focus shows on its button */
     .spinly-profile-file {
         position: absolute;
         width: 1px;
@@ -517,7 +519,7 @@
     .Header {
         position: sticky;
         top: 0;
-        /* Sobre el drawer (60) y su overlay (50) */
+        /* Above the drawer (60) and its overlay (50) */
         z-index: 100;
         height: auto;
         min-height: 4rem;
@@ -537,14 +539,14 @@
             display: flex;
         }
 
-        /* En móvil el idioma se elige dentro del drawer */
+        /* On mobile the language is picked inside the drawer */
         .spinly-lang--header {
             display: none;
         }
 
-        /* El perfil ya no es el último botón (el menú va a su derecha): su panel cuelga de la
-           cabecera y ocupa el ancho de la pantalla con sus mismos márgenes, en vez de colgar del
-           botón y salirse por la izquierda. */
+        /* The profile is no longer the last button (the menu goes to its right): its panel hangs from the
+           header and takes the screen width with the same margins, instead of hanging from the button
+           and overflowing on the left. */
         .spinly-profile {
             position: static;
         }

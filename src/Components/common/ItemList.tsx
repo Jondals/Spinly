@@ -1,3 +1,6 @@
+/**
+ * ItemList: a search box plus a list of cards, with its loading, error and empty states.
+ */
 import type { ReactNode } from 'react';
 import SearchBar from './SearchBar';
 import StatusMessage from './StatusMessage';
@@ -17,7 +20,7 @@ interface ItemListProps {
     children: ReactNode;
 }
 
-/** Buscador + lista de tarjetas con sus estados (cargando, error, vacía). La usan Presets y Themes. */
+/** Search box + card list with its states (loading, error, empty). Used by Presets and Themes. */
 function ItemList({ search, onSearch, searchPlaceholder, searchLabel, count, emptyText, listClassName, emptyClassName, loadingText, loading = false, error = null, children }: ItemListProps) {
     let content: ReactNode;
     if (loading) content = <StatusMessage>{loadingText}</StatusMessage>;

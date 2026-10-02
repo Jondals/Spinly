@@ -1,3 +1,6 @@
+/**
+ * useDraftForm: the state of the single create / edit form shared by the Presets and Themes panels.
+ */
 import { useRef, type Dispatch, type SetStateAction } from 'react';
 import { isCloudTarget, type EditTarget } from '../types/form-drafts';
 
@@ -5,15 +8,16 @@ type Draft = { target: EditTarget };
 export type PanelView = 'mine' | 'community';
 
 /**
- * Estado derivado del formulario único de Presets y Themes (crear, editar en local,
- * editar en la nube). El borrador vive en App para sobrevivir a una visita al editor.
+ * Derived state of the single form of Presets and Themes (create, edit locally, edit in the cloud).
+ * The draft lives in App so it survives a trip to the editor.
  */
 export function useDraftForm<D extends Draft>(draft: D | null, setDraft: Dispatch<SetStateAction<D | null>>, emptyDraft: D, view: PanelView) {
-    // Conserva el último borrador mientras el acordeón se pliega, para que no salte el contenido.
+    // Keeps the last draft while the accordion folds, so its content does not jump.
     const lastDraft = useRef<D>(emptyDraft);
     if (draft) lastDraft.current = draft;
 
     const editingId = draft && draft.target.mode !== 'create' ? draft.target.id : null;
+    /** Whether the form is editing this item. */
     const isEditing = (mode: 'local' | 'cloud', id: string) => draft?.target.mode === mode && editingId === id;
 
     return {
@@ -23,7 +27,7 @@ export function useDraftForm<D extends Draft>(draft: D | null, setDraft: Dispatc
         isEditing,
         startCreate: () => setDraft({ ...emptyDraft }),
         close: () => setDraft(null),
-        /** Un segundo clic sobre el mismo elemento cierra el formulario. */
+        /** Opens the form to edit an item; a second click on the same item closes it. */
         toggleEdit: (mode: 'local' | 'cloud', id: string, build: () => D, onOpen: () => void) => {
             if (isEditing(mode, id)) {
                 setDraft(null);
@@ -32,11 +36,12 @@ export function useDraftForm<D extends Draft>(draft: D | null, setDraft: Dispatc
             onOpen();
             setDraft(build());
         },
+        /** Closes the form if it is editing this item (for example, after deleting it). */
         closeIfEditing: (mode: 'local' | 'cloud', id: string) => {
             if (isEditing(mode, id)) setDraft(null);
         },
     };
 }
 
-/** Vista inicial: si se estaba editando algo de la nube, se vuelve directamente a Comunidad. */
+/** Initial view: if something from the cloud was being edited, go straight back to Community. */
 export const initialView = (draft: Draft | null): PanelView => (draft && isCloudTarget(draft.target) ? 'community' : 'mine');

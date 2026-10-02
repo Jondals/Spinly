@@ -1,10 +1,14 @@
+/**
+ * Supabase client and shared service helpers. The SDK is loaded lazily, so visitors without a session
+ * never download it, and every service returns a ServiceResult instead of throwing.
+ */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { dictMessage, dictMessageWith, type LocalMessage } from './strings';
 
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
 const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
-/** Sin credenciales la app funciona 100% en local. */
+/** Without credentials the app runs 100% locally. */
 export const isSupabaseConfigured: boolean = Boolean(supabaseUrl && supabaseAnonKey);
 
 let clientPromise: Promise<SupabaseClient | null> | null = null;
@@ -12,9 +16,8 @@ let loadedClient: SupabaseClient | null = null;
 const readyListeners = new Set<(client: SupabaseClient) => void>();
 
 /**
- * Cliente perezoso: el SDK se descarga la primera vez que algo lo necesita
- * (perfil, comunidad o una sesión guardada), nunca en el arranque. Si la descarga
- * falla se reintenta en la siguiente llamada.
+ * Lazy client: the SDK is downloaded the first time something needs it (profile, community or a saved
+ * session), never at startup. If the download fails it is retried on the next call.
  */
 export function getSupabase(): Promise<SupabaseClient | null> {
     if (!isSupabaseConfigured) return Promise.resolve(null);
@@ -35,7 +38,7 @@ export function getSupabase(): Promise<SupabaseClient | null> {
     return clientPromise;
 }
 
-/** Llama a `callback` cuando exista el cliente, sin provocar su descarga. */
+/** Calls `callback` once the client exists, without triggering its download. */
 export function onSupabaseReady(callback: (client: SupabaseClient) => void): () => void {
     if (loadedClient) {
         callback(loadedClient);
@@ -47,11 +50,12 @@ export function onSupabaseReady(callback: (client: SupabaseClient) => void): () 
     };
 }
 
+/** Whether the SDK has already been downloaded. */
 export function isSupabaseLoaded(): boolean {
     return loadedClient !== null;
 }
 
-/** supabase-js persiste la sesión en `sb-<ref>-auth-token`; basta con saber si existe. */
+/** supabase-js persists the session in `sb-<ref>-auth-token`; knowing whether it exists is enough. */
 export function hasStoredSession(): boolean {
     if (!isSupabaseConfigured) return false;
     try {
@@ -63,25 +67,27 @@ export function hasStoredSession(): boolean {
 }
 
 /**
- * Los servicios nunca lanzan hacia la UI: un fallo de red o de Supabase no rompe el modo local.
- * Los mensajes van en todos los idiomas para re-traducirse si cambia el idioma en pantalla.
+ * Services never throw at the UI: a network or Supabase failure never breaks local mode.
+ * Messages carry every language so they can be re-translated if the language changes on screen.
  */
 export type ServiceResult<T> =
     | { ok: true; data: T; warning?: LocalMessage }
     | { ok: false; error: LocalMessage };
 
+/** Message shown when Supabase is not configured. */
 export function notConfiguredError(): LocalMessage {
     return dictMessage('errors', 'notConfigured');
 }
 
+/** Turns a Supabase or network error into a friendly message (or the fallback with the raw detail). */
 export function supabaseErrorMessage(fallback: LocalMessage, error: unknown): LocalMessage {
     const err = error as { code?: string; message?: string } | null;
     const message = err?.message ?? (typeof error === 'string' ? error : '');
     if (err?.code === '23505' || /duplicate key|unique constraint/i.test(message)) {
         return dictMessage('errors', 'usernameTaken');
     }
-    // El trigger handle_new_user inserta en profiles (username unique): con un nombre repetido
-    // Supabase devuelve este error genérico en vez del 23505.
+    // The handle_new_user trigger inserts into profiles (unique username): with a taken name Supabase
+    // returns this generic error instead of 23505.
     if (/database error creating anonymous user/i.test(message)) {
         return dictMessage('errors', 'usernameTakenCreate');
     }
@@ -99,24 +105,25 @@ export function supabaseErrorMessage(fallback: LocalMessage, error: unknown): Lo
     return message ? dictMessageWith('errors', 'withDetail', { message: fallback, detail: message }) : fallback;
 }
 
-/** Normaliza el dato antes de persistirlo; el escapado de salida ya lo hace React. */
+/** Normalises text before it is stored; output escaping is already done by React. */
 export function normalizeText(value: string, max: number): string {
     return value.replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
-// Sin SVG ni GIF: el SVG puede llevar scripts.
+// No SVG or GIF: SVG can carry scripts.
 export const ALLOWED_IMAGE_MIME: readonly string[] = ['image/png', 'image/jpeg', 'image/webp'];
 
+/** Whether an uploaded image type is allowed. */
 export function isAllowedImageMime(type: string): boolean {
     return ALLOWED_IMAGE_MIME.includes(type);
 }
 
 /**
- * Debe coincidir con Supabase → Authentication → Email: "Minimum password length" y
- * "Password requirements" = minúsculas, mayúsculas, dígitos y símbolos.
+ * Must match Supabase → Authentication → Email: "Minimum password length" and
+ * "Password requirements" = lowercase, uppercase, digits and symbols.
  */
 export const MIN_PASSWORD_LENGTH = 10;
 
-// Máximo de una imagen subida (avatar o textura de la ruleta). Antes de guardarla se reduce
-// (image-resize.ts): lo que llega al bucket de avatares o a localStorage pesa mucho menos.
+// Maximum size of an uploaded image (avatar or wheel texture). It is shrunk before it is saved
+// (image-resize.ts), so what reaches the avatars bucket or localStorage is much lighter.
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;

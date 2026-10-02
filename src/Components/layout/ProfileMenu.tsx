@@ -1,3 +1,7 @@
+/**
+ * ProfileMenu: the account menu in the header. It creates an account, signs in and out, edits the
+ * profile (name, photo, password) and protects an older passwordless profile with a password.
+ */
 import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import Avatar from '../common/Avatar';
 import Icon from '../common/Icon';
@@ -28,14 +32,14 @@ import { clearTrackFiles } from '../../scripts/music-files';
 import { replaySplashOnNextLoad } from '../../scripts/splash';
 import { isAllowedImageMime, isSupabaseConfigured, MAX_UPLOAD_BYTES, notConfiguredError } from '../../scripts/supabaseClient';
 
-/** view: perfil abierto. create / login: sin sesión. edit: nombre, foto y contraseña. protect: poner contraseña a un perfil antiguo. */
+/** view: signed-in profile. create / login: no session. edit: name, photo and password. protect: add a password to an older profile. */
 type Mode = 'view' | 'create' | 'login' | 'edit' | 'protect';
 type FormMode = Exclude<Mode, 'view'>;
 
-// Debe coincidir con la animación de salida de .spinly-profile-menu--closing (Header.css).
+// Must match the exit animation of .spinly-profile-menu--closing (Header.css).
 const CLOSE_MS = 140;
 
-// Tras varios fallos seguidos al entrar, una pausa creciente (el límite real lo pone Supabase).
+// After several failed sign-ins in a row, a growing pause (the real limit is enforced by Supabase).
 const FREE_ATTEMPTS = 3;
 const LOCK_STEP_S = 5;
 const MAX_LOCK_S = 30;
@@ -48,7 +52,7 @@ interface PasswordInputProps {
     required?: boolean;
 }
 
-/** Campo de contraseña con botón para mostrarla: sin recuperación, conviene poder revisarla. */
+/** Password field with a show/hide button: there is no recovery, so being able to check it matters. */
 function PasswordInput({ label, value, onChange, autoComplete, required = true }: PasswordInputProps) {
     const { t } = useTranslation();
     const id = useId();
@@ -83,6 +87,7 @@ function PasswordInput({ label, value, onChange, autoComplete, required = true }
     );
 }
 
+// Password requirements shown in the live checklist, in order.
 const RULES: ReadonlyArray<{ id: PasswordCheck; label: 'ruleLength' | 'ruleLower' | 'ruleUpper' | 'ruleDigit' | 'ruleSymbol' | 'ruleNoName' }> = [
     { id: 'length', label: 'ruleLength' },
     { id: 'lower', label: 'ruleLower' },
@@ -92,12 +97,12 @@ const RULES: ReadonlyArray<{ id: PasswordCheck; label: 'ruleLength' | 'ruleLower
     { id: 'noName', label: 'ruleNoName' },
 ];
 
-/** Requisitos de la contraseña, marcados en vivo mientras se escribe. */
+/** Password requirements, ticked live while typing. */
 function PasswordRules({ password, username }: { password: string; username: string }) {
     const { t } = useTranslation();
     const checks = passwordChecks(password, username);
     const name = username.trim();
-    // Con menos de 3 letras la regla no aplica (passwordChecks): mejor no mostrarla.
+    // With fewer than 3 letters the rule does not apply (passwordChecks), so it is not shown.
     const rules = name.length >= 3 ? RULES : RULES.filter((rule) => rule.id !== 'noName');
     return (
         <ul className="spinly-profile-rules" aria-label={t('header', 'passwordRules')}>
@@ -113,8 +118,8 @@ function PasswordRules({ password, username }: { password: string; username: str
 }
 
 /**
- * Cuenta con nombre de usuario y contraseña. Entrar o salir recarga la página: la app
- * arranca con los datos de la cuenta, o como nueva tras cerrar sesión.
+ * Account with a username and a password. Signing in or out reloads the page: the app starts with the
+ * account's data, or as new after signing out.
  */
 function ProfileMenu() {
     const { t, tm } = useTranslation();
@@ -141,6 +146,7 @@ function ProfileMenu() {
     const nameId = useId();
     const photoId = useId();
 
+    /** Closes the menu after its exit animation. */
     const closeMenu = () => {
         if (!open || closing) return;
         setClosing(true);
@@ -169,12 +175,14 @@ function ProfileMenu() {
         };
     }, [userId]);
 
+    /** Empties every password field. */
     const clearSecrets = () => {
         setPassword('');
         setPasswordRepeat('');
         setCurrentPassword('');
     };
 
+    /** Switches the menu to another step, resetting the form. */
     const goTo = (next: Mode) => {
         setMode(next);
         setDraftName(next === 'edit' ? profile?.username ?? '' : next === 'login' || next === 'create' ? '' : draftName);
@@ -184,6 +192,7 @@ function ProfileMenu() {
         setAvatarPreview(null);
     };
 
+    /** Opens the menu (on the profile, or on account creation without one) or closes it. */
     const toggleOpen = () => {
         if (open) {
             closeMenu();
@@ -194,6 +203,7 @@ function ProfileMenu() {
         setOpen(true);
     };
 
+    /** Validates the chosen photo and shows a preview. */
     const handleAvatarFile = (event: ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0] ?? null;
         setFormError(null);
@@ -212,13 +222,14 @@ function ProfileMenu() {
         reader.readAsDataURL(file);
     };
 
-    // Al crear cuenta el nombre es el que se está escribiendo; después, el del perfil.
+    // When creating an account the name is the one being typed; afterwards, the profile's one.
     const nameForRules = mode === 'create' ? draftName : profile?.username ?? '';
 
-    /** Contraseña nueva: segura y repetida igual; sin recuperación posible, un error tecleando sería definitivo. */
+    /** New password: strong and repeated identically; with no recovery, a typo would be final. */
     const checkNewPassword = (): LocalMessage | null =>
         validatePassword(password, nameForRules) ?? (password !== passwordRepeat ? dictMessage('errors', 'passwordMismatch') : null);
 
+    /** Runs a form action with the busy state and a generic error for anything unexpected. */
     const run = async (action: () => Promise<void>) => {
         setFormError(null);
         setFormNotice(null);
@@ -232,6 +243,7 @@ function ProfileMenu() {
         }
     };
 
+    /** Creates the account (and its profile and photo). */
     const handleCreate = () => run(async () => {
         const username = draftName.trim();
         if (!username) return setFormError(dictMessage('errors', 'typeUsername'));
@@ -245,6 +257,7 @@ function ProfileMenu() {
         setFormNotice(result.warning ?? dictMessage('header', 'passwordSaved'));
     });
 
+    /** Counts a failed sign-in and, past the free attempts, locks the form for a growing time. */
     const lockAfterFailure = () => {
         const failures = failedLogins + 1;
         setFailedLogins(failures);
@@ -255,6 +268,7 @@ function ProfileMenu() {
         return dictMessage('errors', 'tooManyAttempts', { s: seconds });
     };
 
+    /** Signs in, adopts the account's data and reloads the app. */
     const handleLogin = () => run(async () => {
         beginAccountSwitch();
         const result = await signInWithUsername(draftName, password);
@@ -272,6 +286,7 @@ function ProfileMenu() {
         reloadApp();
     });
 
+    /** Adds a password to an anonymous profile. */
     const handleProtect = () => run(async () => {
         const invalid = checkNewPassword();
         if (invalid) return setFormError(invalid);
@@ -282,6 +297,7 @@ function ProfileMenu() {
         setFormNotice(dictMessage('header', 'passwordSaved'));
     });
 
+    /** Saves the name and photo and, if typed, the new password. */
     const handleEdit = () => run(async () => {
         if (!userId) return;
         const username = draftName.trim();
@@ -303,7 +319,7 @@ function ProfileMenu() {
         setFormNotice(result.warning ?? (changingPassword ? dictMessage('header', 'passwordChanged') : null));
     });
 
-    // Lo pendiente se sube antes de salir; si no se puede, no se sale (se perdería).
+    /** Signs out. Pending changes are uploaded first; if that fails, it does not sign out (they would be lost). */
     const handleSignOut = () => run(async () => {
         beginAccountSwitch();
         if (!(await flushAccountSync())) {
@@ -316,12 +332,13 @@ function ProfileMenu() {
             return setFormError(result.error);
         }
         clearLocalData();
-        // Las canciones de este navegador también: se espera al borrado antes de recargar.
+        // This browser's songs go too: the deletion is awaited before reloading.
         await clearTrackFiles();
         replaySplashOnNextLoad();
         reloadApp();
     });
 
+    /** Routes the form submission to the current step's action. */
     const onSubmit = (event: FormEvent) => {
         event.preventDefault();
         if (mode === 'create') void handleCreate();
@@ -357,6 +374,7 @@ function ProfileMenu() {
         protect: t('header', 'protectButton'),
     };
 
+    /** New password, its repetition and the live checklist. */
     const newPasswordFields = (label: string, required: boolean) => (
         <>
             <PasswordInput label={label} value={password} onChange={setPassword} autoComplete="new-password" required={required} />

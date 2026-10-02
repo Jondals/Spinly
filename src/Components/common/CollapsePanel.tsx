@@ -1,3 +1,6 @@
+/**
+ * CollapsePanel: the accordion form used to create or edit themes and presets.
+ */
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react';
 import Icon from './Icon';
 import { useTranslation } from '../i18n/LanguageProvider';
@@ -11,24 +14,24 @@ interface CollapsePanelProps {
     submitDisabled?: boolean;
     onSubmit: () => void;
     onClose: () => void;
-    /** En el sitio de la tarjeta que se edita: se monta ya abierto y entra con un fundido. */
+    /** In place of the card being edited: it mounts already open and fades in. */
     inline?: boolean;
     children: ReactNode;
 }
 
-// Debe coincidir con la transición de .spinly-collapse (shared.css).
+// Must match the .spinly-collapse transition (shared.css).
 const EXPAND_MS = 260;
 
 /**
- * Formulario en acordeón bajo las tarjetas (crear) o en el sitio de una tarjeta (editar,
- * `inline`). Cerrado queda montado pero `inert` (sin foco ni lector de pantalla) para poder
- * animar también el plegado. Enter en un campo de una línea envía el formulario.
+ * Accordion form below the cards (create) or in place of a card (edit, `inline`). While closed it stays
+ * mounted but `inert` (no focus, hidden from screen readers) so folding can be animated too. Enter in a
+ * single-line field submits the form.
  */
 function CollapsePanel({ id, open, title, hint, submitLabel, submitDisabled = false, onSubmit, onClose, inline = false, children }: CollapsePanelProps) {
     const { t } = useTranslation();
     const rootRef = useRef<HTMLDivElement>(null);
 
-    // Vive bajo las tarjetas: al abrir puede quedar fuera del scroll del panel.
+    // It lives below the cards: when it opens it may be outside the panel's scroll, so it is brought into view.
     useEffect(() => {
         if (!open) return undefined;
         const focusTimer = window.setTimeout(() => {
@@ -43,6 +46,7 @@ function CollapsePanel({ id, open, title, hint, submitLabel, submitDisabled = fa
         };
     }, [open]);
 
+    /** Escape closes the form; Enter in a single-line field submits it. */
     const handleKeyDown = (event: KeyboardEvent) => {
         if (event.key === 'Escape') {
             event.stopPropagation();

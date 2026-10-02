@@ -1,3 +1,6 @@
+/**
+ * Avatar: a profile photo with a placeholder fallback.
+ */
 import { useEffect, useState } from 'react';
 import Icon from './Icon';
 import { useTranslation } from '../i18n/LanguageProvider';
@@ -9,12 +12,12 @@ interface AvatarProps {
     className?: string;
 }
 
-// Si no hay foto o la URL falla se muestra un placeholder, nunca una imagen rota.
+/** Shows the photo, or a placeholder when there is none or the URL fails: never a broken image. */
 function Avatar({ src, alt = '', size = 'md', className = '' }: AvatarProps) {
     const { t } = useTranslation();
     const [failed, setFailed] = useState(false);
 
-    // Una URL nueva (foto recién subida) vuelve a intentarlo.
+    // A new URL (a freshly uploaded photo) gets another try.
     useEffect(() => {
         setFailed(false);
     }, [src]);

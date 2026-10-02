@@ -1,11 +1,16 @@
-// Conversiones de color compartidas por el selector de color, la ruleta y sus temas.
+/**
+ * Color conversions shared by the color picker, the wheel and its themes.
+ */
 
 export type Rgb = { r: number; g: number; b: number };
 export type Hsv = { h: number; s: number; v: number };
 
+/** Limits a number to the [min, max] range. */
 export const clamp = (v: number, min: number, max: number): number => Math.min(Math.max(v, min), max);
+/** One color channel (0-255) as two hex digits. */
 const byte = (n: number): string => clamp(Math.round(Number.isFinite(n) ? n : 0), 0, 255).toString(16).padStart(2, '0');
 
+/** Parses #rgb or #rrggbb into RGB; black for anything invalid. */
 export function hexToRgb(hex: string): Rgb {
     let clean = hex.trim().replace('#', '');
     if (clean.length === 3) clean = clean.split('').map((c) => c + c).join('');
@@ -15,8 +20,8 @@ export function hexToRgb(hex: string): Rgb {
 }
 
 /**
- * Color devuelto por la pipeta: normalmente "#rrggbb", pero según el perfil de color algunas
- * versiones de Chrome devuelven "#rrggbbaa" o "rgb(r, g, b)". Se descarta la transparencia.
+ * Color returned by the eyedropper: usually "#rrggbb", but depending on the color profile some Chrome
+ * versions return "#rrggbbaa" or "rgb(r, g, b)". Transparency is dropped.
  */
 export function parseScreenColor(value: string): Rgb | null {
     const clean = value.trim();
@@ -28,10 +33,12 @@ export function parseScreenColor(value: string): Rgb | null {
     return { r, g, b };
 }
 
+/** RGB to #rrggbb. */
 export function rgbToHex({ r, g, b }: Rgb): string {
     return `#${byte(r)}${byte(g)}${byte(b)}`;
 }
 
+/** RGB (0-255) to HSV (hue 0-360, saturation and value 0-1). */
 export function rgbToHsv({ r, g, b }: Rgb): Hsv {
     const rr = r / 255;
     const gg = g / 255;
@@ -50,6 +57,7 @@ export function rgbToHsv({ r, g, b }: Rgb): Hsv {
     return { h, s: max === 0 ? 0 : d / max, v: max };
 }
 
+/** HSV (hue 0-360, saturation and value 0-1) to RGB (0-255). */
 export function hsvToRgb({ h, s, v }: Hsv): Rgb {
     const c = v * s;
     const hh = (((h % 360) + 360) % 360) / 60;
@@ -71,11 +79,14 @@ export function hsvToRgb({ h, s, v }: Hsv): Rgb {
     };
 }
 
+/** HSL (hue 0-360, saturation and lightness 0-100) to #rrggbb. */
 export function hslToHex(h: number, s: number, l: number): string {
     const sat = s / 100;
     const light = l / 100;
+    /** HSL helper term. */
     const k = (n: number) => (n + h / 30) % 12;
     const a = sat * Math.min(light, 1 - light);
+    /** One RGB channel as two hex digits. */
     const channel = (n: number) => {
         const value = light - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
         return Math.round(value * 255).toString(16).padStart(2, '0');
@@ -83,7 +94,7 @@ export function hslToHex(h: number, s: number, l: number): string {
     return `#${channel(0)}${channel(8)}${channel(4)}`;
 }
 
-/** Tono (0-360) de un hex #rgb/#rrggbb; null si no es hex válido o es gris. */
+/** Hue (0-360) of a #rgb/#rrggbb color; null if it is not a valid hex or it is a gray. */
 export function hexToHue(color: string | undefined): number | null {
     if (!color || !color.startsWith('#')) return null;
     let hex = color.slice(1);

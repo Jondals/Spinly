@@ -1,6 +1,10 @@
+/**
+ * Icon: every inline SVG icon of the app, drawn from a single typed catalogue.
+ */
 import type { ReactNode } from 'react';
 
-type IconDef = {     /** stroke: iconos de línea (currentColor). fill: sólidos. own: el dibujo trae sus colores. */
+/** stroke: line icons (currentColor). fill: solid icons. own: the drawing brings its own colors. */
+type IconDef = {
     body: ReactNode;
     viewBox?: string;
     paint?: 'stroke' | 'fill' | 'own';
@@ -8,10 +12,11 @@ type IconDef = {     /** stroke: iconos de línea (currentColor). fill: sólidos
     fit?: 'slice';
 };
 
+/** Identity helper that type-checks the catalogue while keeping its literal keys. */
 const defineIcons = <T extends Record<string, IconDef>>(icons: T): T => icons;
 
 const ICONS = defineIcons({
-    // Editor de ruleta: ajustes de las opciones.
+    // Wheel editor: option settings.
     sliders: {
         body: (
             <>
@@ -22,12 +27,12 @@ const ICONS = defineIcons({
         ),
         strokeWidth: 1.75,
     },
-    // Preajustes: configuraciones guardadas.
+    // Presets: saved setups.
     bookmark: {
         body: <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z" />,
         strokeWidth: 1.75,
     },
-    // Temas: el aspecto visual.
+    // Themes: the visual look.
     palette: {
         body: (
             <>
@@ -266,7 +271,7 @@ interface IconProps {
     className?: string;
 }
 
-/** Iconos decorativos (aria-hidden): el nombre accesible lo pone siempre el control que los contiene. */
+/** Decorative icons (aria-hidden): the accessible name always comes from the control that contains them. */
 function Icon({ name, size = 16, className }: IconProps) {
     const icon: IconDef = ICONS[name];
     const paint = icon.paint ?? 'stroke';

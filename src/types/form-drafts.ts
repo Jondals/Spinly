@@ -1,4 +1,11 @@
-// Viven en App y no en el panel: sobreviven a una visita al editor para cambiar colores u opciones.
+/**
+ * Drafts of the theme and preset forms.
+ *
+ * They live in App rather than in the panels, so they survive a trip to the editor to change colors
+ * or options.
+ */
+
+/** What a form is editing: a new item, a local one or one shared in the community. */
 export type EditTarget =
     | { mode: 'create' }
     | { mode: 'local'; id: string }
@@ -18,5 +25,5 @@ export type PresetDraft = {
     tags: string;
 };
 
-// La edición en la nube se abre en la vista Comunidad; el resto en la vista propia.
+/** Cloud edits open in the Community view; everything else in the user's own view. */
 export const isCloudTarget = (target: EditTarget): boolean => target.mode === 'cloud';

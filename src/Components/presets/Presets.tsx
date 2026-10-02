@@ -1,3 +1,7 @@
+/**
+ * Presets: the panel of saved wheels (options + theme). "Mine" lists the user's presets; "Community"
+ * lists the shared ones, which can be used, and edited or deleted by their author.
+ */
 import { useState, type Dispatch, type SetStateAction } from 'react';
 import AuthorTag, { authorName } from '../common/AuthorTag';
 import CollapsePanel from '../common/CollapsePanel';
@@ -40,14 +44,17 @@ interface PresetsProps {
 const FORM_ID = 'presets-form';
 const EMPTY_DRAFT: PresetDraft = { target: { mode: 'create' }, name: '', tags: '' };
 
-// Los presets semilla no se pueden editar, borrar ni compartir.
+/** Seed presets cannot be edited or shared (only removed from the list). */
 const isSeed = (id: string) => id.startsWith('default-preset-');
 
+/** Splits a comma-separated tag field into clean tags. */
 const parseTags = (raw: string): string[] => raw.split(',').map((tag) => tag.trim()).filter(Boolean);
 
+/** Card classes, reserving room for its action buttons. */
 const cardClass = (base: string, actionCount: number, extra = '') =>
     `${base} spinly-panel-card${extra}${actionCount ? ` spinly-card--actions-${actionCount}` : ''}`;
 
+/** Renders the presets panel with its two views and the create / edit form. */
 function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, onSavePreset, onLoadPreset, onDeletePreset, onUpdatePreset, onImportPreset, draft, setDraft }: PresetsProps) {
     const { lang, t, tm } = useTranslation();
     const userId = useSessionUserId();
@@ -60,7 +67,7 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
     const form = useDraftForm(draft, setDraft, EMPTY_DRAFT, view);
     const { shownDraft } = form;
 
-    // Los presets semilla se localizan; los del usuario se muestran tal cual.
+    /** Seed presets are localized; the user's own presets are shown as they are. */
     const displayName = (preset: WheelPreset): string => seedText(preset.id, 'name', lang) ?? preset.name;
 
     const query = search.trim().toLowerCase();
@@ -77,6 +84,7 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
     const downloaded = community.items.filter(({ preset }) => savedIds.has(preset.id)).length;
     const canSubmit = Boolean(activeTheme) && currentOptions.length > 0;
 
+    /** Shares a preset in the community. */
     const handleShare = async (preset: WheelPreset) => {
         setNotice(null);
         const result = await cloud.run(preset.id, () => sharePreset(preset));
@@ -89,8 +97,10 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
         community.refresh();
     };
 
-    // Si ya está en Mis preajustes (mismo id) se carga la copia guardada, con los cambios
-    // locales que tenga, en vez de descargarlo otra vez.
+    /**
+     * Uses a community preset. If it is already in My presets (same id), the saved copy is loaded, with
+     * any local changes, instead of downloading it again.
+     */
     const handleUse = (preset: WheelPreset) => {
         const saved = savedPresets.find((item) => item.id === preset.id);
         if (saved) {
@@ -102,7 +112,7 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
         setNotice({ tone: 'ok', text: dictMessage('presets', 'usedOk', { name: preset.name }) });
     };
 
-    // Editar carga el preset en la ruleta (sus opciones se cambian en el editor) y abre el formulario.
+    /** Editing loads the preset on the wheel (its options are changed in the editor) and opens the form. */
     const startEdit = (preset: WheelPreset, mode: 'local' | 'cloud') => form.toggleEdit(
         mode,
         preset.id,
@@ -110,6 +120,7 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
         () => onLoadPreset(preset),
     );
 
+    /** Submits the form: creates a preset, updates a local one, or updates the shared row in the cloud. */
     const handleSubmit = async () => {
         if (!draft || !canSubmit || !activeTheme) return;
         const { target } = draft;
@@ -117,7 +128,7 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
         const tags = parseTags(draft.tags);
 
         if (target.mode === 'cloud') {
-            // UPDATE de la misma fila; la copia local, si existe, es independiente y no se toca.
+            // UPDATE of the same row; the local copy, if any, is independent and left untouched.
             setNotice(null);
             const result = await cloud.run(target.id, () => updateSharedPreset(target.id, {
                 id: target.id,
@@ -143,11 +154,13 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
         form.close();
     };
 
+    /** Deletes a preset from My presets. */
     const handleDeleteLocal = (preset: WheelPreset) => {
         form.closeIfEditing('local', preset.id);
         onDeletePreset(preset.id);
     };
 
+    /** Deletes one of the user's shared presets from the community. */
     const handleDeleteCloud = async (preset: WheelPreset) => {
         setNotice(null);
         const result = await cloud.run(preset.id, () => deleteSharedPreset(preset.id));
@@ -165,11 +178,12 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
     const mode = shownDraft.target.mode;
     const formTitle = mode === 'cloud' ? t('presets', 'editCloudTitle') : mode === 'local' ? t('presets', 'editTitle') : t('presets', 'newTitle');
     const submitLabel = mode === 'cloud' ? t('common', 'updateCloud') : mode === 'local' ? t('common', 'saveChanges') : t('presets', 'create');
+    /** "N options" badge of a card. */
     const optionsBadge = (preset: WheelPreset) => (
         <span className="presets-presets-card-badge">{t('presets', 'optionsCount', { n: preset.options.length })}</span>
     );
 
-    // Crear va bajo la lista; editar sustituye a la tarjeta que se edita, en su sitio.
+    /** The form: creating goes below the list; editing replaces the card being edited, in place. */
     const formPanel = (inline: boolean) => (
         <CollapsePanel
             id={inline ? `${FORM_ID}-edit` : FORM_ID}
@@ -316,7 +330,7 @@ function Presets({ savedPresets, activePresetId, currentOptions, activeTheme, on
                 >
                     {shared.map(({ preset, author, authorId }) => {
                         if (form.isEditing('cloud', preset.id)) return <SwapItem key={preset.id} swapped className="spinly-inline-edit">{formPanel(true)}</SwapItem>;
-                        // Solo decide qué se muestra; la autorización real la impone RLS.
+                        // This only decides what is shown; real authorization is enforced by RLS.
                         const actions = userId && authorId === userId ? {
                             onEdit: () => startEdit(preset, 'cloud'),
                             onDelete: () => { void handleDeleteCloud(preset); },

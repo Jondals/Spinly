@@ -1,7 +1,10 @@
+/**
+ * Tests of the beat analysis (scripts/beat-analysis.ts): the whole-song analysis and the real-time tracker.
+ */
 import { analyzeBeats, BeatTracker, fft, OnsetMeter } from './beat-analysis';
 
-// Canciones sintéticas con los tiempos conocidos al milisegundo: bombo en cada tiempo, hats en las
-// corcheas (con swing opcional), caja en los tiempos pares y un acorde de fondo constante.
+// Synthetic songs with beats known to the millisecond: a kick on every beat, hats on the eighth notes
+// (with optional swing), a snare on the even beats and a constant background chord.
 const RATE = 22050;
 const DURATION = 20;
 
@@ -12,17 +15,21 @@ interface SongOptions {
     accentEvery?: number;
 }
 
+/** Evenly spaced beat times at a BPM between two instants. */
 function grid(bpm: number, from = 0, to = DURATION): number[] {
     const list: number[] = [];
     for (let t = from; t < to - 1e-6; t += 60 / bpm) list.push(t);
     return list;
 }
 
+/** Renders a synthetic song with the given beats. */
 function render(beats: number[], { swing = 0, silence, reverb = 0, accentEvery = 4 }: SongOptions = {}): Float32Array {
     const n = RATE * DURATION;
     const out = new Float32Array(n);
     let seed = 3;
+    /** Deterministic pseudo-random noise in [-1, 1]. */
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) * 2 - 1;
+    /** Adds a sound (a function of time) at t0 for len seconds. */
     const add = (t0: number, fn: (x: number) => number, len: number) => {
         const start = Math.round(t0 * RATE);
         for (let i = 0; i < len * RATE && start + i < n; i++) out[start + i] += fn(i / RATE);
@@ -49,7 +56,7 @@ function render(beats: number[], { swing = 0, silence, reverb = 0, accentEvery =
     return out;
 }
 
-/** Desfase (ms) de cada tiempo real desde `from` s con el tiempo detectado más cercano; a más de 150 ms, perdido. */
+/** Offset (ms) of every real beat from `from` s on to the nearest detected beat; beyond 150 ms it counts as missed. */
 function offsets(detected: number[], truth: number[], from = 2): { mean: number; max: number; missed: number } {
     const errors: number[] = [];
     let missed = 0;
@@ -62,7 +69,7 @@ function offsets(detected: number[], truth: number[], from = 2): { mean: number;
     return { mean: errors.reduce((a, v) => a + v, 0) / Math.max(1, errors.length), max: Math.max(0, ...errors), missed };
 }
 
-/** Tempo de los tiempos detectados dentro de [from, to): mediana de los intervalos. */
+/** Tempo of the detected beats within [from, to): the median of the intervals. */
 function tempoBetween(beats: number[], from: number, to: number): number {
     const inside = beats.filter((t) => t >= from && t < to);
     const gaps = inside.slice(1).map((t, i) => t - inside[i]).sort((a, b) => a - b);
@@ -70,8 +77,8 @@ function tempoBetween(beats: number[], from: number, to: number): number {
 }
 
 /**
- * Como la app: 60 lecturas por segundo de un analizador (ventana de ~46 ms, suavizado 0,55) y su
- * fuerza de ataque al seguidor, fechada en el centro de la ventana.
+ * Like the app: 60 readings per second of an analyser (~46 ms window, 0.55 smoothing) feeding its onset
+ * strength to the tracker, timestamped at the centre of the window.
  */
 function live(samples: Float32Array): { beats: number[]; bpm: number } {
     const size = 1024;
@@ -102,17 +109,17 @@ function live(samples: Float32Array): { beats: number[]; bpm: number } {
     return { beats, bpm: tracker.bpm };
 }
 
-// Cada caso: los tiempos reales y el tempo de cada tramo [desde, hasta, BPM].
+// Each case: the real beats and the tempo of each section [from, to, BPM].
 const cases: { name: string; beats: number[]; options?: SongOptions; tempos: [number, number, number][] }[] = [
-    { name: '120 BPM exactos', beats: grid(120), tempos: [[0, 20, 120]] },
-    { name: '95 BPM con swing', beats: grid(95), options: { swing: 0.17 }, tempos: [[0, 20, 95]] },
-    { name: 'cambio de 100 a 130 BPM', beats: [...grid(100, 0, 10), ...grid(130, 10)], tempos: [[0, 9.5, 100], [12, 20, 130]] },
-    { name: 'pausa de 4 s sin percusión', beats: grid(120), options: { silence: [8, 12] }, tempos: [[0, 20, 120]] },
-    { name: 'reverberación larga', beats: grid(110), options: { reverb: 1.5 }, tempos: [[0, 20, 110]] },
+    { name: 'exactly 120 BPM', beats: grid(120), tempos: [[0, 20, 120]] },
+    { name: '95 BPM with swing', beats: grid(95), options: { swing: 0.17 }, tempos: [[0, 20, 95]] },
+    { name: 'change from 100 to 130 BPM', beats: [...grid(100, 0, 10), ...grid(130, 10)], tempos: [[0, 9.5, 100], [12, 20, 130]] },
+    { name: '4 s break without drums', beats: grid(120), options: { silence: [8, 12] }, tempos: [[0, 20, 120]] },
+    { name: 'long reverb', beats: grid(110), options: { reverb: 1.5 }, tempos: [[0, 20, 110]] },
 ];
 
-describe('análisis previo de la canción', () => {
-    it.each(cases)('$name: tempo, fase y desfase máximo', ({ beats, options, tempos }) => {
+describe('whole-song analysis', () => {
+    it.each(cases)('$name: tempo, phase and maximum offset', ({ beats, options, tempos }) => {
         const result = analyzeBeats(render(beats, options), RATE);
         expect(result).not.toBeNull();
         if (!result) return;
@@ -124,8 +131,8 @@ describe('análisis previo de la canción', () => {
         expect(score.max).toBeLessThan(40);
     });
 
-    it('el primero de compás es el tiempo acentuado', () => {
-        // Acento en los tiempos 2, 6, 10…: la canción empieza a mitad de compás.
+    it('the first beat of the bar is the accented one', () => {
+        // Accent on beats 2, 6, 10…: the song starts mid-bar.
         const beats = grid(120).slice(1);
         const result = analyzeBeats(render(beats), RATE);
         expect(result).not.toBeNull();
@@ -136,19 +143,19 @@ describe('análisis previo de la canción', () => {
         }
     });
 
-    it('rechaza lo demasiado corto', () => {
+    it('rejects audio that is too short', () => {
         expect(analyzeBeats(new Float32Array(RATE), RATE)).toBeNull();
     });
 });
 
-describe('seguidor en tiempo real', () => {
-    it.each(cases)('$name: tempo y desfase', ({ beats, options, tempos }) => {
+describe('real-time tracker', () => {
+    it.each(cases)('$name: tempo and offset', ({ beats, options, tempos }) => {
         const result = live(render(beats, options));
         const [, , finalBpm] = tempos[tempos.length - 1];
         expect(Math.abs(result.bpm - finalBpm)).toBeLessThan(2);
         for (const [from, to, bpm] of tempos) expect(Math.abs(tempoBetween(result.beats, Math.max(from, 3.5), to) - bpm)).toBeLessThan(2);
-        // Engancha en ~3 s; después solo puede perder los pocos tiempos que tarda en re-enganchar tras
-        // un cambio de tempo. En la pausa sigue marcando: esos tiempos también cuentan.
+        // It locks in ~3 s; after that it may only miss the few beats it takes to relock after a tempo
+        // change. During the break it keeps time: those beats count too.
         const score = offsets(result.beats, beats, 3.5);
         expect(score.missed).toBeLessThanOrEqual(tempos.length > 1 ? 3 : 0);
         expect(score.mean).toBeLessThan(15);

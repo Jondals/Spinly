@@ -1,8 +1,11 @@
+/**
+ * useEyeDropper: picks colors from the screen, choosing the best method the browser supports.
+ */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseScreenColor, rgbToHex } from '../scripts/color';
 import { supportsScreenCapture } from '../scripts/screen-capture';
 
-// EyeDropper API (Chromium de escritorio): aún no está en lib.dom de TypeScript 4.9.
+// EyeDropper API (desktop Chromium): not in TypeScript 4.9's lib.dom yet.
 interface EyeDropperResult {
     sRGBHex: string;
 }
@@ -11,18 +14,20 @@ interface EyeDropperInstance {
 }
 type EyeDropperConstructor = new () => EyeDropperInstance;
 
+/** The native EyeDropper constructor, if the browser has one. */
 const getEyeDropper = (): EyeDropperConstructor | undefined =>
     typeof window === 'undefined' ? undefined : (window as unknown as { EyeDropper?: EyeDropperConstructor }).EyeDropper;
 
 /**
- * Cómo toma colores la pipeta en este navegador, de mejor a peor:
- * - native: EyeDropper (Chrome, Edge, Opera de escritorio). Cualquier punto de la pantalla.
- * - screen: captura de pantalla (Firefox, Safari de escritorio). El usuario elige pantalla,
- *   ventana o pestaña y el color se toma sobre el fotograma congelado.
- * - image: una imagen o captura de pantalla del dispositivo (móvil, o página sin HTTPS).
+ * How the eyedropper picks colors in this browser, from best to worst:
+ * - native: EyeDropper (desktop Chrome, Edge, Opera). Any point of the screen.
+ * - screen: screen capture (desktop Firefox, Safari). The user picks a screen, window or tab and the
+ *   color is taken from the frozen frame.
+ * - image: an image or screenshot from the device (mobile, or a page without HTTPS).
  */
 export type EyeDropperMode = 'native' | 'screen' | 'image';
 
+/** Detects the best available mode. */
 const detectMode = (): EyeDropperMode => {
     if (getEyeDropper()) return 'native';
     if (supportsScreenCapture()) return 'screen';
@@ -30,17 +35,18 @@ const detectMode = (): EyeDropperMode => {
 };
 
 /**
- * `pickNative` devuelve el color en hex, o null si el usuario cancela (Escape) o el navegador
- * lo impide. Los modos screen e image los resuelve ColorPicker con ColorSampler.
+ * `pickNative` returns the color as hex, or null if the user cancels (Escape) or the browser prevents it.
+ * The screen and image modes are handled by ColorPicker with ColorSampler.
  */
 export function useEyeDropper() {
     const [mode] = useState(detectMode);
     const [picking, setPicking] = useState(false);
     const controllerRef = useRef<AbortController | null>(null);
 
-    // Si el selector se cierra con la pipeta abierta, se cancela en lugar de quedar colgada.
+    // If the picker closes while the eyedropper is open, it is cancelled instead of being left hanging.
     useEffect(() => () => controllerRef.current?.abort(), []);
 
+    /** Opens the native eyedropper and resolves with the picked color (or null). */
     const pickNative = useCallback(async (): Promise<string | null> => {
         const EyeDropper = getEyeDropper();
         if (!EyeDropper || controllerRef.current) return null;

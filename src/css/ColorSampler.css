@@ -1,8 +1,8 @@
-/* ColorSampler.tsx: pipeta sobre una captura o imagen, a pantalla completa. */
+/* ColorSampler.tsx: a full-screen eyedropper over a screenshot or an image. */
 .csampler {
     position: fixed;
     inset: 0;
-    /* Sobre el header (100) y el selector de color (60) */
+    /* Above the header (100) and the color picker (60) */
     z-index: 160;
     display: flex;
     background: rgba(0, 0, 0, 0.88);
@@ -63,7 +63,7 @@
     padding: 1rem;
 }
 
-/* Canvas a resolución real, reducido para caber sin deformarse */
+/* Full-resolution canvas, scaled down to fit without distortion */
 .csampler-canvas {
     display: block;
     max-width: 100%;

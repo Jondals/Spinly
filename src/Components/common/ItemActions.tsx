@@ -1,3 +1,6 @@
+/**
+ * ItemActions: the share / edit / delete buttons on theme and preset cards.
+ */
 import { useEffect, useRef, useState } from 'react';
 import Icon from './Icon';
 import { useTranslation } from '../i18n/LanguageProvider';
@@ -7,21 +10,21 @@ interface ItemActionsProps {
     onShare?: () => void;
     onEdit?: () => void;
     onDelete?: () => void;
-    // Editar y Borrar actúan sobre la fila de la nube.
+    // Edit and Delete act on the cloud row.
     cloud?: boolean;
     editing?: boolean;
     busy?: boolean;
 }
 
-// Ventana para confirmar el borrado en la nube con un segundo clic.
+// Time window to confirm a cloud delete with a second click.
 const CONFIRM_MS = 3000;
 
-// La tarjeta reserva a la derecha el hueco de las acciones que se van a pintar.
+/** How many actions a card shows, so it can reserve that much room on its right. */
 export function countItemActions(props: Pick<ItemActionsProps, 'onShare' | 'onEdit' | 'onDelete'>): number {
     return [props.onShare, props.onEdit, props.onDelete].filter(Boolean).length;
 }
 
-// Borrar en la nube es irreversible, así que pide un segundo clic.
+/** The action buttons of a card. Deleting from the cloud cannot be undone, so it asks for a second click. */
 function ItemActions({ itemName, onShare, onEdit, onDelete, cloud = false, editing = false, busy = false }: ItemActionsProps) {
     const { t } = useTranslation();
     const [armed, setArmed] = useState(false);
@@ -31,6 +34,7 @@ function ItemActions({ itemName, onShare, onEdit, onDelete, cloud = false, editi
         if (armTimer.current !== null) window.clearTimeout(armTimer.current);
     }, []);
 
+    /** Deletes right away locally; in the cloud the first click arms the button and the second one deletes. */
     const handleDelete = () => {
         if (!onDelete) return;
         if (!cloud) {

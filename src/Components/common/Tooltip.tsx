@@ -1,3 +1,6 @@
+/**
+ * Tooltip: an accessible tooltip that works with mouse, keyboard and touch.
+ */
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { useDismiss } from '../../hooks/useDismiss';
 
@@ -11,8 +14,8 @@ interface TooltipProps {
 const LONG_PRESS_MS = 400;
 
 /**
- * Ratón: hover (solo en dispositivos con hover real). Teclado: Enter/Espacio lo fija y
- * Escape lo cierra. Táctil: toque o pulsación larga lo abre y tocar fuera lo cierra.
+ * Mouse: hover (only on devices with real hover). Keyboard: Enter/Space pins it and Escape closes it.
+ * Touch: a tap or a long press opens it and tapping outside closes it.
  */
 function Tooltip({ content, children, ariaLabel, className = '' }: TooltipProps) {
     const [open, setOpen] = useState(false);
@@ -27,6 +30,7 @@ function Tooltip({ content, children, ariaLabel, className = '' }: TooltipProps)
         if (pressTimer.current !== null) window.clearTimeout(pressTimer.current);
     }, []);
 
+    /** Cancels a pending long press. */
     const clearPress = () => {
         if (pressTimer.current !== null) {
             window.clearTimeout(pressTimer.current);
@@ -34,6 +38,7 @@ function Tooltip({ content, children, ariaLabel, className = '' }: TooltipProps)
         }
     };
 
+    /** Touch and pen: a long press opens the tooltip. */
     const handlePointerDown = (event: React.PointerEvent) => {
         if (event.pointerType === 'mouse') return;
         clearPress();
@@ -43,8 +48,9 @@ function Tooltip({ content, children, ariaLabel, className = '' }: TooltipProps)
         }, LONG_PRESS_MS);
     };
 
+    /** A click (or tap) toggles the tooltip. */
     const handleClick = () => {
-        // El click que sigue a una pulsación larga no debe volver a cerrarlo.
+        // The click that follows a long press must not close it again.
         if (openedByPress.current) {
             openedByPress.current = false;
             return;
@@ -52,9 +58,10 @@ function Tooltip({ content, children, ariaLabel, className = '' }: TooltipProps)
         setOpen((prev) => !prev);
     };
 
+    /** Enter or Space toggles the tooltip from the keyboard. */
     const handleKeyDown = (event: React.KeyboardEvent) => {
         if (event.key === 'Enter' || event.key === ' ') {
-            // Evita que Espacio llegue al listener global de la ruleta.
+            // Keeps Space from reaching the wheel's global listener.
             event.preventDefault();
             event.stopPropagation();
             setOpen((prev) => !prev);

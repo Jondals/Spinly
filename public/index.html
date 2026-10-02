@@ -8,11 +8,11 @@
     <link rel="icon" type="image/webp" href="/Images/spinly-logo-128.webp" />
     <link rel="preload" as="image" type="image/webp" href="/Images/spinly-logo-64.webp" imagesrcset="/Images/spinly-logo-64.webp 64w, /Images/spinly-logo-128.webp 128w" imagesizes="(max-width: 750px) 2rem, 2.5rem" />
     <title>Spinly</title>
-    <!-- Antes del primer pintado: el modo claro/oscuro (sin destello del modo equivocado) y si esta
-         pestaña ya vio la pantalla de carga (recargar o cambiar de cuenta no la repite).
-         Su hash va en la CSP de vercel.json; inline-css.cjs falla el build si no coincide. -->
+    <!-- Before the first paint: the light/dark mode (no flash of the wrong mode) and whether this tab has
+         already seen the splash screen (reloading or switching accounts does not repeat it).
+         Its hash is in the CSP of vercel.json; inline-css.cjs fails the build if they do not match. -->
     <script>try{var d=document.documentElement;"light"===localStorage.getItem("spinly-theme")&&d.setAttribute("data-theme","light"),sessionStorage.getItem("spinly-splash")?d.classList.add("spinly-splash-seen"):sessionStorage.setItem("spinly-splash","1")}catch(t){}</script>
-    <style> /* evita que el menu aparezca desplegado mientras carga el CSS del bundle */
+    <style> /* keeps the menu from showing expanded while the bundle's CSS loads */
       @media (max-width: 750px) {
         .Wheelmanager:not(.Wheelmanager--open) {
           position: fixed;
@@ -27,7 +27,7 @@
         }
       }
     </style>
-    <style> /* Pantalla de carga: se pinta con el HTML y la retira la app (src/scripts/splash.ts) */
+    <style> /* Splash screen: painted with the HTML and removed by the app (src/scripts/splash.ts) */
       .spinly-splash {
         position: fixed;
         inset: 0;
@@ -38,11 +38,11 @@
         background-color: #07080d;
         color: #f4f5fa;
         font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        /* Salida en iris: un círculo que se cierra sobre el logo. La app aparece alrededor tal cual,
-           sin mezclarse con la aurora ni pasar por negro, como haría un fundido. */
+        /* Iris exit: a circle closing over the logo. The app appears around it as it is, without blending
+           with the aurora or going through black, as a fade would. */
         clip-path: circle(75% at 50% 50%);
         transition: clip-path 0.9s cubic-bezier(0.65, 0, 0.35, 1), visibility 0s linear 0.9s;
-        /* Por si la app no llegara a arrancar: nunca se queda tapando la página */
+        /* In case the app never starts: it never stays covering the page */
         animation: spinly-splash-failsafe 0.01s linear 8s forwards;
       }
 
@@ -51,7 +51,7 @@
         color: #0f172a;
       }
 
-      /* Ya vista en esta pestaña: la app aparece directamente */
+      /* Already seen in this tab: the app appears directly */
       .spinly-splash-seen .spinly-splash {
         display: none;
       }
@@ -62,8 +62,8 @@
         pointer-events: none;
       }
 
-      /* Aurora: tres manchas de los colores del logo que derivan despacio. Entra con un fundido:
-         al recargar, el primer frame es solo el fondo oscuro y no un fogonazo de color sin logo. */
+      /* Aurora: three blobs in the logo colors drifting slowly. It fades in: on reload the first frame is just
+         the dark background, not a flash of color without the logo. */
       .spinly-splash-aurora {
         position: absolute;
         inset: 0;
@@ -112,13 +112,13 @@
           opacity 0.4s ease-in 0.45s;
       }
 
-      /* El logo se encoge hacia el centro mientras el círculo se cierra sobre él */
+      /* The logo shrinks towards the centre while the circle closes over it */
       .spinly-splash--out .spinly-splash-stage {
         opacity: 0;
         transform: scale(0.7);
       }
 
-      /* Anillo que gira alrededor del logo, como el aro de la ruleta */
+      /* A ring turning around the logo, like the wheel's rim */
       .spinly-splash-orbit {
         position: absolute;
         left: 50%;
@@ -161,7 +161,7 @@
         overflow: visible;
       }
 
-      /* Todo gira y escala alrededor del centro de la ruleta: el (0, 0) del viewBox */
+      /* Everything turns and scales around the wheel's centre: the viewBox's (0, 0) */
       .spinly-splash-logo g,
       .spinly-splash-logo path {
         transform-box: view-box;
@@ -291,7 +291,7 @@
           transition: none;
         }
 
-        /* Sin iris: un fundido corto */
+        /* No iris: a short fade */
         .spinly-splash {
           transition: opacity 0.3s ease, visibility 0s linear 0.3s;
         }
@@ -310,7 +310,7 @@
         <div class="spinly-splash-mark">
           <span class="spinly-splash-glow"></span>
           <span class="spinly-splash-orbit"></span>
-          <!-- El logo de Spinly en vectores: cuatro sectores que se montan girando, el centro y la flecha -->
+          <!-- The Spinly logo as vectors: four sectors that assemble while turning, the hub and the pointer -->
           <svg class="spinly-splash-logo" viewBox="-50 -58 100 108" width="144" height="156" focusable="false">
             <defs>
               <linearGradient id="spinly-splash-tr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f0197d" /><stop offset="1" stop-color="#ff4a5f" /></linearGradient>

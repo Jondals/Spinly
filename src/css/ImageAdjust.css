@@ -1,3 +1,5 @@
+/* Image fit editor (ImageAdjustDialog.tsx): the sector preview, the zoom and rotation sliders and the actions. */
+
 .spinly-imgadj {
     position: fixed;
     inset: 0;
@@ -181,7 +183,7 @@ button.spinly-imgadj-apply {
     to { opacity: 1; }
 }
 
-/* Móvil: hoja inferior a ancho completo, con la vista previa lo más grande posible */
+/* Mobile: a full-width bottom sheet, with the preview as big as possible */
 @media (max-width: 750px) {
     .spinly-imgadj {
         align-items: flex-end;

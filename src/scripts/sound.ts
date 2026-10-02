@@ -1,17 +1,19 @@
-// Sonidos sintetizados con Web Audio: sin archivos que descargar.
-// El AudioContext se crea en el primer uso, que siempre llega tras un gesto del usuario
-// (un clic o pulsar Espacio), como exigen los navegadores.
+/**
+ * Sound effects synthesized with Web Audio: no audio files to download.
+ * The AudioContext is created on first use, which always comes after a user gesture (a click or
+ * pressing Space), as browsers require.
+ */
 
 const SOUND_KEY = 'spinly-sound';
 const SOUND_VOLUME_KEY = 'spinly-sound-volume';
 
 let context: AudioContext | null = null;
-// Solo se usan si localStorage no está disponible (modo privado estricto).
+// Only used when localStorage is unavailable (strict private mode).
 let memoryEnabled = true;
 let memoryVolume = 1;
 const listeners = new Set<() => void>();
 
-/** Activado por defecto. Se lee de storage en cada llamada: no hay copia que desincronizar. */
+/** Whether sound effects are on (on by default). Read from storage on every call: no copy to get out of sync. */
 export function isSoundEnabled(): boolean {
     try {
         return localStorage.getItem(SOUND_KEY) !== 'off';
@@ -20,17 +22,18 @@ export function isSoundEnabled(): boolean {
     }
 }
 
+/** Turns sound effects on or off and notifies subscribers. */
 export function setSoundEnabled(enabled: boolean): void {
     memoryEnabled = enabled;
     try {
         localStorage.setItem(SOUND_KEY, enabled ? 'on' : 'off');
     } catch {
-        // Sin acceso a storage: la preferencia se mantiene en memoria.
+        // No storage access: the preference is kept in memory.
     }
     listeners.forEach((listener) => listener());
 }
 
-/** Volumen de los efectos, de 0 a 1 (1 por defecto). Apagarlos no lo pierde: se recupera al encender. */
+/** Effects volume, 0 to 1 (1 by default). Turning effects off keeps it: it comes back when they are turned on. */
 export function getSoundVolume(): number {
     try {
         const raw = localStorage.getItem(SOUND_VOLUME_KEY);
@@ -41,16 +44,18 @@ export function getSoundVolume(): number {
     }
 }
 
+/** Sets the effects volume (0-1) and notifies subscribers. */
 export function setSoundVolume(volume: number): void {
     memoryVolume = Math.min(Math.max(volume, 0), 1);
     try {
         localStorage.setItem(SOUND_VOLUME_KEY, String(Math.round(memoryVolume * 100) / 100));
     } catch {
-        // Sin acceso a storage: el volumen se mantiene en memoria.
+        // No storage access: the volume is kept in memory.
     }
     listeners.forEach((listener) => listener());
 }
 
+/** Subscribes to sound preference changes (for useSyncExternalStore); returns the unsubscribe function. */
 export function subscribeSound(listener: () => void): () => void {
     listeners.add(listener);
     return () => {
@@ -58,6 +63,7 @@ export function subscribeSound(listener: () => void): () => void {
     };
 }
 
+/** The shared AudioContext, created and resumed on demand; null when sound is off or unsupported. */
 function audio(): AudioContext | null {
     if (!isSoundEnabled()) return null;
     if (typeof window === 'undefined' || typeof window.AudioContext === 'undefined') return null;
@@ -66,9 +72,10 @@ function audio(): AudioContext | null {
     return context;
 }
 
+/** Plays one oscillator note with a short attack and an exponential decay. */
 function tone(ctx: AudioContext, { frequency, to, start, duration, volume, type }: {
     frequency: number;
-    /** Frecuencia final: un barrido corto da el carácter de "pop" o de caída. */
+    /** Final frequency: a short sweep gives the "pop" or falling character. */
     to?: number;
     start: number;
     duration: number;
@@ -77,7 +84,7 @@ function tone(ctx: AudioContext, { frequency, to, start, duration, volume, type 
 }) {
     const oscillator = ctx.createOscillator();
     const gain = ctx.createGain();
-    // Curva cuadrática: el deslizador se percibe lineal. Nunca 0: las rampas exponenciales no lo admiten.
+    // Squared curve: the slider feels linear. Never 0: exponential ramps do not accept it.
     const level = Math.max(volume * getSoundVolume() ** 2, 0.0002);
     oscillator.type = type;
     oscillator.frequency.setValueAtTime(frequency, start);
@@ -90,7 +97,7 @@ function tone(ctx: AudioContext, { frequency, to, start, duration, volume, type 
     oscillator.stop(start + duration + 0.02);
 }
 
-/** Clic de la lengüeta al pasar por la separación entre dos sectores. */
+/** The flapper's click as it passes the border between two sectors. */
 export function playTick(): void {
     const ctx = audio();
     if (!ctx) return;
@@ -99,7 +106,7 @@ export function playTick(): void {
     tone(ctx, { frequency: 520, start: now, duration: 0.05, volume: 0.08, type: 'square' });
 }
 
-/** Arpegio corto al anunciar el ganador. */
+/** Short arpeggio when the winner is announced. */
 export function playWin(): void {
     const ctx = audio();
     if (!ctx) return;
@@ -109,12 +116,44 @@ export function playWin(): void {
     });
 }
 
+/** Tournament: a duel is decided. A rising arpeggio that lands on a bright chord. */
+export function playDuelWin(): void {
+    const ctx = audio();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    [392, 523.25, 659.25, 783.99].forEach((frequency, i) => {
+        tone(ctx, { frequency, start: now + i * 0.08, duration: 0.3, volume: 0.12, type: 'triangle' });
+    });
+    [523.25, 659.25, 783.99, 1046.5].forEach((frequency) => {
+        tone(ctx, { frequency, start: now + 0.36, duration: 0.9, volume: 0.07, type: 'sine' });
+    });
+}
+
+/** Tournament: the champion is crowned. A short brass-like fanfare with a sparkling tail. */
+export function playFanfare(): void {
+    const ctx = audio();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const notes: Array<[number, number, number]> = [
+        [523.25, 0, 0.16], [523.25, 0.18, 0.16], [523.25, 0.36, 0.16], [659.25, 0.54, 0.5],
+        [587.33, 1.08, 0.16], [659.25, 1.26, 0.16], [783.99, 1.44, 1.2],
+    ];
+    for (const [frequency, at, duration] of notes) {
+        tone(ctx, { frequency, start: now + at, duration, volume: 0.1, type: 'sawtooth' });
+        tone(ctx, { frequency: frequency * 2, start: now + at, duration, volume: 0.05, type: 'sine' });
+    }
+    [1046.5, 1318.51, 1567.98, 2093].forEach((frequency, i) => {
+        tone(ctx, { frequency, start: now + 1.5 + i * 0.07, duration: 0.6, volume: 0.04, type: 'sine' });
+    });
+}
+
 /**
- * tap: botón corriente. nav: cambiar de sección o pestaña. confirm: acción principal.
- * remove: borrar o quitar.
+ * tap: a regular button. nav: switching section or tab. confirm: a primary action.
+ * remove: deleting or removing something.
  */
 export type UiSound = 'tap' | 'nav' | 'confirm' | 'remove';
 
+/** Plays the interface sound of a kind of button. */
 export function playUi(kind: UiSound): void {
     const ctx = audio();
     if (!ctx) return;

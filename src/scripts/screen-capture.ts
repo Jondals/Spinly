@@ -1,9 +1,11 @@
-// Fuentes de imagen para tomar colores cuando el navegador no tiene EyeDropper nativo.
-// Todo acaba en un canvas a resolución real, del que ColorSampler lee los píxeles.
+/**
+ * Image sources to pick colors from when the browser has no native EyeDropper.
+ * Everything ends up in a full-resolution canvas, from which ColorSampler reads the pixels.
+ */
 
 import { rgbToHex } from './color';
 
-/** Captura de pantalla (Firefox y Safari de escritorio): exige contexto seguro y un gesto del usuario. */
+/** Screen capture (desktop Firefox and Safari): it requires a secure context and a user gesture. */
 export function supportsScreenCapture(): boolean {
     return typeof navigator !== 'undefined'
         && typeof window !== 'undefined'
@@ -11,6 +13,7 @@ export function supportsScreenCapture(): boolean {
         && typeof navigator.mediaDevices?.getDisplayMedia === 'function';
 }
 
+/** Draws a source into a new canvas of the given size (null if it cannot). */
 function canvasFrom(source: CanvasImageSource, width: number, height: number): HTMLCanvasElement | null {
     if (!width || !height) return null;
     const canvas = document.createElement('canvas');
@@ -22,7 +25,7 @@ function canvasFrom(source: CanvasImageSource, width: number, height: number): H
     return canvas;
 }
 
-/** Espera a que el vídeo pinte un fotograma real: el primero puede llegar negro o vacío. */
+/** Waits for the video to paint a real frame: the first one may arrive black or empty. */
 function nextFrame(video: HTMLVideoElement): Promise<void> {
     const withFrameCallback = video as HTMLVideoElement & { requestVideoFrameCallback?: (callback: () => void) => number };
     if (typeof withFrameCallback.requestVideoFrameCallback === 'function') {
@@ -32,8 +35,8 @@ function nextFrame(video: HTMLVideoElement): Promise<void> {
 }
 
 /**
- * Pide al usuario qué pantalla, ventana o pestaña compartir, congela un fotograma y corta la
- * captura enseguida (el aviso de "compartiendo" desaparece). null si el usuario cancela.
+ * Asks the user which screen, window or tab to share, freezes one frame and stops the capture right away
+ * (the "sharing" indicator disappears). null if the user cancels.
  */
 export async function captureScreenFrame(): Promise<HTMLCanvasElement | null> {
     if (!supportsScreenCapture()) return null;
@@ -54,7 +57,7 @@ export async function captureScreenFrame(): Promise<HTMLCanvasElement | null> {
     }
 }
 
-/** Imagen o captura elegida por el usuario (móvil, o sin permiso de captura). */
+/** An image or screenshot picked by the user (mobile, or without capture permission). */
 export async function loadImageFile(file: File): Promise<HTMLCanvasElement | null> {
     if (!file.type.startsWith('image/')) return null;
     const url = URL.createObjectURL(file);
@@ -70,7 +73,7 @@ export async function loadImageFile(file: File): Promise<HTMLCanvasElement | nul
     }
 }
 
-/** Color del píxel (x, y) del canvas, en hex. */
+/** Color of the canvas pixel (x, y), as hex. */
 export function pixelHex(canvas: HTMLCanvasElement, x: number, y: number): string | null {
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return null;

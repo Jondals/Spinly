@@ -1,7 +1,10 @@
+/**
+ * StatusMessage: the inline info / success / error line shown inside panels.
+ */
 import type { ReactNode } from 'react';
 import type { LocalMessage } from '../../scripts/strings';
 
-/** Aviso de un panel. LocalMessage y no string: se re-traduce si cambia el idioma con él en pantalla. */
+/** A panel notice. LocalMessage instead of string: it is translated again if the language changes while it is on screen. */
 export type Notice = { tone: 'ok' | 'error'; text: LocalMessage };
 
 interface StatusMessageProps {
@@ -9,6 +12,7 @@ interface StatusMessageProps {
     children: ReactNode;
 }
 
+/** Renders the message; errors are announced as alerts, the rest as polite status updates. */
 function StatusMessage({ tone = 'info', children }: StatusMessageProps) {
     const toneClass = tone === 'info' ? '' : ` spinly-status--${tone}`;
     return (

@@ -1,7 +1,9 @@
-// Datos de la cuenta (ruleta, temas y preajustes) en un JSON privado por usuario, en el bucket
-// user-data de Storage: user-data/<uid>/spinly.json. Las políticas del bucket solo dejan
-// leer y escribir la carpeta propia, y escribir solo a cuentas con contraseña.
-// Las preferencias del dispositivo (idioma, claro/oscuro, sonido) no viajan con la cuenta.
+/**
+ * Account data (wheel, themes, presets and playlist) in one private JSON per user, in the user-data
+ * Storage bucket: user-data/<uid>/spinly.json. The bucket policies only allow reading and writing the
+ * user's own folder, and writing only to password accounts.
+ * Device preferences (language, light/dark, sound) do not travel with the account.
+ */
 import { getSupabase, notConfiguredError, supabaseErrorMessage, type ServiceResult } from './supabaseClient';
 import { dictMessage } from './strings';
 import { MAX_WHEEL_OPTIONS, MIN_OPTIONS, type WheelOption } from './option-wheel';
@@ -36,24 +38,24 @@ export type AccountData = {
     wheelLimit: number | null;
     themes: WheelTheme[];
     presets: WheelPreset[];
-    /** Playlist de música. null en cuentas guardadas antes de que existiera. */
+    /** Music playlist. null for accounts saved before it existed. */
     music: MusicLibrary | null;
 };
 
-/** Lo que se sincroniza: sin updatedAt ni versión. */
+/** What is synced: everything but updatedAt and version. */
 export type AccountSnapshot = Omit<AccountData, 'version' | 'updatedAt'>;
 
 export const USER_DATA_BUCKET = 'user-data';
 const BUCKET = USER_DATA_BUCKET;
-// Coincide con file_size_limit del bucket: mejor un aviso claro que un error del servidor.
+// Matches the bucket's file_size_limit: a clear message is better than a server error.
 const MAX_ACCOUNT_BYTES = 10 * 1024 * 1024;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SYNC_KEY = 'spinly-account-sync';
 
-/** Torneo en curso (modo torneo): vive en este navegador, pero se borra al cerrar sesión como lo demás. */
+/** Tournament in progress (tournament mode): it lives in this browser, but is cleared on sign-out like the rest. */
 export const TOURNAMENT_STORAGE_KEY = 'spinly-tournament';
 
-/** Claves de localStorage que pertenecen a la cuenta; se borran al cerrar sesión. */
+/** localStorage keys that belong to the account; they are cleared on sign-out. */
 const DATA_KEYS = [
     TOURNAMENT_STORAGE_KEY,
     OPTIONS_STORAGE_KEY,
@@ -68,12 +70,13 @@ const DATA_KEYS = [
     SYNC_KEY,
 ];
 
-/** uid con forma de uid de Supabase: las rutas de la nube solo se construyen con uno así. */
+/** A uid shaped like a Supabase uid: cloud paths are only ever built from one. */
 export const isAccountUid = (uid: string): boolean => UUID.test(uid);
 
-// La ruta sale siempre del uid de la sesión, nunca de datos del usuario.
+/** Cloud path of the account file. It always comes from the session's uid, never from user data. */
 const objectPath = (uid: string): string | null => (UUID.test(uid) ? `${uid}/spinly.json` : null);
 
+/** Parses JSON; null if it is missing or broken. */
 const parse = (raw: string | null): unknown => {
     if (!raw) return null;
     try {
@@ -83,18 +86,20 @@ const parse = (raw: string | null): unknown => {
     }
 };
 
+/** A sanitized list, read either from an array or from `raw[key]` (older format). */
 const listOf = <T>(raw: unknown, key: string, clean: (item: unknown) => T | null): T[] => {
     const list = Array.isArray(raw) ? raw : (raw as Record<string, unknown> | null)?.[key];
     if (!Array.isArray(list)) return [];
     return list.map(clean).filter((item): item is T => item !== null);
 };
 
+/** A valid option limit, or null. */
 const cleanLimit = (raw: unknown): number | null => {
     const n = typeof raw === 'number' ? raw : Number(raw);
     return Number.isFinite(n) && n !== 0 ? Math.min(Math.max(Math.round(n), MIN_OPTIONS), MAX_WHEEL_OPTIONS) : null;
 };
 
-/** Todo lo que llega del storage o de la nube pasa por los mismos sanitizers que la app. */
+/** Everything coming from storage or the cloud goes through the same sanitizers as the app. */
 export function sanitizeAccountData(raw: unknown): AccountData | null {
     if (!raw || typeof raw !== 'object') return null;
     const d = raw as Record<string, unknown>;
@@ -112,7 +117,9 @@ export function sanitizeAccountData(raw: unknown): AccountData | null {
     };
 }
 
+/** Snapshot of the account data stored in this browser. */
 export function readLocalData(): AccountSnapshot {
+    /** Reads a localStorage key (null if storage is unavailable). */
     const get = (key: string) => {
         try {
             return localStorage.getItem(key);
@@ -133,6 +140,7 @@ export function readLocalData(): AccountSnapshot {
     return snapshot;
 }
 
+/** Writes a snapshot to localStorage (removing keys with no value). */
 export function writeLocalData(data: AccountSnapshot): void {
     const entries: Array<[string, string | null]> = [
         [OPTIONS_STORAGE_KEY, data.options.length >= MIN_OPTIONS ? JSON.stringify(data.options) : null],
@@ -141,7 +149,7 @@ export function writeLocalData(data: AccountSnapshot): void {
         [WHEEL_LIMIT_STORAGE_KEY, data.wheelLimit !== null ? String(data.wheelLimit) : null],
         [THEMES_STORAGE_KEY, JSON.stringify(data.themes)],
         [PRESETS_STORAGE_KEY, JSON.stringify(data.presets)],
-        // Sin lista en la cuenta (anterior a la música): este navegador vuelve a la de por defecto.
+        // No list in the account (it predates music): this browser goes back to the default one.
         [MUSIC_STORAGE_KEY, data.music ? JSON.stringify(data.music) : null],
     ];
     for (const [key, value] of entries) {
@@ -149,44 +157,45 @@ export function writeLocalData(data: AccountSnapshot): void {
             if (value === null) localStorage.removeItem(key);
             else localStorage.setItem(key, value);
         } catch {
-            // Sin espacio o sin acceso: se queda lo que hubiera; la nube sigue siendo la copia buena.
+            // No space or no access: whatever was there stays; the cloud is still the good copy.
         }
     }
 }
 
-/** Deja el navegador como la primera vez: la app arranca con sus valores por defecto. */
+/** Leaves the browser as on a first visit: the app starts with its defaults. */
 export function clearLocalData(): void {
     for (const key of DATA_KEYS) {
         try {
             localStorage.removeItem(key);
         } catch {
-            // Sin acceso a storage: no hay nada que borrar.
+            // No storage access: there is nothing to delete.
         }
     }
 }
 
-/** Marca de la última sincronización en este navegador: de qué cuenta es y de cuándo. */
+/** Marker of the last sync in this browser: which account and when. */
 export function readSyncMarker(): { uid: string; updatedAt: number } | null {
     try {
         const raw = parse(localStorage.getItem(SYNC_KEY)) as { uid?: unknown; updatedAt?: unknown } | null;
         if (raw && typeof raw.uid === 'string' && typeof raw.updatedAt === 'number') return { uid: raw.uid, updatedAt: raw.updatedAt };
     } catch {
-        // Sin acceso a storage: se trata como si no hubiera sincronizado nunca.
+        // No storage access: treated as never synced.
     }
     return null;
 }
 
+/** Saves the sync marker. */
 export function writeSyncMarker(uid: string, updatedAt: number): void {
     try {
         localStorage.setItem(SYNC_KEY, JSON.stringify({ uid, updatedAt }));
     } catch {
-        // Sin acceso a storage: la próxima apertura volverá a comparar con la nube.
+        // No storage access: the next start will compare with the cloud again.
     }
 }
 
 /**
- * Al entrar en la cuenta, lo que el invitado tenía en este navegador se añade a la cuenta
- * (unión por id; ante un mismo id gana la cuenta). La ruleta y el tema activo son los de la cuenta.
+ * On sign-in, what the guest had in this browser is added to the account (union by id; on the same id
+ * the account wins). The wheel and the active theme are the account's.
  */
 export function mergeGuestData(account: AccountSnapshot, guest: AccountSnapshot): AccountSnapshot {
     const themeIds = new Set(account.themes.map((theme) => theme.id));
@@ -200,7 +209,7 @@ export function mergeGuestData(account: AccountSnapshot, guest: AccountSnapshot)
     };
 }
 
-/** data = null si la cuenta aún no tiene datos guardados (cuenta nueva o anterior a la sincronización). */
+/** Downloads the account file. data = null if the account has no saved data yet (new, or older than sync). */
 export async function fetchAccountData(uid: string): Promise<ServiceResult<AccountData | null>> {
     const supabase = await getSupabase();
     if (!supabase) return { ok: false, error: notConfiguredError() };
@@ -221,6 +230,7 @@ export async function fetchAccountData(uid: string): Promise<ServiceResult<Accou
     }
 }
 
+/** Uploads the account file; resolves with the updatedAt it was saved with. */
 export async function saveAccountData(uid: string, snapshot: AccountSnapshot, updatedAt = Date.now()): Promise<ServiceResult<number>> {
     const supabase = await getSupabase();
     if (!supabase) return { ok: false, error: notConfiguredError() };
@@ -231,7 +241,7 @@ export async function saveAccountData(uid: string, snapshot: AccountSnapshot, up
     const body = JSON.stringify(data);
     if (new Blob([body]).size > MAX_ACCOUNT_BYTES) return { ok: false, error: dictMessage('errors', 'accountTooBig') };
     try {
-        // cacheControl 0: la comprobación al abrir la app nunca debe leer una copia antigua de caché.
+        // cacheControl 0: the check at startup must never read an old cached copy.
         const { error } = await supabase.storage.from(BUCKET).upload(path, new Blob([body], { type: 'application/json' }), {
             upsert: true,
             contentType: 'application/json',
@@ -248,8 +258,8 @@ export async function saveAccountData(uid: string, snapshot: AccountSnapshot, up
 }
 
 /**
- * Tras iniciar sesión: la cuenta más lo del invitado pasa a este navegador y a la nube.
- * Si la cuenta no tenía datos (anterior a la sincronización), lo local se convierte en ellos.
+ * After signing in: the account plus the guest's data goes to this browser and to the cloud.
+ * If the account had no data (older than sync), the local data becomes its data.
  */
 export async function adoptAccountData(uid: string): Promise<ServiceResult<true>> {
     const remote = await fetchAccountData(uid);
@@ -263,32 +273,35 @@ export async function adoptAccountData(uid: string): Promise<ServiceResult<true>
     return { ok: true, data: true };
 }
 
-/** Entrar o salir de la cuenta: la app arranca de nuevo desde localStorage. */
+/** Signing in or out: the app starts again from localStorage. */
 export function reloadApp(): void {
     window.location.reload();
 }
 
-// Datos nuevos de otro dispositivo: basta con volver a montar App, que lee localStorage al
-// montarse. Recargar la página se vería como un parpadeo justo al acabar la pantalla de carga.
+// New data from another device: remounting App is enough, since it reads localStorage on mount.
+// Reloading the page would look like a flash right after the splash screen.
 let remount: (() => void) | null = null;
 
+/** Registers (or clears) the function that remounts App (set by index.tsx). */
 export function setAppRemount(handler: (() => void) | null): void {
     remount = handler;
 }
 
-/** Sin raíz registrada (fuera de index.tsx) recurre a recargar. */
+/** Remounts App to apply new data; without a registered root (outside index.tsx) it reloads. */
 export function remountApp(): void {
     if (remount) remount();
     else reloadApp();
 }
 
-// Durante un cambio de cuenta (entrar o salir) la página se recarga: no debe subirse nada más.
+// During an account switch (sign in or out) the page reloads: nothing else must be uploaded.
 let switchingAccount = false;
+/** Marks the start of an account switch. */
 export const beginAccountSwitch = (): void => {
     switchingAccount = true;
 };
-/** El cambio falló (credenciales, red): la sesión que hubiera sigue y vuelve a sincronizarse. */
+/** The switch failed (credentials, network): the previous session stays and syncs again. */
 export const endAccountSwitch = (): void => {
     switchingAccount = false;
 };
+/** Whether an account switch is in progress. */
 export const isSwitchingAccount = (): boolean => switchingAccount;

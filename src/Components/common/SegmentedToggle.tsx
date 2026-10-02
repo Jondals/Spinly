@@ -1,3 +1,6 @@
+/**
+ * SegmentedToggle: a row of buttons with a sliding indicator, used as tabs or as a single choice.
+ */
 import type { CSSProperties, ReactNode } from 'react';
 
 export interface SegmentedOption<T extends string> {
@@ -10,12 +13,12 @@ interface SegmentedToggleProps<T extends string> {
     value: T;
     onChange: (value: T) => void;
     ariaLabel: string;
-    /** tabs: cambia de vista (Mis X / Comunidad). choice: elige un valor (idioma). */
+    /** tabs: switches between views (Mine / Community). choice: picks a value (language). */
     kind?: 'tabs' | 'choice';
     className?: string;
 }
 
-/** El indicador activo se desliza con transform (.spinly-segmented en shared.css). */
+/** Renders the toggle; the active indicator slides with a transform (.spinly-segmented in shared.css). */
 function SegmentedToggle<T extends string>({ options, value, onChange, ariaLabel, kind = 'tabs', className = '' }: SegmentedToggleProps<T>) {
     const activeIndex = Math.max(0, options.findIndex((option) => option.id === value));
     const style = {

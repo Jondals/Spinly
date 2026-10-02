@@ -1,3 +1,7 @@
+/**
+ * ColorSampler: a full-screen eyedropper over a frozen screenshot or an image, with a pixel magnifier.
+ * Used by browsers without the native EyeDropper API.
+ */
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import Modal from '../common/Modal';
 import { useTranslation } from '../i18n/LanguageProvider';
@@ -6,27 +10,27 @@ import { pixelHex } from '../../scripts/screen-capture';
 import '../../css/ColorSampler.css';
 
 interface ColorSamplerProps {
-    /** Captura congelada o imagen, a resolución real. */
+    /** Frozen capture or image, at full resolution. */
     source: HTMLCanvasElement;
     onPick: (hex: string) => void;
     onCancel: () => void;
-    /** Solo con imagen: elegir otra sin cerrar. */
+    /** Image mode only: pick another image without closing. */
     onReplace?: () => void;
 }
 
 type Point = { x: number; y: number };
 
-// Lupa: LOUPE_PIXELS × LOUPE_PIXELS píxeles de la fuente, cada uno ampliado LOUPE_ZOOM veces.
+// Magnifier: LOUPE_PIXELS × LOUPE_PIXELS source pixels, each one enlarged LOUPE_ZOOM times.
 const LOUPE_PIXELS = 11;
 const LOUPE_ZOOM = 12;
 const LOUPE_SIZE = LOUPE_PIXELS * LOUPE_ZOOM;
 const LOUPE_GAP = 24;
-// En táctil la lupa va por encima del dedo, que si no la taparía.
+// On touch the magnifier sits above the finger, which would otherwise cover it.
 const TOUCH_LIFT = 56;
 
 /**
- * Pipeta sobre una imagen, para navegadores sin EyeDropper: ratón (mover y clic), táctil
- * (arrastrar y soltar) y teclado (flechas y Enter). Escape cancela (lo gestiona Modal).
+ * Eyedropper over an image, for browsers without EyeDropper: mouse (move and click), touch (drag and
+ * release) and keyboard (arrows and Enter). Escape cancels (handled by Modal).
  */
 function ColorSampler({ source, onPick, onCancel, onReplace }: ColorSamplerProps) {
     const { t } = useTranslation();
@@ -53,7 +57,7 @@ function ColorSampler({ source, onPick, onCancel, onReplace }: ColorSamplerProps
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, LOUPE_SIZE, LOUPE_SIZE);
         ctx.drawImage(source, cursor.x - half, cursor.y - half, LOUPE_PIXELS, LOUPE_PIXELS, 0, 0, LOUPE_SIZE, LOUPE_SIZE);
-        // Píxel central: doble marco para que se vea sobre cualquier color.
+        // Central pixel: a double frame so it shows over any color.
         const at = half * LOUPE_ZOOM;
         ctx.lineWidth = 2;
         ctx.strokeStyle = '#000000';
@@ -62,6 +66,7 @@ function ColorSampler({ source, onPick, onCancel, onReplace }: ColorSamplerProps
         ctx.strokeRect(at + 1, at + 1, LOUPE_ZOOM - 2, LOUPE_ZOOM - 2);
     }, [cursor, source]);
 
+    /** Converts a screen point into a pixel of the source image. */
     const toSource = (clientX: number, clientY: number): Point | null => {
         const rect = canvasRef.current?.getBoundingClientRect();
         if (!rect || rect.width === 0 || rect.height === 0) return null;
@@ -71,6 +76,7 @@ function ColorSampler({ source, onPick, onCancel, onReplace }: ColorSamplerProps
         };
     };
 
+    /** Converts a pixel of the source image into a screen point (centre of the pixel). */
     const toClient = ({ x, y }: Point): Point | null => {
         const rect = canvasRef.current?.getBoundingClientRect();
         if (!rect) return null;
@@ -80,6 +86,7 @@ function ColorSampler({ source, onPick, onCancel, onReplace }: ColorSamplerProps
         };
     };
 
+    /** Moves the cursor and the magnifier to the pointer. */
     const track = (event: PointerEvent<HTMLCanvasElement>) => {
         const point = toSource(event.clientX, event.clientY);
         if (!point) return;
@@ -87,6 +94,7 @@ function ColorSampler({ source, onPick, onCancel, onReplace }: ColorSamplerProps
         setAnchor({ client: { x: event.clientX, y: event.clientY }, touch: event.pointerType !== 'mouse' });
     };
 
+    /** Starts sampling (touch: while the finger is down). */
     const onPointerDown = (event: PointerEvent<HTMLCanvasElement>) => {
         if (event.pointerType === 'mouse' && event.button !== 0) return;
         event.preventDefault();
@@ -95,11 +103,13 @@ function ColorSampler({ source, onPick, onCancel, onReplace }: ColorSamplerProps
         track(event);
     };
 
+    /** Updates the magnifier while moving. */
     const onPointerMove = (event: PointerEvent<HTMLCanvasElement>) => {
-        // Con ratón la lupa sigue al cursor; en táctil solo mientras el dedo está apoyado.
+        // With a mouse the magnifier follows the cursor; on touch only while the finger is down.
         if (event.pointerType === 'mouse' || pressedRef.current) track(event);
     };
 
+    /** Picks the color under the pointer when it is released. */
     const onPointerUp = (event: PointerEvent<HTMLCanvasElement>) => {
         if (!pressedRef.current) return;
         pressedRef.current = false;
@@ -108,11 +118,13 @@ function ColorSampler({ source, onPick, onCancel, onReplace }: ColorSamplerProps
         if (picked) onPick(picked);
     };
 
+    /** Hides the magnifier when the gesture is cancelled. */
     const onPointerCancel = () => {
         pressedRef.current = false;
         setAnchor(null);
     };
 
+    /** Keyboard: arrows move one pixel (Shift: ten), Enter or Space picks. */
     const onKeyDown = (event: KeyboardEvent<HTMLCanvasElement>) => {
         const current = cursor ?? { x: Math.floor(source.width / 2), y: Math.floor(source.height / 2) };
         const step = event.shiftKey ? 10 : 1;
@@ -141,7 +153,7 @@ function ColorSampler({ source, onPick, onCancel, onReplace }: ColorSamplerProps
         }
     };
 
-    // Junto al cursor sin salirse de la pantalla; si no cabe a la derecha o abajo, al otro lado.
+    // Next to the cursor without leaving the screen; if it does not fit to the right or below, on the other side.
     const loupeStyle = (() => {
         if (!anchor) return undefined;
         const { client, touch } = anchor;
@@ -206,7 +218,7 @@ function ColorSampler({ source, onPick, onCancel, onReplace }: ColorSamplerProps
                     </span>
                 </div>
             )}
-            {/* El color bajo el cursor también se anuncia al lector de pantalla */}
+            {/* The color under the cursor is also announced to screen readers */}
             <span className="csampler-live" aria-live="polite">{hex ?? ''}</span>
         </Modal>
     );

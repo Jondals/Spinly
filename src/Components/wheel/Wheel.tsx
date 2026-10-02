@@ -1,3 +1,7 @@
+/**
+ * Wheel: the main prize wheel (conic-gradient disc, optional sector images, rim lights, pointer, spin
+ * button with ticks, winner dialog and the odds tooltip). Space spins it too.
+ */
 import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import '../../css/Wheel.css';
 import { SPIN_DURATION, describeSector, getImageBox, getWheelBackground, spinWheel, getLabelTransform, getOptionProbabilities, isLightColor, WHEEL_VIEWBOX } from '../../scripts/wheel';
@@ -16,22 +20,22 @@ import { useTranslation } from '../i18n/LanguageProvider';
 import { useSoundPreference, useSpinTicks } from '../../hooks/useSpinSound';
 import { useWheelColors } from '../../hooks/useWheelColors';
 
-/** Colores de la ruleta que el usuario puede tocar directamente sobre ella. */
+/** Wheel colors the user can change by clicking the wheel itself. */
 export type WheelColorField = 'pointerColor' | 'lightColor';
 
 interface WheelProps {
     options: WheelOption[];
     activeTheme?: WheelTheme | null;
     onColorChange: (field: WheelColorField, color: string) => void;
-    /** false mientras otra vista la tapa (el torneo): Espacio no la gira. */
+    /** false while another view covers it (the tournament): Space does not spin it. */
     active?: boolean;
 }
 
-// Solo se usan tras una interacción: fuera del JS inicial.
+// Only used after an interaction: kept out of the initial JS.
 const ColorPicker = lazy(() => import('../editor/ColorPicker'));
 const WinnerOverlay = lazy(() => import('./WinnerOverlay'));
 
-/** Luces en una circunferencia; el retardo escalonado crea el efecto de persecución. */
+/** Lights on a circle; the staggered delay creates the chasing effect. */
 const ringOfLights = (count: number, radius: number, cycleSeconds: number) =>
     Array.from({ length: count }, (_, i) => {
         const angle = (i / count) * 2 * Math.PI;
@@ -42,16 +46,17 @@ const ringOfLights = (count: number, radius: number, cycleSeconds: number) =>
         };
     });
 
-// Luces fijas (no giran con el disco), como en una ruleta de feria. El ciclo coincide
-// con la duración de la animación wheel-light (Wheel.css).
+// Fixed lights (they do not turn with the disc), like on a fairground wheel. The cycle matches the
+// duration of the wheel-light animation (Wheel.css).
 const LIGHT_CYCLE_S = 2.4;
 const RIM_LIGHTS = ringOfLights(24, 48.6, LIGHT_CYCLE_S);
 const HUB_LIGHTS = ringOfLights(8, 5, LIGHT_CYCLE_S);
 
-/** Color efectivo de una variable CSS: el del tema o el por defecto del modo claro/oscuro. */
+/** Resolved color of a CSS variable: the theme's one or the light/dark mode default. */
 const cssColor = (name: string): string =>
     getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#000000';
 
+/** Renders the wheel and handles spinning, the result dialog and the color pickers. */
 function Wheel({ options, activeTheme, onColorChange, active = true }: WheelProps) {
     const { lang, t } = useTranslation();
     const [rotation, setRotation] = useState(0);
@@ -68,24 +73,26 @@ function Wheel({ options, activeTheme, onColorChange, active = true }: WheelProp
     const [picker, setPicker] = useState<{ field: WheelColorField; anchor: HTMLElement; color: string } | null>(null);
     const sound = useSoundPreference();
     const isMobile = useMediaQuery(MOBILE_QUERY);
-    // Con música sonando, las luces siguen su ritmo y su patrón, también mientras gira; sin música, al
-    // girar hacen su persecución rápida de siempre.
+    // With music playing, the lights follow its rhythm and pattern, even while spinning; without music they
+    // do their usual fast chase while spinning.
     const music = useMusic();
     const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
     const containerRef = useRef<HTMLDivElement>(null);
-    // Oculta (torneo), no: la ruleta del duelo lleva entonces las luces con la música.
+    // Not while hidden (tournament): the duel wheel carries the music lights then.
     const lightsFollowMusic = music.playing && !reducedMotion && active;
     useMusicPulse(containerRef, lightsFollowMusic);
 
     useWheelColors(activeTheme);
     useSpinTicks(discRef, spinning, options.length, sound.enabled);
 
+    /** Opens (or closes, if already open) the pointer or lights color picker. */
     const togglePicker = (field: WheelColorField, anchor: HTMLElement | null) => {
         if (!anchor) return;
         const cssVar = field === 'pointerColor' ? '--wheel-pointer-color' : '--wheel-light-color';
         setPicker((open) => (open?.field === field ? null : { field, anchor, color: cssColor(cssVar) }));
     };
 
+    /** Spins the wheel and announces the winner when the transition ends. */
     const handleSpin = () => {
         if (spinning || !hasOptions) return;
         setWinner(null);
@@ -99,19 +106,21 @@ function Wheel({ options, activeTheme, onColorChange, active = true }: WheelProp
         }, SPIN_DURATION);
     };
 
-    // El foco vuelve al botón de girar para no perderlo al cerrar el resultado.
+    // Focus goes back to the spin button so it is not lost when the result closes.
     const spinButtonRef = useRef<HTMLButtonElement>(null);
+    /** Closes the result dialog. */
     const closeResult = useCallback(() => {
         setWinner(null);
         spinButtonRef.current?.focus({ preventScroll: true });
     }, []);
 
+    /** "Spin again" from the result dialog. */
     const handleSpinAgain = () => {
         spinButtonRef.current?.focus({ preventScroll: true });
         handleSpin();
     };
 
-    // El listener global se registra una vez; la ref evita que use un handleSpin obsoleto.
+    // The global listener is registered once; the ref keeps it from using a stale handleSpin.
     const handleSpinRef = useRef(handleSpin);
     const activeRef = useRef(active);
     useEffect(() => {
@@ -119,9 +128,10 @@ function Wheel({ options, activeTheme, onColorChange, active = true }: WheelProp
         activeRef.current = active;
     });
 
-    // Espacio gira la ruleta salvo que el foco esté en un campo, un botón o un diálogo,
-    // donde Espacio ya tiene su propio significado.
+    // Space spins the wheel unless the focus is on a field, a button or a dialog, where Space already has
+    // its own meaning.
     useEffect(() => {
+        /** Space spins the wheel when nothing else should handle it. */
         const onKeyDown = (e: KeyboardEvent) => {
             if (e.code !== 'Space' && e.key !== ' ') return;
             if (e.repeat) return;
@@ -150,10 +160,9 @@ function Wheel({ options, activeTheme, onColorChange, active = true }: WheelProp
         : undefined;
     const hasAnyImage = Boolean(segmentImages?.some(Boolean));
 
-    // Reparto equitativo: una frase. Con pesos distintos: la lista completa.
+    // Equal odds: one sentence. Different weights: the full list.
     const probabilities = getOptionProbabilities(options);
-    // Hasta dos decimales, sin ceros sobrantes. Sin Intl.NumberFormat: crearlo cuesta ~6 ms en el
-    // primer render y aquí solo cambia el separador decimal.
+    /** Up to two decimals without trailing zeros. No Intl.NumberFormat: creating one costs ~6 ms on the first render and only the decimal separator changes here. */
     const formatPct = (probability: number): string => {
         const rounded = String(Math.round(probability * 10000) / 100);
         return lang === 'es' ? rounded.replace('.', ',') : rounded;
@@ -201,7 +210,7 @@ function Wheel({ options, activeTheme, onColorChange, active = true }: WheelProp
                 >
                     <Icon name="pointer" className="wheel-pointer" size={40} />
                 </button>
-                {/* Toda la ruleta abre el color de las luces; la flecha queda por encima con el suyo */}
+                {/* The whole wheel opens the lights color; the pointer sits above it with its own */}
                 <button
                     ref={lightsRef}
                     type="button"
@@ -224,7 +233,7 @@ function Wheel({ options, activeTheme, onColorChange, active = true }: WheelProp
                     </defs>
                     <circle className="wheel-rim-ring" cx="50" cy="50" r="48.6" />
                     <circle className="wheel-rim-inner" cx="50" cy="50" r="47.1" />
-                    {/* Halo de cada luz: solo con música, lo enciende music-visuals.ts con la luz */}
+                    {/* Halo of each light: only with music, music-visuals.ts lights it up with the light */}
                     {RIM_LIGHTS.map((light, i) => (
                         <circle key={`halo-${i}`} className="wheel-light-halo" cx={light.x} cy={light.y} r="3.2" />
                     ))}
@@ -309,7 +318,7 @@ function Wheel({ options, activeTheme, onColorChange, active = true }: WheelProp
                     </Tooltip>
                 </div>
             </div>
-            {/* Escritorio: música y sonidos abajo a la derecha. En móvil van en el menú. */}
+            {/* Desktop: music and sounds at the bottom right. On mobile they live in the menu. */}
             {!isMobile && active && <AudioControls variant="dock" />}
         </div>
     );

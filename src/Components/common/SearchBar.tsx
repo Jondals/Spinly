@@ -1,3 +1,6 @@
+/**
+ * SearchBar: the search input at the top of the theme and preset lists.
+ */
 import Icon from './Icon';
 
 interface SearchBarProps {
@@ -7,6 +10,7 @@ interface SearchBarProps {
     ariaLabel: string;
 }
 
+/** Search field with a magnifier icon, used to filter the panel lists. */
 function SearchBar({ value, onChange, placeholder, ariaLabel }: SearchBarProps) {
     return (
         <div className="spinly-toolbar">

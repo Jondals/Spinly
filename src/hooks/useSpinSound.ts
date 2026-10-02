@@ -1,9 +1,12 @@
+/**
+ * Sound hooks for the wheels: the sound preference and the ticks while a wheel spins.
+ */
 import { useEffect, useSyncExternalStore, type RefObject } from 'react';
 import { getSoundVolume, isSoundEnabled, playTick, setSoundEnabled, setSoundVolume, subscribeSound } from '../scripts/sound';
 
 const MIN_TICK_GAP_MS = 28;
 
-/** Preferencia de sonido (activado por defecto), compartida por la ruleta y los botones. */
+/** Sound preference (on by default), shared by the wheel and the buttons. */
 export function useSoundPreference() {
     const enabled = useSyncExternalStore(subscribeSound, isSoundEnabled, () => true);
     const volume = useSyncExternalStore(subscribeSound, getSoundVolume, () => 1);
@@ -11,7 +14,7 @@ export function useSoundPreference() {
         enabled,
         volume,
         toggle: () => setSoundEnabled(!enabled),
-        /** Deslizador de escritorio: a 0 los apaga (sin perder el volumen anterior), por encima los enciende. */
+        /** Desktop slider: at 0 it mutes the sounds (keeping the previous volume), above 0 it turns them on. */
         setVolume: (next: number) => {
             if (next <= 0) {
                 setSoundEnabled(false);
@@ -23,15 +26,15 @@ export function useSoundPreference() {
     };
 }
 
-/** Ángulo real del disco a mitad de la transición CSS, leído de su matriz de transformación. */
+/** The disc's real angle in the middle of the CSS transition, read from its transform matrix. */
 function currentAngle(element: HTMLElement): number {
     const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform);
     return (Math.atan2(matrix.b, matrix.a) * 180) / Math.PI;
 }
 
 /**
- * Un "tic" cada vez que una separación entre sectores pasa bajo la flecha. Se sigue el
- * giro real frame a frame, así el ritmo acompaña la desaceleración de la animación.
+ * A "tick" every time a border between sectors passes under the pointer. The real rotation is followed
+ * frame by frame, so the rhythm follows the animation as it slows down.
  */
 export function useSpinTicks(discRef: RefObject<HTMLElement | null>, spinning: boolean, sectorCount: number, enabled: boolean) {
     useEffect(() => {
@@ -43,6 +46,7 @@ export function useSpinTicks(discRef: RefObject<HTMLElement | null>, spinning: b
         let lastTick = 0;
         let frame = 0;
 
+        /** Animation frame: plays a tick every time the disc crosses a sector border. */
         const step = (time: number) => {
             const angle = currentAngle(disc);
             let delta = angle - previous;

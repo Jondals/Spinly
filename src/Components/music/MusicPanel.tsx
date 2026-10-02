@@ -1,3 +1,6 @@
+/**
+ * MusicPanel: the music player and playlist (now playing, controls, volumes, track list and uploads).
+ */
 import { useRef, type CSSProperties } from 'react';
 import Icon, { type IconName } from '../common/Icon';
 import StatusMessage from '../common/StatusMessage';
@@ -18,7 +21,7 @@ interface VolumeRowProps {
     onChange: (value: number) => void;
 }
 
-/** Fila del mezclador: icono, nombre y deslizador de 0 a 1 con la parte llena coloreada. */
+/** Mixer row: icon, name and a 0-1 slider with its filled part colored. */
 function VolumeRow({ icon, label, ariaLabel, value, onChange }: VolumeRowProps) {
     return (
         <label className="spinly-music-volume">
@@ -39,13 +42,13 @@ function VolumeRow({ icon, label, ariaLabel, value, onChange }: VolumeRowProps) 
 }
 
 interface MusicPanelProps {
-    /** Escritorio: el volumen de los efectos va aquí, en vez de un botón aparte de silenciar. */
+    /** Desktop: the effects volume goes here instead of a separate mute button. */
     showSoundsVolume?: boolean;
 }
 
 /**
- * Reproductor y playlist: lo que suena con sus controles, el mezclador, la lista (tocar una
- * canción la pone, el asa la reordena, la X la quita) y la subida de canciones propias.
+ * Player and playlist: what is playing with its controls, the mixer, the list (tapping a song plays it,
+ * the handle reorders it, the X removes it) and uploading your own songs.
  */
 function MusicPanel({ showSoundsVolume = false }: MusicPanelProps) {
     const { t, tm } = useTranslation();

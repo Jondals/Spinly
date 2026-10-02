@@ -1,7 +1,9 @@
-// Cuentas: nombre de usuario, contraseña y foto opcional; el usuario nunca ve un email.
-// La cuenta nace anónima (signInAnonymously, uid = id de profiles) y al ponerle contraseña se
-// le asigna un email interno derivado del uid. Para entrar: nombre → uid (profiles es pública)
-// → email interno → signInWithPassword. Requiere "Confirm email" desactivado en Supabase.
+/**
+ * Accounts: a username, a password and an optional photo; the user never sees an email.
+ * An account is born anonymous (signInAnonymously, uid = profiles id) and, when it gets a password, it
+ * is given an internal email derived from the uid. Signing in: name → uid (profiles is public) →
+ * internal email → signInWithPassword. Requires "Confirm email" to be off in Supabase.
+ */
 import {
     getSupabase,
     hasStoredSession,
@@ -26,28 +28,29 @@ export type SpinlyProfile = {
 
 export const MAX_USERNAME_LENGTH = 24;
 export { MIN_PASSWORD_LENGTH };
-// Límite de bcrypt en Supabase: lo que pase de 72 bytes se ignoraría en silencio.
+// Supabase's bcrypt limit: anything past 72 bytes would be silently ignored.
 const MAX_PASSWORD_LENGTH = 72;
 
 export type AccountSession = { userId: string; isAnonymous: boolean };
 
-/** Dominio reservado (RFC 2606): a una dirección .invalid nunca puede llegar correo. */
+/** Reserved domain (RFC 2606): an .invalid address can never receive mail. */
 const loginEmail = (userId: string): string => `${userId}@spinly.invalid`;
 
+/** Checks that a username is present and not too long. */
 function validateUsername(username: string): LocalMessage | null {
     if (!username) return dictMessage('errors', 'typeUsername');
     if (username.length > MAX_USERNAME_LENGTH) return dictMessage('errors', 'usernameTooLong', { max: MAX_USERNAME_LENGTH });
     return null;
 }
 
-// Los mismos conjuntos que comprueba Supabase con "lowercase, uppercase, digits and symbols".
+// The same character sets Supabase checks with "lowercase, uppercase, digits and symbols".
 const PASSWORD_SYMBOLS = /[!@#$%^&*()_+\-=[\]{};':"|<>?,./`~]/;
 
 export type PasswordCheck = 'length' | 'lower' | 'upper' | 'digit' | 'symbol' | 'noName';
 
 /**
- * Requisitos de una contraseña segura, uno a uno (el formulario los muestra en vivo).
- * noName: no puede contener el nombre de usuario, lo primero que probaría un atacante.
+ * Requirements of a strong password, one by one (the form shows them live).
+ * noName: it cannot contain the username, the first thing an attacker would try.
  */
 export function passwordChecks(password: string, username = ''): Record<PasswordCheck, boolean> {
     const name = username.trim().toLowerCase();
@@ -61,34 +64,36 @@ export function passwordChecks(password: string, username = ''): Record<Password
     };
 }
 
+/** Validates a new password: every requirement met and at most 72 UTF-8 bytes. */
 export function validatePassword(password: string, username = ''): LocalMessage | null {
     if (Object.values(passwordChecks(password, username)).some((ok) => !ok)) {
         return dictMessage('errors', 'passwordWeak', { min: MIN_PASSWORD_LENGTH });
     }
-    // Bytes en UTF-8: cada %XX de encodeURIComponent es un byte. Un surrogate suelto la hace fallar.
+    // UTF-8 bytes: each %XX of encodeURIComponent is one byte. A lone surrogate makes it throw.
     let bytes = Infinity;
     try {
         bytes = encodeURIComponent(password).replace(/%[0-9A-F]{2}/gi, '_').length;
     } catch {
-        // Texto no representable en UTF-8: se rechaza como demasiado largo.
+        // Text that cannot be encoded as UTF-8: rejected as too long.
     }
     if (bytes > MAX_PASSWORD_LENGTH) return dictMessage('errors', 'passwordTooLong');
     return null;
 }
 
 type SessionLike = { user: { id: string; is_anonymous?: boolean } } | null | undefined;
+/** Reduces a Supabase session to the app's AccountSession. */
 const toAccountSession = (session: SessionLike): AccountSession | null =>
     session ? { userId: session.user.id, isAnonymous: session.user.is_anonymous !== false } : null;
 
 /**
- * Restaura en silencio la sesión guardada; nunca crea una nueva. Solo se crea sesión
- * desde el menú de perfil (crear cuenta o iniciar sesión).
+ * Silently restores the saved session; it never creates a new one. Sessions are only created from the
+ * profile menu (create an account or sign in).
  */
 export async function ensureSession(): Promise<string | null> {
     return getCurrentUserId();
 }
 
-/** Sesión actual o null. Sin sesión guardada no descarga el SDK. */
+/** Current session or null. Without a saved session it does not download the SDK. */
 export async function getCurrentSession(): Promise<AccountSession | null> {
     if (!isSupabaseLoaded() && !hasStoredSession()) return null;
     const supabase = await getSupabase();
@@ -102,11 +107,12 @@ export async function getCurrentSession(): Promise<AccountSession | null> {
     }
 }
 
+/** Current user id or null. */
 export async function getCurrentUserId(): Promise<string | null> {
     return (await getCurrentSession())?.userId ?? null;
 }
 
-/** Se engancha cuando el cliente exista (al crear perfil, por ejemplo) sin forzar su descarga. */
+/** Subscribes to auth changes once the client exists (e.g. after creating a profile) without forcing its download. */
 export function onAuthChange(callback: (userId: string | null, isAnonymous: boolean) => void): () => void {
     let active = true;
     let unsubscribe: (() => void) | null = null;
@@ -125,7 +131,7 @@ export function onAuthChange(callback: (userId: string | null, isAnonymous: bool
     };
 }
 
-/** data = null si hay sesión pero todavía no hay fila de perfil. */
+/** Reads a profile. data = null if there is a session but no profile row yet. */
 export async function fetchProfile(userId: string): Promise<ServiceResult<SpinlyProfile | null>> {
     const supabase = await getSupabase();
     if (!supabase) return { ok: false, error: notConfiguredError() };
@@ -146,10 +152,10 @@ export async function fetchProfile(userId: string): Promise<ServiceResult<Spinly
 }
 
 const AVATAR_MAX_SIDE = 512;
-// file_size_limit del bucket avatars (README).
+// file_size_limit of the avatars bucket (README).
 const AVATAR_BUCKET_BYTES = 2 * 1024 * 1024;
 
-// La política de Storage exige que la carpeta sea el uid del autor.
+/** Uploads a profile photo and returns its public URL. The Storage policy requires the folder to be the author's uid. */
 async function uploadAvatar(userId: string, file: File): Promise<ServiceResult<string>> {
     const supabase = await getSupabase();
     if (!supabase) return { ok: false, error: notConfiguredError() };
@@ -157,7 +163,7 @@ async function uploadAvatar(userId: string, file: File): Promise<ServiceResult<s
     if (file.size > MAX_UPLOAD_BYTES) return { ok: false, error: dictMessage('errors', 'photoTooBig') };
     const uploadError = dictMessage('errors', 'uploadPhoto');
     try {
-        // Se muestra como mucho a ~80 px: con 512 sobra y cabe siempre en el límite del bucket (2 MB).
+        // It is shown at ~80 px at most: 512 is plenty and always fits the bucket limit (2 MB).
         const photo = await shrinkImage(file, AVATAR_MAX_SIDE);
         if (!isAllowedImageMime(photo.type) || photo.size > AVATAR_BUCKET_BYTES) return { ok: false, error: dictMessage('errors', 'photoTooBig') };
         const extension = photo.type.split('/')[1] === 'jpeg' ? 'jpg' : photo.type.split('/')[1];
@@ -175,6 +181,7 @@ async function uploadAvatar(userId: string, file: File): Promise<ServiceResult<s
     }
 }
 
+/** Validates the name, uploads the photo if any and upserts the profiles row. */
 async function saveProfileRow(
     base: SpinlyProfile,
     avatarFile: File | null
@@ -205,8 +212,8 @@ async function saveProfileRow(
 }
 
 /**
- * Crea la cuenta: sesión anónima, fila de profiles y contraseña, en ese orden. Si falla solo
- * la contraseña, el perfil existe igualmente y se avisa (luego se puede poner desde el menú).
+ * Creates the account: anonymous session, profiles row and password, in that order. If only the
+ * password fails, the profile exists anyway and a warning is shown (it can be set later from the menu).
  */
 export async function createAccount(input: {
     username: string;
@@ -239,9 +246,9 @@ export async function createAccount(input: {
 }
 
 /**
- * Pone la contraseña a la cuenta de la sesión actual. Si aún es anónima le asigna además el
- * email interno, lo que la convierte en permanente conservando uid, perfil y lo compartido.
- * refreshSession: el JWT deja de ser anónimo al momento (el bucket user-data lo exige).
+ * Sets the password of the current session's account. If it is still anonymous it also gets the
+ * internal email, which makes it permanent while keeping its uid, profile and shared items.
+ * refreshSession: the JWT stops being anonymous right away (the user-data bucket requires it).
  */
 export async function setAccountPassword(password: string): Promise<ServiceResult<true>> {
     const supabase = await getSupabase();
@@ -257,7 +264,7 @@ export async function setAccountPassword(password: string): Promise<ServiceResul
             account.isAnonymous ? { email: loginEmail(account.userId), password } : { password },
         );
         if (error) return { ok: false, error: supabaseErrorMessage(failed, error) };
-        // Con "Confirm email" activo el email queda pendiente de un correo que nunca llegará.
+        // With "Confirm email" on, the email would wait for a message that never arrives.
         if (account.isAnonymous && updated.user?.email !== loginEmail(account.userId)) {
             return { ok: false, error: dictMessage('errors', 'confirmEmailEnabled') };
         }
@@ -269,9 +276,9 @@ export async function setAccountPassword(password: string): Promise<ServiceResul
 }
 
 /**
- * Entra con nombre y contraseña. El error es el mismo si el nombre no existe o la contraseña
- * falla, para no revelar qué cuentas hay. El uid de la sesión debe ser el del nombre buscado:
- * el uid es público y otra cuenta podría haberse puesto su email interno para suplantarla.
+ * Signs in with a name and a password. The error is the same whether the name does not exist or the
+ * password is wrong, so it does not reveal which accounts exist. The session's uid must match the
+ * looked-up name: uids are public and another account could have set that internal email to impersonate it.
  */
 export async function signInWithUsername(usernameInput: string, password: string): Promise<ServiceResult<string>> {
     const supabase = await getSupabase();
@@ -302,8 +309,8 @@ export async function signInWithUsername(usernameInput: string, password: string
 }
 
 /**
- * Comprueba la contraseña actual antes de cambiarla: con una sesión robada no basta para
- * quedarse la cuenta. Sin email no hay reautenticación en el servidor; esto es lo máximo.
+ * Checks the current password before changing it, so a stolen session is not enough to take over the
+ * account. Without email there is no server-side reauthentication; this is the most that can be done.
  */
 export async function changePassword(currentPassword: string, nextPassword: string): Promise<ServiceResult<true>> {
     const supabase = await getSupabase();
@@ -322,7 +329,7 @@ export async function changePassword(currentPassword: string, nextPassword: stri
     }
 }
 
-/** Cierra la sesión solo en este dispositivo: las de otros dispositivos siguen abiertas. */
+/** Signs out on this device only: sessions on other devices stay open. */
 export async function signOut(): Promise<ServiceResult<true>> {
     const supabase = await getSupabase();
     if (!supabase) return { ok: false, error: notConfiguredError() };
@@ -335,6 +342,7 @@ export async function signOut(): Promise<ServiceResult<true>> {
     }
 }
 
+/** Saves profile changes (name and, optionally, a new photo). */
 export async function updateProfile(
     profile: SpinlyProfile,
     avatarFile?: File | null

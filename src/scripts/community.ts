@@ -1,5 +1,7 @@
-// Comunidad: shared_themes y shared_presets con el autor (profiles) en la misma consulta.
-// Reutiliza los tipos y sanitizers locales: no hay modelos duplicados.
+/**
+ * Community service: shared_themes and shared_presets, each fetched with its author (profiles) in the
+ * same query. It reuses the local types and sanitizers, so there are no duplicated models.
+ */
 import {
     getSupabase,
     notConfiguredError,
@@ -16,21 +18,24 @@ import {
 } from '../types/theme-types';
 import { getCurrentUserId } from './profile';
 
-// username vacío = autor sin fila en profiles; la UI muestra un nombre genérico.
+// Empty username = author without a profiles row; the UI shows a generic name.
 export type CommunityAuthor = {
     username: string;
     avatar_url: string | null;
 };
 
-// authorId solo decide qué acciones se muestran; la autorización la impone RLS.
+// authorId only decides which actions are shown; authorization is enforced by RLS.
 export type CommunityTheme = { theme: WheelTheme; author: CommunityAuthor; authorId: string };
 export type CommunityPreset = { preset: WheelPreset; author: CommunityAuthor; authorId: string };
 
+/** Error messages and the author used when a profile is missing. */
 const noSessionError = () => dictMessage('errors', 'noSession');
+/** Error shown when the community cannot be loaded. */
 const loadCommunityError = () => dictMessage('errors', 'loadCommunity');
+/** Author used when the profile is missing. */
 const fallbackAuthor = (): CommunityAuthor => ({ username: '', avatar_url: null });
 
-// Límites de cliente; la verdad última son RLS y las constraints de la base de datos.
+// Client-side limits; the source of truth is RLS and the database constraints.
 const MAX_SHARED_NAME = 40;
 const MAX_SHARED_DESCRIPTION = 160;
 const MAX_SHARED_TAGS = 10;
@@ -64,6 +69,7 @@ type SharedPresetRow = {
     author: ProfileRef;
 };
 
+/** Normalises the joined profile into an author (generic when missing). */
 function toAuthor(author: ProfileRef): CommunityAuthor {
     if (!author || typeof author.username !== 'string' || author.username.length === 0) {
         return fallbackAuthor();
@@ -71,6 +77,7 @@ function toAuthor(author: ProfileRef): CommunityAuthor {
     return { username: author.username, avatar_url: author.avatar_url ?? null };
 }
 
+/** Converts a shared_themes row into a sanitized theme; null if it is invalid. */
 function rowToTheme(row: SharedThemeRow): CommunityTheme | null {
     const theme = sanitizeTheme({
         id: row.id,
@@ -90,14 +97,15 @@ function rowToTheme(row: SharedThemeRow): CommunityTheme | null {
 
 const AUTHOR_JOIN = 'author:profiles(username, avatar_url)';
 
+/** Every shared theme, newest first. */
 export async function fetchCommunityThemes(): Promise<ServiceResult<CommunityTheme[]>> {
     const supabase = await getSupabase();
     if (!supabase) return { ok: false, error: notConfiguredError() };
     try {
         const { data, error } = await supabase
             .from('shared_themes')
-            // `*` y no una lista: light_color puede no existir aún (supabase-update-policies.sql)
-            // y pedir una columna inexistente haría fallar toda la lectura.
+            // `*` rather than a list: light_color may not exist yet (supabase-update-policies.sql) and
+            // asking for a missing column would make the whole read fail.
             .select('*, ' + AUTHOR_JOIN)
             .order('created_at', { ascending: false });
         if (error) return { ok: false, error: supabaseErrorMessage(loadCommunityError(), error) };
@@ -108,6 +116,7 @@ export async function fetchCommunityThemes(): Promise<ServiceResult<CommunityThe
     }
 }
 
+/** Converts a shared_presets row into a sanitized preset; null if it is invalid. */
 function rowToPreset(row: SharedPresetRow): CommunityPreset | null {
     const parsed = Date.parse(row.created_at);
     const preset = sanitizePreset({
@@ -122,6 +131,7 @@ function rowToPreset(row: SharedPresetRow): CommunityPreset | null {
     return { preset, author: toAuthor(row.author), authorId: String(row.author_id ?? '') };
 }
 
+/** Every shared preset, newest first. */
 export async function fetchCommunityPresets(): Promise<ServiceResult<CommunityPreset[]>> {
     const supabase = await getSupabase();
     if (!supabase) return { ok: false, error: notConfiguredError() };
@@ -138,9 +148,10 @@ export async function fetchCommunityPresets(): Promise<ServiceResult<CommunityPr
     }
 }
 
-// Mismo payload saneado para insert y update: editar no puede colar lo que el alta bloquea.
+// The same sanitized payload for insert and update: editing cannot sneak in what creating blocks.
 type Payload<T> = { ok: true; row: T } | { ok: false; error: LocalMessage };
 
+/** Validated database row for a theme, or the reason it cannot be shared. */
 function themePayload(theme: WheelTheme): Payload<Record<string, unknown>> {
     const name = normalizeText(theme.name, MAX_SHARED_NAME);
     if (!name) return { ok: false, error: dictMessage('errors', 'themeNoName') };
@@ -157,12 +168,13 @@ function themePayload(theme: WheelTheme): Payload<Record<string, unknown>> {
             border_color: clean.borderColor ?? null,
             center_color: clean.centerColor ?? null,
             pointer_color: clean.pointerColor ?? null,
-            // Solo si hay valor: sin la columna creada, compartir temas sin luces sigue funcionando.
+            // Only when set: without the column, sharing themes without a light color keeps working.
             ...(clean.lightColor ? { light_color: clean.lightColor } : {}),
         },
     };
 }
 
+/** Validated database row for a preset, or the reason it cannot be shared. */
 function presetPayload(preset: WheelPreset): Payload<Record<string, unknown>> {
     const name = normalizeText(preset.name, MAX_SHARED_NAME);
     if (!name) return { ok: false, error: dictMessage('errors', 'presetNoName') };
@@ -175,6 +187,7 @@ function presetPayload(preset: WheelPreset): Payload<Record<string, unknown>> {
     return { ok: true, row: { name: clean.name, options: clean.options, theme: clean.theme, tags } };
 }
 
+/** Publishes a theme in the community as the current user. */
 export async function shareTheme(theme: WheelTheme): Promise<ServiceResult<true>> {
     const supabase = await getSupabase();
     if (!supabase) return { ok: false, error: notConfiguredError() };
@@ -192,6 +205,7 @@ export async function shareTheme(theme: WheelTheme): Promise<ServiceResult<true>
     }
 }
 
+/** Publishes a preset in the community as the current user. */
 export async function sharePreset(preset: WheelPreset): Promise<ServiceResult<true>> {
     const supabase = await getSupabase();
     if (!supabase) return { ok: false, error: notConfiguredError() };
@@ -211,8 +225,10 @@ export async function sharePreset(preset: WheelPreset): Promise<ServiceResult<tr
 
 type SharedTable = 'shared_themes' | 'shared_presets';
 
-// author_id nunca va en el payload, así que no se puede reasignar. RLS en UPDATE/DELETE
-// no da error, filtra: .select('id') devuelve las filas tocadas y 0 significa bloqueado.
+/**
+ * Updates a row owned by the current user. author_id is never in the payload, so it cannot be reassigned.
+ * RLS on UPDATE/DELETE does not fail, it filters: .select('id') returns the touched rows and 0 means blocked.
+ */
 async function updateOwnRow(table: SharedTable, id: string, row: Record<string, unknown>, fallback: LocalMessage): Promise<ServiceResult<true>> {
     const supabase = await getSupabase();
     if (!supabase) return { ok: false, error: notConfiguredError() };
@@ -233,6 +249,7 @@ async function updateOwnRow(table: SharedTable, id: string, row: Record<string, 
     }
 }
 
+/** Deletes a row owned by the current user (0 touched rows means RLS blocked it). */
 async function deleteOwnRow(table: SharedTable, id: string, fallback: LocalMessage): Promise<ServiceResult<true>> {
     const supabase = await getSupabase();
     if (!supabase) return { ok: false, error: notConfiguredError() };
@@ -253,22 +270,26 @@ async function deleteOwnRow(table: SharedTable, id: string, fallback: LocalMessa
     }
 }
 
+/** Updates one of the user's shared themes. */
 export async function updateSharedTheme(id: string, theme: WheelTheme): Promise<ServiceResult<true>> {
     const payload = themePayload(theme);
     if (!payload.ok) return { ok: false, error: payload.error };
     return updateOwnRow('shared_themes', id, payload.row, dictMessage('errors', 'cloudUpdate'));
 }
 
+/** Updates one of the user's shared presets. */
 export async function updateSharedPreset(id: string, preset: WheelPreset): Promise<ServiceResult<true>> {
     const payload = presetPayload(preset);
     if (!payload.ok) return { ok: false, error: payload.error };
     return updateOwnRow('shared_presets', id, payload.row, dictMessage('errors', 'cloudUpdate'));
 }
 
+/** Deletes one of the user's shared themes. */
 export async function deleteSharedTheme(id: string): Promise<ServiceResult<true>> {
     return deleteOwnRow('shared_themes', id, dictMessage('errors', 'cloudDelete'));
 }
 
+/** Deletes one of the user's shared presets. */
 export async function deleteSharedPreset(id: string): Promise<ServiceResult<true>> {
     return deleteOwnRow('shared_presets', id, dictMessage('errors', 'cloudDelete'));
 }

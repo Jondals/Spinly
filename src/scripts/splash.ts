@@ -1,32 +1,35 @@
-// Pantalla de carga de public/index.html: se pinta con el HTML, antes que el JS, y la retira la
-// app ya montada. Espera un mínimo para que la animación de entrada se vea entera.
+/**
+ * Splash screen of public/index.html: it is painted with the HTML, before the JS, and removed by the
+ * app once mounted. It waits a minimum time so the entry animation is seen in full.
+ */
 const SPLASH_ID = 'spinly-splash';
-// Desde el inicio de la navegación: la ruleta del logo acaba de girar y la flecha y el nombre llegan
-// hacia 0,95 s, ya con la salida empezando. Más larga, Lighthouse la cuenta como carga lenta.
+// From the start of navigation: the logo wheel has just finished turning and the pointer and the name
+// arrive around 0.95 s, as the exit starts. Any longer and Lighthouse counts it as a slow load.
 const MIN_VISIBLE_MS = 850;
 const REDUCED_MOTION_MIN_MS = 300;
-// Coincide con la transición de salida de .spinly-splash--out (public/index.html): un iris que se
-// cierra sobre el logo y deja ver la app, ya pintada y quieta.
+// Matches the exit transition of .spinly-splash--out (public/index.html): an iris that closes over the
+// logo and reveals the app, already painted and still.
 const EXIT_MS = 900;
-// Lo anota el script de index.html: la pantalla de carga sale una vez por pestaña.
+// Written by index.html's inline script: the splash is shown once per tab.
 const SEEN_KEY = 'spinly-splash';
 
-/** Entrar o salir de la cuenta es como abrir la app de nuevo: la próxima carga vuelve a mostrar
-    la pantalla de carga (una recarga normal, no). */
+/** Signing in or out is like opening the app again: the next load shows the splash again (a normal
+    reload does not). */
 export function replaySplashOnNextLoad(): void {
     try {
         sessionStorage.removeItem(SEEN_KEY);
     } catch {
-        // Sin sessionStorage el script tampoco pudo anotarla: saldrá igualmente.
+        // Without sessionStorage the script could not record it either: it will show anyway.
     }
 }
 
+/** Removes the splash: after its minimum time and exit animation, or right away if it was already seen. */
 export function hideSplash(): void {
     const splash = document.getElementById(SPLASH_ID);
-    // StrictMode monta dos veces en desarrollo: la salida solo se programa una.
+    // StrictMode mounts twice in development: the exit is scheduled only once.
     if (!splash || splash.dataset.leaving) return;
     splash.dataset.leaving = 'true';
-    // Recarga o cambio de cuenta: el script de index.html ya la ocultó, solo queda quitarla.
+    // Reload or account switch: index.html's script already hid it, it only has to be removed.
     if (document.documentElement.classList.contains('spinly-splash-seen')) {
         splash.remove();
         return;

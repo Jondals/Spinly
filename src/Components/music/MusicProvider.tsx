@@ -1,3 +1,8 @@
+/**
+ * MusicProvider: the music context of the app. It plays the user's playlist (crossfades, next/previous,
+ * resume on the first gesture), uploads songs to the account, feeds the beat-reactive visuals and wires
+ * the Media Session (lock screen and media keys).
+ */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import type { Notice } from '../common/StatusMessage';
 import type { AccountSession } from '../../scripts/profile';
@@ -31,7 +36,7 @@ const MB = Math.round(MAX_TRACK_BYTES / (1024 * 1024));
 
 export interface MusicContextValue {
     playlist: readonly MusicTrack[];
-    /** Encendida: sonando o a punto (cargando la canción). */
+    /** On: playing or about to (loading the song). */
     playing: boolean;
     currentId: string | null;
     loadingId: string | null;
@@ -51,9 +56,10 @@ export interface MusicContextValue {
 
 const MusicContext = createContext<MusicContextValue | null>(null);
 
+/** The music context; it must be used inside MusicProvider. */
 export function useMusic(): MusicContextValue {
     const value = useContext(MusicContext);
-    if (!value) throw new Error('useMusic fuera de MusicProvider');
+    if (!value) throw new Error('useMusic must be used inside MusicProvider');
     return value;
 }
 
@@ -64,18 +70,19 @@ interface MusicProviderProps {
     children: ReactNode;
 }
 
-// Controles de audio: un gesto sobre ellos ya enciende o apaga la música por su cuenta.
+// Audio controls: a gesture on them already turns music on or off by itself.
 const AUDIO_CONTROLS = '.spinly-audio';
 
+/** Adds ids to (or removes them from) the list of songs waiting to be uploaded. */
 const markPending = (ids: readonly string[], pending: boolean) => {
     const current = readPendingUploads();
     writePendingUploads(pending ? [...current, ...ids.filter((id) => !current.includes(id))] : current.filter((id) => !ids.includes(id)));
 };
 
 /**
- * Música de la app: la playlist de cada usuario la guarda App (viaja con la cuenta) y aquí vive
- * la reproducción, las subidas y la copia de los archivos en la nube. El motor de audio se carga
- * la primera vez que se enciende la música.
+ * The app's music: each user's playlist is stored by App (it travels with the account) and this provider
+ * handles playback, uploads and the cloud copy of the files. The audio engine loads the first time
+ * music is turned on.
  */
 function MusicProvider({ library, onLibraryChange, session, children }: MusicProviderProps) {
     const uid = session && !session.isAnonymous ? session.userId : null;
@@ -90,12 +97,12 @@ function MusicProvider({ library, onLibraryChange, session, children }: MusicPro
 
     const engineRef = useRef<MusicEngine | null>(null);
     const enginePromise = useRef<Promise<MusicEngine | null> | null>(null);
-    // Pista cargada en el motor (sonando o en pausa) y su URL blob, que se libera al cambiar.
+    // Track loaded in the engine (playing or paused) and its blob URL, released when it changes.
     const loadedIdRef = useRef<string | null>(null);
     const urlRef = useRef<string | null>(null);
-    // Cada petición de reproducción invalida las anteriores que sigan cargando.
+    // Every play request invalidates earlier ones that are still loading.
     const requestRef = useRef(0);
-    // Pulso de cada canción ya analizada (null: no se pudo; sin entrada: sin analizar o analizando).
+    // Beat grid of every analysed song (null: it failed; no entry: not analysed yet, or in progress).
     const gridsRef = useRef(new Map<string, BeatGrid | null>());
     const analyzingRef = useRef(new Set<string>());
     const libraryRef = useRef(library);
@@ -105,8 +112,10 @@ function MusicProvider({ library, onLibraryChange, session, children }: MusicPro
     const volumeRef = useRef(volume);
     volumeRef.current = volume;
 
+    /** Shows a notice in the player. */
     const say = useCallback((tone: Notice['tone'], text: LocalMessage) => setNotice({ tone, text }), []);
 
+    /** Loads and creates the audio engine once. */
     const getEngine = useCallback((): Promise<MusicEngine | null> => {
         if (!enginePromise.current) {
             enginePromise.current = import('../../scripts/music-engine')
@@ -121,12 +130,13 @@ function MusicProvider({ library, onLibraryChange, session, children }: MusicPro
         return enginePromise.current;
     }, []);
 
+    /** Frees the current blob URL. */
     const releaseUrl = useCallback(() => {
         if (urlRef.current) URL.revokeObjectURL(urlRef.current);
         urlRef.current = null;
     }, []);
 
-    /** Archivo de una canción: el de este navegador o, si no está, el de la cuenta (y se guarda aquí). */
+    /** A song's file: this browser's copy or, if missing, the account's (which is then cached here). */
     const fileOf = useCallback(async (track: MusicTrack): Promise<Blob | null> => {
         const local = await readTrackFile(track.id);
         if (local) return local;
@@ -139,6 +149,7 @@ function MusicProvider({ library, onLibraryChange, session, children }: MusicPro
         return remote.data;
     }, [say]);
 
+    /** Pauses and remembers that music is off. */
     const stopPlayback = useCallback(() => {
         engineRef.current?.pause();
         setPlaying(false);
@@ -146,6 +157,7 @@ function MusicProvider({ library, onLibraryChange, session, children }: MusicPro
         writeMusicPreference({ on: false });
     }, []);
 
+    /** Loads and plays a track, starting its beat analysis in parallel. */
     const startTrack = useCallback(async (id: string) => {
         const track = libraryRef.current.playlist.find((item) => item.id === id);
         if (!track) return;
@@ -168,8 +180,8 @@ function MusicProvider({ library, onLibraryChange, session, children }: MusicPro
             stopPlayback();
             return;
         }
-        // El pulso de la canción entera se analiza mientras empieza a sonar; hasta que acaba, las luces
-        // siguen el pulso en tiempo real.
+        // The whole song's beat is analysed while it starts playing; until that finishes, the lights follow
+        // the real-time beat tracker.
         if (!gridsRef.current.has(id) && !analyzingRef.current.has(id)) {
             analyzingRef.current.add(id);
             void engine.analyze(file).then((grid) => {
@@ -195,20 +207,23 @@ function MusicProvider({ library, onLibraryChange, session, children }: MusicPro
         setNotice((current) => (current?.tone === 'ok' ? null : current));
     }, [fileOf, getEngine, releaseUrl, say, stopPlayback]);
 
+    /** Plays the track `offset` positions away (wrapping around the playlist). */
     const step = useCallback((offset: number) => {
         const list = libraryRef.current.playlist;
         if (!list.length) return;
         const index = list.findIndex((track) => track.id === currentId);
-        // Sin pista actual, "siguiente" empieza por la primera y "anterior" por la última.
+        // Without a current track, "next" starts at the first one and "previous" at the last one.
         const from = index === -1 ? (offset > 0 ? -1 : 0) : index;
         const target = list[(from + offset + list.length) % list.length];
         void startTrack(target.id);
     }, [currentId, startTrack]);
 
+    /** Next track. */
     const next = useCallback(() => step(1), [step]);
+    /** Previous track. */
     const previous = useCallback(() => step(-1), [step]);
 
-    // Al acabar una pista suena la siguiente; con una sola, se repite.
+    // When a track ends the next one plays; with a single track, it repeats.
     const nextRef = useRef(next);
     nextRef.current = next;
     useEffect(() => {
@@ -216,8 +231,8 @@ function MusicProvider({ library, onLibraryChange, session, children }: MusicPro
         void getEngine().then((engine) => engine?.onEnded(() => nextRef.current()));
     }, [playing, getEngine]);
 
-    // Mientras suena, las luces de la ruleta y el fondo laten con la canción (music-pulse.ts). Cada
-    // canción empieza su análisis de cero: su tempo y su patrón son suyos.
+    // While playing, the wheel lights and the background pulse with the song (music-pulse.ts). Every song
+    // starts its analysis from scratch: its tempo and pattern are its own.
     useEffect(() => {
         if (!playing) return undefined;
         let alive = true;
@@ -236,6 +251,7 @@ function MusicProvider({ library, onLibraryChange, session, children }: MusicPro
         };
     }, [playing, currentId, getEngine]);
 
+    /** Play / pause, resuming the loaded track when possible. */
     const toggle = useCallback(() => {
         if (playing) {
             requestRef.current += 1;
@@ -255,6 +271,7 @@ function MusicProvider({ library, onLibraryChange, session, children }: MusicPro
         void startTrack(id);
     }, [currentId, playing, startTrack, stopPlayback]);
 
+    /** Plays a specific track (or toggles it if it is the loaded one). */
     const playTrack = useCallback((id: string) => {
         if (id === currentId && playing) return;
         if (id === currentId && engineRef.current && loadedIdRef.current === id) {
@@ -264,6 +281,7 @@ function MusicProvider({ library, onLibraryChange, session, children }: MusicPro
         void startTrack(id);
     }, [currentId, playing, startTrack, toggle]);
 
+    /** Sets and remembers the music volume (0-1). */
     const setVolume = useCallback((value: number) => {
         const clamped = Math.min(Math.max(value, 0), 1);
         setVolumeState(clamped);
@@ -271,17 +289,19 @@ function MusicProvider({ library, onLibraryChange, session, children }: MusicPro
         writeMusicPreference({ volume: clamped });
     }, []);
 
-    // Si la música estaba encendida la última vez, vuelve con el primer gesto (los navegadores no
-    // dejan sonar nada antes). Los propios controles de audio se ocupan de su clic.
+    // If music was on last time, it comes back with the first gesture (browsers do not allow any sound
+    // before that). The audio controls handle their own click.
     const toggleRef = useRef(toggle);
     toggleRef.current = toggle;
     useEffect(() => {
         if (!preference.on) return undefined;
+        /** First user gesture: turns the music back on (unless it was on the audio controls). */
         const onGesture = (event: Event) => {
             remove();
             if (event.target instanceof Element && event.target.closest(AUDIO_CONTROLS)) return;
             toggleRef.current();
         };
+        /** Stops listening for the first gesture. */
         const remove = () => {
             document.removeEventListener('pointerdown', onGesture, true);
             document.removeEventListener('keydown', onGesture, true);
@@ -291,6 +311,7 @@ function MusicProvider({ library, onLibraryChange, session, children }: MusicPro
         return remove;
     }, [preference.on]);
 
+    /** Validates and stores uploaded songs, then queues them for the cloud. */
     const addFiles = useCallback(async (files: readonly File[]) => {
         let uploads = libraryRef.current.playlist.length;
         const added: MusicTrack[] = [];
@@ -329,6 +350,7 @@ function MusicProvider({ library, onLibraryChange, session, children }: MusicPro
         else if (added.length === 1 && !uidRef.current) say('ok', dictMessage('music', 'addedLocal', { name: added[0].name }));
     }, [onLibraryChange, say]);
 
+    /** Removes a track everywhere (moving on to another one if it was playing). */
     const removeTrack = useCallback((id: string) => {
         const track = libraryRef.current.playlist.find((item) => item.id === id);
         if (!track) return;
@@ -348,10 +370,11 @@ function MusicProvider({ library, onLibraryChange, session, children }: MusicPro
         const wasPending = readPendingUploads().includes(id);
         markPending([id], false);
         void deleteTrackFile(id);
-        // En la nube solo si llegó a subirse. Si falla, el archivo queda huérfano pero invisible.
+        // In the cloud only if it was uploaded. If that fails, the file is left orphaned but invisible.
         if (uidRef.current && !wasPending) void deleteCloudTrackFile(uidRef.current, id);
     }, [currentId, onLibraryChange, playing, startTrack, stopPlayback]);
 
+    /** Reorders the playlist. */
     const moveTrack = useCallback((from: number, to: number) => {
         onLibraryChange((prev) => {
             const playlist = [...prev.playlist];
@@ -362,8 +385,8 @@ function MusicProvider({ library, onLibraryChange, session, children }: MusicPro
         });
     }, [onLibraryChange]);
 
-    // Sube a la cuenta las canciones que solo están en este navegador (añadidas sin sesión o
-    // cuya subida falló). Una a una; ante un error para y lo reintenta en la próxima ocasión.
+    // Uploads to the account the songs that are only in this browser (added without a session, or whose
+    // upload failed). One at a time; on an error it stops and retries next time.
     useEffect(() => {
         if (!uid) return undefined;
         let alive = true;
@@ -394,7 +417,7 @@ function MusicProvider({ library, onLibraryChange, session, children }: MusicPro
         };
     }, [uid, pendingTick, say]);
 
-    // Controles del sistema (pantalla de bloqueo, teclas multimedia, auriculares).
+    // System controls (lock screen, media keys, headphones).
     const current = library.playlist.find((track) => track.id === currentId) ?? null;
     const currentTitle = current?.name ?? null;
     useEffect(() => {
@@ -418,18 +441,19 @@ function MusicProvider({ library, onLibraryChange, session, children }: MusicPro
             try {
                 media.setActionHandler(action, handler);
             } catch {
-                // Acción no soportada por este navegador.
+                // Action not supported by this browser.
             }
         });
         return () => handlers.forEach(([action]) => {
             try {
                 media.setActionHandler(action, null);
             } catch {
-                // Acción no soportada por este navegador.
+                // Action not supported by this browser.
             }
         });
     }, [currentTitle, playing, toggle, next, previous]);
 
+    /** Disposes the engine and the blob URL on unmount. */
     const shutdown = useCallback(() => {
         engineRef.current?.dispose();
         releaseUrl();

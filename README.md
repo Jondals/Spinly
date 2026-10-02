@@ -53,13 +53,16 @@ Songs you upload are stored twice: in **IndexedDB** for instant playback (a few 
 - The **Media Session API** puts the current song on the lock screen and wires up the media keys.
 
 ### Tournament mode
-A knockout bracket where each duel is played on its own wheel, with a live bracket, participant standings, a spin history and stats (spins, average spin, comeback rate).
-- **Set up in two steps**: first who plays (the current wheel options in one click, any colour per participant, shuffle or reorder), then how. Three styles (Quick, Classic, Epic) fill in the rules, and every rule explains itself right where you choose it: best of 1/3/5/7 for the rounds and the final, even odds or odds weighted by seed, random draw or list order, third-place match, referee mode and quick spins. With list order, a preview shows the first-round pairings before you start.
-- **Your wheel, in every duel**: the duel wheel has the same rim, lights and pointer as the main one. Tap the pointer or the wheel to recolour them; the colours are saved in the active theme, so both wheels always match.
+A knockout bracket where every duel is played on its own two-sector wheel, built so that anyone understands it at a glance.
+- **Setup that explains itself**: "Who plays?" lists one coloured tile per participant (the wheel options in one click, any colour, shuffle or reorder). "How do they play?" asks plain questions with the answer's meaning always in view: a quick-start style (Quick, Classic, Epic), how many spins each duel has (any best of from 1 to 10, for the rounds and for the final, with "first to N points · M spins at most" under it), who plays whom (random draw, or list order with a preview of the first round), whether everyone has the same chances (50/50, or a bigger slice for the top of the list, with a worked example) and the extras (third-place match, referee mode, quick spins). A final card sums it up in one sentence next to the start button.
+- **An arena for every duel**: the two rivals face each other in big cards on both sides of the wheel, each in their colour, with their seed, a big score, one pip per point they need and their slice of the wheel. The left rival owns the left half of the wheel and the right one the right half, and the wheel always lands inside the winner's sector, sized by their odds. Below it, one line says what is at stake ("Match point for Sushi") and which duel comes next.
+- **A bar that tells the story**: the tournament name, the current round, one progress segment per duel and labelled actions (quick spin, undo, restart with a confirming second click, new tournament).
+- **A bracket that reads like a bracket**: the duel in play glows, the next one is outlined, winners get a check and knocked-out names fade. With 16 or 32 players it scrolls sideways and brings the duel in play into view by itself. Standings (sorted by how far each one got) and the full spin history sit in tabs next to it.
+- **Sounds and a real celebration**: a chime on every spin, a longer arpeggio when a duel is won and a fanfare for the champion, who gets a dialog with confetti, a glowing trophy and the podium.
+- **A stage of its own**: the view does not reuse the wheel's background. Two spotlights sweep from the top, rings leave the centre, a perspective floor grid rolls towards you and sparks rise, all animated with transforms and opacity only. With music on, the rings and the floor move exactly in time with the beat (one ring every two beats, one floor tile per beat), the spotlights brighten with the mids and the sparks with the highs.
 - **Any number of players** from 2 to 32: the bracket grows to the next power of two and the byes go to the top seeds in classic seeding order, so seeds 1 and 2 can only meet in the final.
 - **Only the essentials are saved**: config, seeded participants and the list of spins. The whole bracket is rebuilt from them, so it can never end up inconsistent, and undo is just dropping the last spin.
-- The duel wheel lands inside the winner's sector, sized by their odds.
-- **A background that plays along**: the view has its own stadium-light background built with GPU-only animations. With music on, it follows the song: the lights pulse on every beat and breathe with the mids and highs, the floor grid moves one tile per beat, and a light beam sweeps across on the first beat of each bar. The duel wheel's lights follow the music too, just like the main wheel.
+- **Accessible in both themes**: every tournament view (setup, live with its tabs, and the champion dialog, dark and light) scores 100 in Lighthouse accessibility.
 
 ### Lights that follow the beat
 While a song plays, the wheel lights and the dotted background move with it. They follow the pulse, not individual hits:
@@ -110,7 +113,8 @@ Dependencies flow one way: components and hooks use `scripts` and `types`, which
 
 ```
 src/
-├── Components/   React UI by feature: wheel, editor, presets, themes, music, layout, common, i18n
+├── Components/   React UI by feature: wheel, editor, presets, themes, tournament, music, layout,
+│                 common, i18n
 ├── hooks/        UI logic: sorting, sounds, account sync, community data, media queries
 ├── scripts/      Framework-free: wheel geometry, color math, sound and music engines,
 │                 screen capture, song storage, strings, Supabase services
@@ -128,6 +132,11 @@ src/
 | **Jest + Testing Library** | 79 tests covering the UI, the data models, music, beat tracking, tournaments and the account flows |
 | **Vercel** | Static hosting with a strict Content Security Policy |
 | **pnpm** | Dependencies, plus two patches that keep Create React App working on Node 24 |
+
+### Code conventions
+- **Everything in English**: identifiers, comments and test names. Only the UI texts are bilingual (English and Spanish), kept in `scripts/strings.ts` and, for tournament mode, `scripts/tournament-strings.ts`.
+- **Every file starts with a header comment** saying what it is for, and **every function has a doc comment**, down to small helpers and event handlers.
+- **Framework-free logic lives in `scripts/`** and is unit-tested on its own (tournament rules, beat analysis); components only render and wire events.
 
 ## 🚀 Run it locally
 

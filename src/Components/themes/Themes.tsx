@@ -1,3 +1,7 @@
+/**
+ * Themes: the panel of wheel looks (sector colors and images, rim, pointer and lights). "Mine" lists the
+ * user's themes; "Community" lists the shared ones, which can be downloaded, and edited or deleted by their author.
+ */
 import { useState, type Dispatch, type SetStateAction } from 'react';
 import AuthorTag, { authorName } from '../common/AuthorTag';
 import CollapsePanel from '../common/CollapsePanel';
@@ -35,12 +39,14 @@ type DraftField = 'name' | 'description' | 'styleTag' | 'category';
 const FORM_ID = 'themes-form';
 const EMPTY_DRAFT: ThemeDraft = { target: { mode: 'create' }, name: '', description: '', styleTag: '', category: '' };
 
-// Los temas semilla no se pueden editar ni borrar.
+// Seed themes cannot be edited or shared.
 const SEED_IDS = new Set(DEFAULT_THEMES.map((theme) => theme.id));
 
+/** Card classes, reserving room for its action buttons. */
 const cardClass = (base: string, actionCount: number, extra = '') =>
     `${base} spinly-panel-card${extra}${actionCount ? ` spinly-card--actions-${actionCount}` : ''}`;
 
+/** Renders the themes panel with its two views and the create / edit form. */
 function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDeleteTheme, draft, setDraft }: ThemesProps) {
     const { lang, t, tm } = useTranslation();
     const userId = useSessionUserId();
@@ -53,8 +59,9 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
     const form = useDraftForm(draft, setDraft, EMPTY_DRAFT, view);
     const { shownDraft } = form;
 
-    // Los temas semilla se localizan; los del usuario se muestran tal cual.
+    // Seed themes are localized; the user's own themes are shown as they are.
     const themeDescription = (theme: WheelTheme) => seedText(theme.id, 'description', lang) ?? theme.description;
+    /** Localized category of a seed theme (or the theme's own). */
     const themeCategory = (theme: WheelTheme) => seedText(theme.id, 'category', lang) ?? theme.category;
 
     const query = search.trim().toLowerCase();
@@ -68,7 +75,7 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
     const savedIds = new Set(savedThemes.map((theme) => theme.id));
     const downloaded = community.items.filter(({ theme }) => savedIds.has(theme.id)).length;
 
-    // Los colores de flecha y luces son los del tema; sin ellos vuelven los de por defecto.
+    /** Applies a theme to the wheel. Pointer and light colors come from the theme; without them the defaults return. */
     const handleApply = (theme: WheelTheme) => {
         setActiveTheme(cloneTheme({
             ...theme,
@@ -76,8 +83,10 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
         }));
     };
 
-    // Si ya está en Mis temas (mismo id) se aplica la copia guardada, con los cambios locales
-    // que tenga, en vez de descargarlo otra vez.
+    /**
+     * Downloads a community theme. If it is already in My themes (same id), the saved copy is applied, with
+     * any local changes, instead of downloading it again.
+     */
     const handleDownload = (theme: WheelTheme) => {
         const saved = savedThemes.find((item) => item.id === theme.id);
         if (saved) {
@@ -89,6 +98,7 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
         setNotice({ tone: 'ok', text: dictMessage('themes', 'savedOk', { name: theme.name }) });
     };
 
+    /** Shares a theme in the community. */
     const handleShare = async (theme: WheelTheme) => {
         setNotice(null);
         const result = await cloud.run(theme.id, () => shareTheme(theme));
@@ -101,7 +111,7 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
         community.refresh();
     };
 
-    // Editar carga el tema en la ruleta (sus colores se cambian en el editor) y abre el formulario.
+    /** Editing applies the theme to the wheel (its colors are changed in the editor) and opens the form. */
     const startEdit = (theme: WheelTheme, mode: 'local' | 'cloud') => form.toggleEdit(
         mode,
         theme.id,
@@ -115,16 +125,18 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
         () => handleApply(theme),
     );
 
+    /** Updates one text field of the draft. */
     const updateField = (field: DraftField, value: string) => {
         setDraft((prev) => (prev ? { ...prev, [field]: value } : prev));
     };
 
+    /** Submits the form: saves a new or edited theme locally, or updates the shared row in the cloud. */
     const handleSubmit = async () => {
         if (!draft || !activeTheme) return;
         const { target } = draft;
         const userCount = savedThemes.filter((theme) => !SEED_IDS.has(theme.id)).length;
         const name = draft.name.trim() || t('themes', 'autoName', { n: userCount + 1 });
-        // Lo visual sale de la ruleta; los campos vacíos heredan los del tema activo.
+        // The visuals come from the wheel; empty fields inherit the active theme's values.
         const built: WheelTheme = {
             ...activeTheme,
             id: target.mode === 'create' ? crypto.randomUUID() : target.id,
@@ -135,7 +147,7 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
         };
 
         if (target.mode === 'cloud') {
-            // UPDATE de la misma fila; la copia local, si existe, es independiente y no se toca.
+            // UPDATE of the same row; the local copy, if any, is independent and left untouched.
             setNotice(null);
             const result = await cloud.run(target.id, () => updateSharedTheme(target.id, built));
             if (!result) return;
@@ -152,11 +164,13 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
         form.close();
     };
 
+    /** Deletes a theme from My themes. */
     const handleDeleteLocal = (theme: WheelTheme) => {
         form.closeIfEditing('local', theme.id);
         onDeleteTheme(theme.id);
     };
 
+    /** Deletes one of the user's shared themes from the community. */
     const handleDeleteCloud = async (theme: WheelTheme) => {
         setNotice(null);
         const result = await cloud.run(theme.id, () => deleteSharedTheme(theme.id));
@@ -175,8 +189,10 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
     const formTitle = mode === 'cloud' ? t('themes', 'editCloudTitle') : mode === 'local' ? t('themes', 'editTitle') : t('themes', 'newTitle');
     const submitLabel = mode === 'cloud' ? t('common', 'updateCloud') : mode === 'local' ? t('common', 'saveChanges') : t('themes', 'save');
 
+    /** Whether a card of My themes is the theme on the wheel. */
     const isActiveTheme = (theme: WheelTheme) => view === 'mine' && activeTheme?.id === theme.id;
 
+    /** Card body: name, author, description, palette and tags. */
     const renderDetails = (theme: WheelTheme, description?: string, category?: string, author?: CommunityAuthor) => (
         <>
             <div className="presets-themes-card-head">
@@ -197,7 +213,7 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
         </>
     );
 
-    // Crear va bajo la lista; editar sustituye a la tarjeta que se edita, en su sitio.
+    /** The form: creating goes below the list; editing replaces the card being edited, in place. */
     const formPanel = (inline: boolean) => (
         <CollapsePanel
             id={inline ? `${FORM_ID}-edit` : FORM_ID}
@@ -320,7 +336,7 @@ function Themes({ activeTheme, setActiveTheme, savedThemes, onSaveTheme, onDelet
                 >
                     {shared.map(({ theme, author, authorId }) => {
                         if (form.isEditing('cloud', theme.id)) return <SwapItem key={theme.id} swapped className="spinly-inline-edit">{formPanel(true)}</SwapItem>;
-                        // Solo decide qué se muestra; la autorización real la impone RLS.
+                        // This only decides what is shown; real authorization is enforced by RLS.
                         const actions = userId && authorId === userId ? {
                             onEdit: () => startEdit(theme, 'cloud'),
                             onDelete: () => { void handleDeleteCloud(theme); },

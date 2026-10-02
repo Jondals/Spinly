@@ -1,3 +1,5 @@
+/* Global styles and design tokens: dark and light color schemes, the app grid layout and base element rules. */
+
 * {
     box-sizing: border-box;
     font-family: var(--font-family);
@@ -18,7 +20,7 @@ html {
 }
 
 :root[data-theme="light"] {
-    /* Tres niveles bien separados: lienzo y menú pizarra, panel algo tintado y tarjetas blancas */
+    /* Three clearly separated levels: slate canvas and menu, a slightly tinted panel and white cards */
     --bg-color: #e8edf4;
     --bg-header-color: #ffffff;
     --bg-wheelmanager-color: #dfe5ee;
@@ -29,7 +31,7 @@ html {
     --bg-card-hover-color: #f7f9fc;
     --bg-input-color: #ffffff;
 
-    /* Carbón y slate: contraste de lectura alto */
+    /* Charcoal and slate: high reading contrast */
     --font-color: #0f172a;
     --font-color-light: #1e293b;
     --font-color-muted: #475569;
@@ -41,7 +43,7 @@ html {
 
     --color-hover: #e3e8f0;
     --color-active: #cbd5e1;
-    /* Acento índigo del logo: selección, foco e insignias */
+    /* The logo's indigo accent: selection, focus and badges */
     --color-focus: #4f46e5;
     --color-focus-light: #6366f1;
     --color-focus-text: #4338ca;
@@ -49,18 +51,18 @@ html {
     --color-primary-light: #334155;
     --color-remove: #dc2626;
 
-    /* Botón principal: carbón mate con texto blanco */
+    /* Primary button: matte charcoal with white text */
     --button-primary-bg: #0f172a;
     --button-primary-hover: #1e293b;
     --button-primary-fg: #ffffff;
 
-    /* Menú: el activo se eleva en una tarjeta blanca con indicador índigo */
+    /* Menu: the active item rises as a white card with an indigo indicator */
     --menu-hover-bg: #eaeef4;
     --menu-active-bg: #ffffff;
     --menu-active-border: #cfd7e2;
     --menu-indicator: #4f46e5;
 
-    /* Selector de pestañas: carril gris y pestaña activa blanca */
+    /* Tab selector: grey track and a white active tab */
     --seg-bg: #e3e8f0;
     --seg-indicator: #ffffff;
     --seg-shadow: 0 1px 2px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(15, 23, 42, 0.05);
@@ -82,15 +84,15 @@ html {
 }
 
 :root {
-    /* Columnas: menú (#0C0D12), panel (#0E0F16) y ruleta (#090A0F) */
+    /* Columns: menu (#0C0D12), panel (#0E0F16) and wheel (#090A0F) */
     --bg-color: #090a0f;
     --bg-header-color: #0c0d12;
     --bg-wheelmanager-color: #0c0d12;
     --bg-options-color: #0e0f16;
     --bg-wheel-color: #090a0f;
-    /* Hover y activo del menú; también etiquetas e insignias */
+    /* Menu hover and active state; also tags and badges */
     --bg-transparence: #1e202e;
-    /* Botones, campos y contenedores */
+    /* Buttons, fields and containers */
     --bg-card-color: #141620;
     --bg-card-hover-color: #1a1c29;
     --bg-input-color: #141620;
@@ -100,14 +102,14 @@ html {
     --font-color-muted: #8a8ea6;
     --font-color-disabled: #4b4e63;
     --font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    /* Etiquetas, insignias y títulos de panel también en sans, como la maqueta */
+    /* Tags, badges and panel titles in sans too, as in the mockup */
     --font-family-alternative: var(--font-family);
 
     --color-border: #22243a;
     --color-border-light: #2d3048;
     --color-border-dark: #181a27;
 
-    /* Hover del panel central y pestaña activa */
+    /* Central panel hover and active tab */
     --color-hover: #262838;
     --color-active: #2c2f42;
     --color-focus: #3a3d58;
@@ -132,10 +134,10 @@ html {
     --badge-bg: var(--bg-transparence);
     --badge-border: var(--color-focus);
     --wheel-dots-glow: #8b90b8;
-    /* Con música: los tiempos encienden los puntos en el acento; la flor, en rosa */
+    /* With music: beats light the dots in the accent color; the bloom, in pink */
     --wheel-dots-bloom: #f472b6;
 
-    /* Botón principal: gris claro suave, no blanco puro, para no deslumbrar sobre el fondo oscuro */
+    /* Primary button: a soft light grey, not pure white, so it does not glare on the dark background */
     --button-primary-bg: #cdd0dc;
     --button-primary-hover: #dadde7;
     --button-primary-fg: #0c0d12;
@@ -176,7 +178,7 @@ html {
     flex: 1;
     min-height: 0;
     display: grid;
-    /* Menú estrecho, panel más ancho y la ruleta con el resto */
+    /* A narrow menu, a wider panel and the wheel with the rest */
     grid-template-columns: minmax(0, 15rem) minmax(0, 23rem) minmax(0, 1fr);
     overflow: hidden;
 }
@@ -195,7 +197,7 @@ html {
     }
 }
 
-/* Modo torneo: su vista ocupa el panel y la zona de la ruleta (la ruleta sigue montada, oculta) */
+/* Tournament mode: its view takes the panel and the wheel area (the wheel stays mounted, hidden) */
 .Main--tournament > .spinly-panel,
 .Main--tournament > .Wheel {
     display: none;
@@ -220,7 +222,7 @@ html {
     min-height: 0;
 }
 
-/* Móvil: un grid de una sola celda, sin reglas que compitan con el grid de columnas de escritorio. */
+/* Mobile: a single-cell grid, without rules competing with the desktop column grid. */
 @media (max-width: 750px) {
     html, body, #root {
         overflow-x: hidden;
@@ -241,8 +243,8 @@ html {
         grid-template-areas:
             "wheel"
             "panel";
-        /* La fila de la ruleta mide lo suyo y el espacio que sobre va al panel: la ruleta no se mueve
-           cuando el panel se monta (un paso después, ver useStagedMount en App.tsx) ni cambia de alto. */
+        /* The wheel row takes its own size and the leftover space goes to the panel: the wheel does not move when
+           the panel mounts (one step later, see useStagedMount in App.tsx) nor change height. */
         grid-template-rows: auto 1fr;
         min-height: calc(100vh - 4rem);
         min-height: calc(100dvh - 4rem);
@@ -262,7 +264,7 @@ html {
     }
 
     .Wheelmanager {
-        /* El drawer se define en WheelManager.css */
+        /* The drawer is defined in WheelManager.css */
     }
 
     .Wheel {
@@ -309,14 +311,14 @@ html {
     }
 }
 
-/* El zoom está permitido por accesibilidad. Esto evita el zoom por doble toque en
-      controles y el auto-zoom de iOS al enfocar campos con fuente menor de 16px. */
+/* Zooming is allowed for accessibility. This only prevents double-tap zoom on controls and iOS
+      auto-zoom when focusing fields with a font smaller than 16px. */
 button, a, input, select, textarea, label {
     touch-action: manipulation;
 }
 
 @media (max-width: 750px) {
-    /* !important: cada campo fija un tamaño menor en su propia clase */
+    /* !important: each field sets a smaller size in its own class */
     input, select, textarea {
         font-size: max(1rem, 1em) !important;
     }

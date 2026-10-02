@@ -1,3 +1,6 @@
+/**
+ * CreateRow: the row holding a panel's "New / Save" button, which folds away while its form is open.
+ */
 import type { ReactNode } from 'react';
 
 interface CreateRowProps {
@@ -6,9 +9,9 @@ interface CreateRowProps {
 }
 
 /**
- * Fila del botón "Nuevo/Guardar". Se pliega mientras el formulario (CollapsePanel) está
- * abierto y se despliega a la vez que este se cierra: la altura se traspasa de uno a otro
- * sin saltos. Oculta queda `inert`, fuera del foco y del lector de pantalla.
+ * Row of the "New / Save" button. It folds while the form (CollapsePanel) is open and unfolds as the
+ * form closes, so the height moves from one to the other without jumps. While hidden it is `inert`,
+ * out of the focus order and of screen readers.
  */
 function CreateRow({ visible, children }: CreateRowProps) {
     return (

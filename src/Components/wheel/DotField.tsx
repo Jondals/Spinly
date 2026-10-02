@@ -1,40 +1,43 @@
+/**
+ * DotField: the interactive dot background behind the wheel, drawn on a canvas.
+ */
 import { useEffect, useRef } from 'react';
 import { isPulseActive, readMusic, type MusicPattern } from '../../scripts/music-pulse';
 
 type MusicVisuals = typeof import('../../scripts/music-visuals');
 
-// Trama: separación y radio base en px CSS.
+// Grid: spacing and base radius in CSS px.
 const SPACING = 28;
 const BASE_RADIUS = 1.2;
-// Deriva lenta de toda la trama (px/s) y onda de brillo que la cruza en diagonal.
+// Slow drift of the whole grid (px/s) and a brightness wave that crosses it diagonally.
 const DRIFT_X = 3;
 const DRIFT_Y = 6;
 const WAVE_LENGTH = 150;
 const WAVE_SPEED = 0.8;
-// Reacción al cursor: alcance, cuánto se apartan los puntos y cuánto crecen.
+// Reaction to the cursor: reach, how far the dots move away and how much they grow.
 const REACH = 140;
 const PUSH = 5;
 const GROW = 1.3;
-// Tiempos de suavizado (ms): el foco persigue al cursor y aparece o se apaga sin saltos.
+// Smoothing times (ms): the focus chases the cursor and fades in or out without jumps.
 const FOLLOW_MS = 90;
 const FADE_MS = 240;
-// Sin el cursor encima basta con ~30 fps: la onda es lenta y se ahorra batería.
+// Without the cursor over it ~30 fps is enough: the wave is slow and it saves battery.
 const IDLE_FRAME_MS = 33;
-// Los puntos lejos del cursor se agrupan por opacidad: pocas llamadas a fill() por frame.
+// Dots far from the cursor are batched by opacity: few fill() calls per frame.
 const ALPHA_STEPS = 8;
 const MAX_DPR = 2;
-// Efectos que pintan en su propio color (rosa) en vez del de acento.
+// Effects that paint in their own color (pink) instead of the accent color.
 const TINTED: readonly MusicPattern[] = ['bloom', 'fireworks'];
 
 type Rgb = readonly [number, number, number];
 
-/** La pantalla de carga (public/index.html) aún tapa la app: hasta que empieza a abrirse. */
+/** Whether the splash screen (public/index.html) still covers the app (until it starts opening). */
 function coveredBySplash(): boolean {
     const splash = document.getElementById('spinly-splash');
     return splash !== null && !splash.classList.contains('spinly-splash--out') && !document.documentElement.classList.contains('spinly-splash-seen');
 }
 
-/** Cualquier color CSS a RGB: el canvas lo normaliza al asignarlo a fillStyle. */
+/** Any CSS color to RGB: the canvas normalises it when it is assigned to fillStyle. */
 function toRgb(ctx: CanvasRenderingContext2D, value: string, fallback: Rgb): Rgb {
     if (!value) return fallback;
     ctx.fillStyle = '#000000';
@@ -49,14 +52,15 @@ function toRgb(ctx: CanvasRenderingContext2D, value: string, fallback: Rgb): Rgb
     return parts && parts.length >= 3 ? [Number(parts[0]), Number(parts[1]), Number(parts[2])] : fallback;
 }
 
+/** Mixes two RGB colors and returns a CSS rgb() string. */
 const mixRgb = (from: Rgb, to: Rgb, amount: number): string =>
     `rgb(${Math.round(from[0] + (to[0] - from[0]) * amount)}, ${Math.round(from[1] + (to[1] - from[1]) * amount)}, ${Math.round(from[2] + (to[2] - from[2]) * amount)})`;
 
 /**
- * Fondo de puntos del panel de la ruleta, en canvas: una onda de brillo recorre la trama y los
- * puntos cercanos al cursor se apartan, crecen y toman el color de acento. Se dibuja detrás del
- * contenido de su contenedor (que debe ser un contexto de apilamiento) y no recibe eventos.
- * Con movimiento reducido queda una trama fija, sin onda ni reacción.
+ * Dot background of the wheel panel, on a canvas: a brightness wave runs across the grid and the dots
+ * near the cursor move away, grow and take the accent color. It is drawn behind its container's content
+ * (which must be a stacking context) and receives no events. With reduced motion it stays a still grid,
+ * without the wave or the reaction.
  */
 function DotField() {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -68,6 +72,7 @@ function DotField() {
         if (!canvas || !host || !ctx) return undefined;
 
         const reducedQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+        /** Whether reduced motion is on (a still grid). */
         const isStill = () => reducedQuery?.matches === true;
         let width = 0;
         let height = 0;
@@ -82,16 +87,17 @@ function DotField() {
         let colorsRead = false;
         let pendingResize = false;
         let center = { x: 0, y: 0, radius: 0 };
-        // Reloj propio de la deriva y la onda. Con música avanza con los tiempos de la canción (medio
-        // segundo de reloj por tiempo: a 120 BPM, igual que sin música), así el fondo entero va a su BPM.
+        // Own clock for the drift and the wave. With music it advances with the song's beats (half a second
+        // per beat: at 120 BPM, the same as without music), so the whole background moves at its BPM.
         let flow = 0;
         let flowAt = 0;
         let lastBeatPosition: number | null = null;
-        // Capas de la música: se descargan la primera vez que suena una canción.
+        // Music layers: downloaded the first time a song plays.
         let visuals: MusicVisuals | null = null;
         let visualsRequested = false;
         const pointer = { x: 0, y: 0, targetX: 0, targetY: 0, level: 0, inside: false };
 
+        /** Reads the dot colors from the CSS variables. */
         const readColors = () => {
             const style = getComputedStyle(canvas);
             base = toRgb(ctx, style.getPropertyValue('--wheel-dots').trim(), base);
@@ -100,10 +106,11 @@ function DotField() {
             baseFill = `rgb(${base.join(', ')})`;
         };
 
+        /** Draws one frame: the grid, the wave, the music effects and the cursor's focus. */
         const draw = (time: number) => {
             ctx.clearRect(0, 0, width, height);
             const still = isStill();
-            // Con música, cada golpe enciende y agranda puntos según el patrón de la canción.
+            // With music, every hit lights up and grows dots following the song's pattern.
             const music = still ? null : readMusic(time);
             const elapsed = flowAt ? Math.min(100, Math.max(0, time - flowAt)) : 0;
             flowAt = time;
@@ -111,7 +118,7 @@ function DotField() {
                 ? music.beats + Math.min(1, music.sinceBeat / music.beatMs)
                 : null;
             const advanced = beatPosition !== null && lastBeatPosition !== null ? beatPosition - lastBeatPosition : -1;
-            // Un salto (canción nueva, pausa) sigue con el reloj normal en vez de dar un tirón.
+            // A jump (new song, pause) continues with the normal clock instead of jerking.
             flow += advanced >= 0 && advanced < 1 ? advanced * 0.5 : elapsed / 1000;
             lastBeatPosition = beatPosition;
             const seconds = still ? 0 : flow;
@@ -126,7 +133,7 @@ function DotField() {
             const layers = visuals;
             const musicOn = music !== null && layers !== null && (isPulseActive() || music.pulse > 0.01);
             const buckets = Array.from({ length: ALPHA_STEPS }, () => new Path2D());
-            // tint: 0 color de acento (golpes y cursor), 1 color de la flor.
+            // tint: 0 = accent color (hits and cursor), 1 = the bloom color.
             const lit: Array<{ x: number; y: number; radius: number; alpha: number; amount: number; tint: number }> = [];
 
             for (let y = offsetY - SPACING; y < height + SPACING; y += SPACING) {
@@ -143,7 +150,7 @@ function DotField() {
                         beatLift = from + (to - from) * music.patternBlend;
                     }
                     const lift = Math.min(1, beatLift);
-                    // La flor y los fuegos artificiales pintan en su color; los demás efectos, en el de acento.
+                    // The bloom and the fireworks paint in their own color; the other effects, in the accent color.
                     const tint = musicOn && TINTED.includes(music.patternBlend > 0.5 ? music.pattern : music.previousPattern) ? 1 : 0;
                     let radius = BASE_RADIUS + wave * 0.35 + lift * 1.8;
                     let alpha = 0.6 + wave * 0.4;
@@ -192,6 +199,7 @@ function DotField() {
             ctx.globalAlpha = 1;
         };
 
+        /** Animation loop: eases the pointer focus and paints at full or idle rate. */
         const tick = (time: number) => {
             frame = 0;
             const dt = lastTime ? Math.min(time - lastTime, 100) : 16;
@@ -200,8 +208,8 @@ function DotField() {
             pointer.x += (pointer.targetX - pointer.x) * follow;
             pointer.y += (pointer.targetY - pointer.y) * follow;
             pointer.level += ((pointer.inside ? 1 : 0) - pointer.level) * (1 - Math.exp(-dt / FADE_MS));
-            // Con el cursor encima o con música, a la tasa completa: si no, el latido llegaría a saltos.
-            // Tapado por la pantalla de carga no se dibuja: el hilo principal queda para montar la app.
+            // With the cursor over it or with music, at the full rate: otherwise the pulse would stutter.
+            // While covered by the splash it does not draw: the main thread is left to mount the app.
             const covered = coveredBySplash();
             if (!covered && pendingResize) {
                 pendingResize = false;
@@ -214,8 +222,10 @@ function DotField() {
             start();
         };
 
-        // Los colores se leen al primer dibujo y no al montar: getComputedStyle recalcula los estilos
-        // de toda la página, y con la app recién montada detrás de la pantalla de carga era caro.
+        /**
+         * Paints a frame. Colors are read on the first paint rather than on mount: getComputedStyle
+         * recalculates the whole page's styles, which was expensive with the app just mounted behind the splash.
+         */
         const paint = (time: number) => {
             if (!colorsRead) {
                 readColors();
@@ -224,18 +234,22 @@ function DotField() {
             draw(time);
         };
 
+        /** Starts the loop (if visible and motion is allowed). */
         const start = () => {
             if (!frame && onScreen && !isStill()) frame = requestAnimationFrame(tick);
         };
 
+        /** Stops the loop. */
         const stop = () => {
             cancelAnimationFrame(frame);
             frame = 0;
             lastTime = 0;
         };
 
-        // Lo llama el ResizeObserver, ya con el layout hecho: medir y leer estilos aquí no fuerza
-        // un recálculo síncrono de toda la página recién montada.
+        /**
+         * Resizes the canvas to its container. Called by the ResizeObserver, once layout is done: measuring
+         * and reading styles here does not force a synchronous recalculation of the freshly mounted page.
+         */
         const resize = () => {
             const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
             width = host.clientWidth;
@@ -245,7 +259,7 @@ function DotField() {
             canvas.style.width = `${width}px`;
             canvas.style.height = `${height}px`;
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-            // Centro de la ruleta en el lienzo: de ahí salen las ondas con música.
+            // The wheel's centre on the canvas: music waves start from there.
             const wheel = host.querySelector('.wheel-container')?.getBoundingClientRect();
             const box = host.getBoundingClientRect();
             center = wheel
@@ -254,17 +268,18 @@ function DotField() {
             paint(performance.now());
         };
 
-        // Si el panel se desplaza (ventanas muy bajas), la trama acompaña a la parte visible.
+        /** If the panel scrolls (very short windows), the grid stays with the visible part. */
         const onScroll = () => {
             canvas.style.transform = `translateY(${host.scrollTop}px)`;
         };
 
+        /** Moves the cursor focus. */
         const onPointerMove = (event: PointerEvent) => {
             if (isStill()) return;
             const rect = canvas.getBoundingClientRect();
             pointer.targetX = event.clientX - rect.left;
             pointer.targetY = event.clientY - rect.top;
-            // Al entrar, el foco nace donde está el cursor en vez de viajar desde la última posición.
+            // On entering, the focus appears where the cursor is instead of travelling from the last position.
             if (!pointer.inside && pointer.level < 0.05) {
                 pointer.x = pointer.targetX;
                 pointer.y = pointer.targetY;
@@ -273,14 +288,17 @@ function DotField() {
             start();
         };
 
+        /** Fades the focus out when the pointer leaves. */
         const onPointerLeave = () => {
             pointer.inside = false;
         };
 
+        /** Touch and pen: the focus fades out when the finger is lifted. */
         const onTouchEnd = (event: PointerEvent) => {
             if (event.pointerType !== 'mouse') pointer.inside = false;
         };
 
+        /** Reacts to the reduced-motion preference changing. */
         const onMotionChange = () => {
             if (isStill()) {
                 stop();
@@ -290,13 +308,13 @@ function DotField() {
             }
         };
 
-        // La primera notificación del ResizeObserver hace la primera medida y el primer dibujo, en el
-        // frame siguiente: fuera de la tarea del primer layout de la app, que ya es la más pesada.
+        // The first ResizeObserver notification does the first measurement and paint, on the next frame:
+        // outside the task of the app's first layout, which is already the heaviest one.
         let resizeFrame = 0;
         const resizeObserver = new ResizeObserver(() => {
             cancelAnimationFrame(resizeFrame);
-            // Tapado por la pantalla de carga no se mide: medir fuerza un layout de la app que se está
-            // montando detrás. Lo hace el bucle al empezar a abrirse.
+            // While covered by the splash it does not measure: that would force a layout of the app mounting
+            // behind it. The loop does it when the splash starts opening.
             if (coveredBySplash() && !isStill()) {
                 pendingResize = true;
                 start();

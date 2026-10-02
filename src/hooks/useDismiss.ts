@@ -1,8 +1,11 @@
+/**
+ * useDismiss: closes floating UI (menus, popovers) with Escape or a click outside.
+ */
 import { useEffect, useRef, type RefObject } from 'react';
 
 /**
- * Cierra un elemento flotante con Escape o con un toque fuera de `insideRefs`.
- * Sin refs solo escucha Escape (el toque fuera lo gestiona un backdrop propio).
+ * Closes a floating element with Escape or with a pointer down outside `insideRefs`.
+ * Without refs it only listens to Escape (clicks outside are handled by the element's own backdrop).
  */
 export function useDismiss(active: boolean, onDismiss: () => void, insideRefs: ReadonlyArray<RefObject<Element | null>> = []) {
     const onDismissRef = useRef(onDismiss);
@@ -14,9 +17,11 @@ export function useDismiss(active: boolean, onDismiss: () => void, insideRefs: R
 
     useEffect(() => {
         if (!active) return undefined;
+        /** Escape dismisses. */
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') onDismissRef.current();
         };
+        /** A pointer down outside every inside ref dismisses. */
         const onPointerDown = (event: PointerEvent) => {
             const target = event.target as Node;
             if (refsRef.current.some((ref) => ref.current?.contains(target))) return;

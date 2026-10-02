@@ -1,7 +1,7 @@
-/* Controles de audio (AudioControls.tsx) y reproductor con playlist (MusicPanel.tsx). */
+/* Audio controls (AudioControls.tsx) and the player with its playlist (MusicPanel.tsx). */
 
-/* Los iconos y las barras pintan con currentColor: la regla global `* { color }` les pondría el
-   color de texto en vez del de su botón. */
+/* Icons and bars paint with currentColor: the global `* { color }` rule would give them the text color
+   instead of their button's. */
 .spinly-audio svg,
 .spinly-audio svg *,
 .spinly-eq,
@@ -9,7 +9,7 @@
     color: inherit;
 }
 
-/* Escritorio: abajo a la derecha del panel de la ruleta; la playlist se despliega hacia arriba */
+/* Desktop: bottom right of the wheel panel; the playlist opens upwards */
 .spinly-audio--dock {
     position: absolute;
     right: 1.25rem;
@@ -17,9 +17,8 @@
     z-index: 5;
 }
 
-/* Columna de la ruleta estrecha (~900-1000 px de ventana): en la esquina taparía la leyenda de
-   girar, así que pasa a ir centrado debajo de ella. El radio de la ruleta ya descuenta ese hueco
-   (Wheel.css). El contenedor es .Wheel. */
+/* Narrow wheel column (~900-1000 px windows): in the corner it would cover the spin hint, so it moves
+   centred below it. The wheel radius already accounts for that space (Wheel.css). The container is .Wheel. */
 @container (max-width: 33rem) {
     .spinly-audio--dock {
         position: relative;
@@ -141,7 +140,7 @@
     to { opacity: 0; transform: translateY(6px) scale(0.98); }
 }
 
-/* Menú en móvil: una fila que despliega el reproductor, con los mismos volúmenes que en escritorio */
+/* Mobile menu: a row that unfolds the player, with the same volumes as on desktop */
 .spinly-audio-playlist-btn {
     display: flex;
     align-items: center;
@@ -227,7 +226,7 @@
     background: var(--bg-card-color);
 }
 
-/* Reproductor */
+/* Player */
 .spinly-music {
     display: flex;
     flex-direction: column;
@@ -241,7 +240,7 @@
     min-width: 0;
 }
 
-/* Disco con los colores del logo: gira mientras suena */
+/* A disc in the logo colors: it spins while music plays */
 .spinly-music-disc {
     position: relative;
     flex-shrink: 0;
@@ -350,7 +349,7 @@
     display: block;
 }
 
-/* Mezclador: una fila por volumen, con el nombre alineado en columna */
+/* Mixer: one row per volume, with the names aligned in a column */
 .spinly-music-mixer {
     display: flex;
     flex-direction: column;
@@ -380,7 +379,7 @@
 .spinly-music-volume input {
     --fill: 60%;
     flex: 1;
-    /* El range tiene un ancho mínimo propio: en el menú estrecho se saldría del reproductor */
+    /* The range input has its own minimum width: in the narrow menu it would overflow the player */
     min-width: 0;
     height: 1rem;
     margin: 0;
@@ -632,7 +631,7 @@
     color: var(--font-color);
 }
 
-/* Playlist vacía: subir es lo único que se puede hacer, así que el botón pasa a ser el principal */
+/* Empty playlist: uploading is the only thing to do, so the button becomes the primary one */
 .spinly-music-upload-btn--first {
     border-style: solid;
     border-color: transparent;
@@ -672,7 +671,7 @@
     margin: 0;
 }
 
-/* Ecualizador: tres barras desfasadas */
+/* Equalizer: three out-of-phase bars */
 .spinly-eq {
     display: inline-flex;
     align-items: flex-end;
@@ -700,7 +699,7 @@
     animation-delay: -0.6s;
 }
 
-/* Con la música sonando, music-visuals.ts mueve las barras y el disco al tiempo de la canción */
+/* While music plays, music-visuals.ts moves the bars and the disc in time with the song */
 .spinly-music-synced .spinly-eq span,
 .spinly-music-synced .spinly-music-disc--spinning {
     animation: none;
@@ -720,7 +719,7 @@
     animation: spinly-music-spin 0.8s linear infinite;
 }
 
-/* Sección del menú en móvil */
+/* Mobile menu section */
 .wheelmanager-audio {
     margin-top: 1.25rem;
     padding-top: 1.25rem;

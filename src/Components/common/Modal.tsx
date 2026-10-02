@@ -1,3 +1,6 @@
+/**
+ * Modal: an accessible dialog rendered in a portal, with focus trapping and Escape to close.
+ */
 import { useEffect, useRef, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -6,9 +9,9 @@ interface ModalProps {
     onClose: () => void;
     backdropClassName: string;
     className: string;
-    /** Elemento que recibe el foco al abrir; por defecto, el primero enfocable. */
+    /** Element focused when it opens; by default, the first focusable one. */
     initialFocus?: RefObject<HTMLElement | null>;
-    /** Contenido fuera de la tarjeta, sobre el fondo (p. ej. un botón de cierre en la esquina). */
+    /** Content outside the card, over the backdrop (e.g. a close button in the corner). */
     outside?: ReactNode;
     children: ReactNode;
 }
@@ -16,10 +19,10 @@ interface ModalProps {
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
- * Diálogo modal en un portal a <body>: position fixed, así que nunca desplaza el layout.
- * Cierra con Escape o tocando el fondo, atrapa el foco y lo devuelve al cerrarse.
- * stopPropagation impide que los atajos globales (girar con Espacio, cerrar el drawer)
- * reaccionen a las teclas pulsadas dentro.
+ * Modal dialog in a portal to <body>: position fixed, so it never shifts the layout. It closes with
+ * Escape or a click on the backdrop, traps the focus and gives it back when it closes.
+ * stopPropagation keeps global shortcuts (spin with Space, close the drawer) from reacting to keys
+ * pressed inside.
  */
 function Modal({ labelledBy, onClose, backdropClassName, className, initialFocus, outside, children }: ModalProps) {
     const backdropRef = useRef<HTMLDivElement>(null);
@@ -33,6 +36,7 @@ function Modal({ labelledBy, onClose, backdropClassName, className, initialFocus
         };
     }, [initialFocus]);
 
+    /** Escape closes; Tab and Shift+Tab cycle inside the dialog. */
     const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
         event.stopPropagation();
         if (event.key === 'Escape') {
@@ -54,6 +58,7 @@ function Modal({ labelledBy, onClose, backdropClassName, className, initialFocus
         }
     };
 
+    /** A click on the backdrop itself (not on the card) closes the dialog. */
     const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
         if (event.target === event.currentTarget) onClose();
     };

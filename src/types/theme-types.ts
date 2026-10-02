@@ -1,3 +1,7 @@
+/**
+ * Theme and preset models: types, storage keys, the seed themes and presets, and the sanitizers that
+ * validate anything read from localStorage, the sync file or Supabase.
+ */
 import { MAX_OPTION_LENGTH, MAX_WHEEL_OPTIONS } from '../scripts/option-wheel';
 import type { WheelOption } from '../scripts/option-wheel';
 import { pickText, type SpinlyLang } from '../scripts/strings';
@@ -5,10 +9,9 @@ import { pickText, type SpinlyLang } from '../scripts/strings';
 export { MAX_WHEEL_OPTIONS };
 
 /**
- * Encaje de la imagen de un sector, en coordenadas de la ruleta sin girar.
- * x/y: desplazamiento del centro de la imagen respecto al centro de la ruleta,
- * en fracción del diámetro. scale: 1 = la imagen cubre la ruleta entera.
- * rotate: grados alrededor del centro de la imagen.
+ * How a sector's image is fitted, in coordinates of the unrotated wheel.
+ * x/y: offset of the image centre from the wheel centre, as a fraction of the diameter.
+ * scale: 1 = the image covers the whole wheel. rotate: degrees around the image centre.
  */
 export type ImageFit = {
     x: number;
@@ -26,17 +29,18 @@ export const IMAGE_FIT_LIMITS = {
     maxRotate: 180,
 } as const;
 
-/** Solo visual: los nombres viven en WheelOption. */
+/** Visual only: names live in WheelOption. */
 export type WheelSegmentStyle = {
     color: string;
     backgroundImage?: string;
     imageFit?: ImageFit;
 };
 
+/** A finite number clamped to [min, max], or the fallback. */
 const clampFinite = (value: unknown, min: number, max: number, fallback: number): number =>
     typeof value === 'number' && Number.isFinite(value) ? Math.min(Math.max(value, min), max) : fallback;
 
-/** Valida un encaje venido de storage/red; undefined si no es un objeto. */
+/** Validates a fit coming from storage or the network; undefined if it is not an object. */
 export function sanitizeImageFit(raw: unknown): ImageFit | undefined {
     if (!raw || typeof raw !== 'object') return undefined;
     const fit = raw as Record<string, unknown>;
@@ -49,6 +53,7 @@ export function sanitizeImageFit(raw: unknown): ImageFit | undefined {
     };
 }
 
+/** Deep copy of a segment style (with a fallback color when missing). */
 function copySegment(s: WheelSegmentStyle | undefined, fallbackColor: string): WheelSegmentStyle {
     const out: WheelSegmentStyle = { color: s?.color ?? fallbackColor };
     if (s?.backgroundImage) {
@@ -58,7 +63,7 @@ function copySegment(s: WheelSegmentStyle | undefined, fallbackColor: string): W
     return out;
 }
 
-/** Solo visual: nunca cambia nombres ni número de opciones. */
+/** Visual only: it never changes option names or the number of options. */
 export type WheelTheme = {
     id: string;
     name: string;
@@ -66,16 +71,16 @@ export type WheelTheme = {
     styleTag?: string;
     category?: string;
     segments: WheelSegmentStyle[];
-    /** Aro de la ruleta; sin valor se usa el del modo claro/oscuro. */
+    /** Wheel rim; without a value, the light/dark mode's one is used. */
     borderColor?: string;
     centerColor?: string;
-    /** Flecha; sin valor, ámbar (--wheel-pointer-color). */
+    /** Pointer; without a value, amber (--wheel-pointer-color). */
     pointerColor?: string;
-    /** Luces animadas del aro y del centro; sin valor, ámbar (--wheel-light-color). */
+    /** Animated lights of the rim and the hub; without a value, amber (--wheel-light-color). */
     lightColor?: string;
 };
 
-/** Opciones más el tema visual completo del momento en que se guardó. */
+/** Options plus the complete visual theme at the moment it was saved. */
 export type WheelPreset = {
     id: string;
     name: string;
@@ -97,15 +102,17 @@ export const WHEEL_LIMIT_STORAGE_KEY = 'spinly-wheel-limit';
 
 export const OPTIONS_STORAGE_KEY = 'spinly-options';
 
-/** Ids de los temas y preajustes de ejemplo que el usuario ha borrado. */
+/** Ids of the sample themes and presets the user has deleted. */
 export const HIDDEN_DEFAULTS_STORAGE_KEY = 'spinly-hidden-defaults';
 
 export const DEFAULT_SEGMENT_COLOR = '#6366f1';
 
+/** Shorthand for a seed segment. */
 const seg = (color: string, backgroundImage?: string): WheelSegmentStyle => (
     backgroundImage ? { color, backgroundImage } : { color }
 );
 
+/** Exactly `count` segments, cycling the given ones (deep copies). */
 export function ensureSegments(
     segments: WheelSegmentStyle[],
     count: number,
@@ -119,7 +126,7 @@ export function ensureSegments(
     return out;
 }
 
-/** Estilo del sector `index` ciclando la paleta, sin expandir el tema guardado. */
+/** Style of sector `index`, cycling the palette without expanding the saved theme. */
 export function segmentForIndex(
     theme: WheelTheme | null | undefined,
     index: number,
@@ -130,6 +137,7 @@ export function segmentForIndex(
     return copySegment(segs[index % segs.length], fallbackColor);
 }
 
+/** Relative time ("3 days ago") in the given language. */
 export function timeAgo(updatedAt: number, lang: SpinlyLang): string {
     const diff = Date.now() - updatedAt;
     const min = Math.floor(diff / 60000);
@@ -144,6 +152,7 @@ export function timeAgo(updatedAt: number, lang: SpinlyLang): string {
     return pickText('time', 'years', lang, { n: Math.floor(m / 12) });
 }
 
+/** Seed themes (their texts are localized through seedText in strings.ts). */
 export const DEFAULT_THEMES: WheelTheme[] = [
     {
         id: 'theme-obsidian',
@@ -179,6 +188,7 @@ export const DEFAULT_THEMES: WheelTheme[] = [
     },
 ];
 
+/** Validates a preset from storage or the network; null if it is unusable. */
 export function sanitizePreset(raw: unknown): WheelPreset | null {
     if (!raw || typeof raw !== 'object') return null;
     const p = raw as Partial<WheelPreset>;
@@ -198,7 +208,7 @@ export function sanitizePreset(raw: unknown): WheelPreset | null {
     };
 }
 
-/** Opciones leídas de storage o de la nube: solo nombre (acotado), id y color; se descartan las vacías. */
+/** Options read from storage or the cloud: only name (trimmed), id and color; empty ones are dropped. */
 export function sanitizeOptions(raw: unknown, idPrefix: string): WheelOption[] {
     if (!Array.isArray(raw)) return [];
     return (raw as Array<Record<string, unknown>>)
@@ -211,6 +221,7 @@ export function sanitizeOptions(raw: unknown, idPrefix: string): WheelOption[] {
         .filter((o) => o.name.length > 0);
 }
 
+/** Deep copy of a preset. */
 export function clonePreset(p: WheelPreset): WheelPreset {
     return {
         ...p,
@@ -219,14 +230,17 @@ export function clonePreset(p: WheelPreset): WheelPreset {
         tags: p.tags ? [...p.tags] : [],
     };
 }
-// Lo que llega de storage o de Supabase no es de fiar: colores solo hex e imágenes solo
-// data:image raster (nada de SVG con scripts ni URLs externas).
+
+// Whatever comes from storage or Supabase is untrusted: colors must be hex and images raster data:image
+// URLs only (no SVG with scripts, no external URLs).
 const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 const SAFE_DATA_IMAGE = /^data:image\/(?:png|jpeg|webp|gif|avif);base64,/i;
 
+/** The value if it is a hex color, else undefined. */
 const hexOrUndefined = (value: unknown): string | undefined =>
     typeof value === 'string' && HEX_COLOR.test(value) ? value : undefined;
 
+/** Validates a theme from storage or the network; null if it is unusable. */
 export function sanitizeTheme(raw: unknown): WheelTheme | null {
     if (!raw || typeof raw !== 'object') return null;
     const t = raw as Partial<WheelTheme> & { segments?: Array<Record<string, unknown>> };
@@ -237,7 +251,7 @@ export function sanitizeTheme(raw: unknown): WheelTheme | null {
         .map((s) => {
             const rawColor = s['color'];
             const rawImage = s['backgroundImage'];
-            // Un color inválido cae al de por defecto en vez de invalidar el tema entero.
+            // An invalid color falls back to the default instead of invalidating the whole theme.
             const color = typeof rawColor === 'string' && HEX_COLOR.test(rawColor)
                 ? rawColor
                 : DEFAULT_SEGMENT_COLOR;
@@ -264,10 +278,12 @@ export function sanitizeTheme(raw: unknown): WheelTheme | null {
     };
 }
 
+/** Deep copy of a theme. */
 export function cloneTheme(t: WheelTheme): WheelTheme {
     return { ...t, segments: t.segments.map((s) => copySegment(s, s.color)) };
 }
 
+/** Options of a seed preset, with stable ids. */
 function mkPresetOptions(names: string[], prefix: string): WheelOption[] {
     return names.map((name, i) => ({
         id: `${prefix}-opt-${i}`,
@@ -276,10 +292,12 @@ function mkPresetOptions(names: string[], prefix: string): WheelOption[] {
     }));
 }
 
+/** A seed theme by id (the first one as a fallback). */
 function defaultThemeById(id: string): WheelTheme {
     return DEFAULT_THEMES.find((theme) => theme.id === id) ?? DEFAULT_THEMES[0];
 }
 
+/** Seed presets (their names are localized through seedText in strings.ts). */
 export const DEFAULT_PRESETS: WheelPreset[] = [
     {
         id: 'default-preset-cena',

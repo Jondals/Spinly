@@ -1,11 +1,14 @@
+/**
+ * Entry point: loads React DOM as its own chunk and mounts the app inside a transition.
+ */
 import React, { startTransition, useEffect, useState } from 'react';
-// Antes que App: los estilos de cada componente deben poder sobrescribir la base.
+// Before App: each component's styles must be able to override the base.
 import './css/shared.css';
 import App from './App';
 import { LanguageProvider } from './Components/i18n/LanguageProvider';
 import { setAppRemount } from './scripts/account-data';
 
-/** Cambiar la key vuelve a montar App: así se aplican datos de otro dispositivo sin recargar. */
+/** Changing the key remounts App: that is how data from another device is applied without reloading. */
 function Root() {
   const [generation, setGeneration] = useState(0);
   useEffect(() => {
@@ -15,13 +18,13 @@ function Root() {
   return <App key={generation} />;
 }
 
-// React DOM va en su propio archivo, que index.html precarga (lo añade inline-css.cjs): se descarga a
-// la vez que este y se evalúa en otra tarea. Evaluarlo todo junto era una tarea larga que bloqueaba el
-// hilo principal durante la carga.
+// React DOM lives in its own file, which index.html preloads (inline-css.cjs adds the preload): it is
+// downloaded alongside this one and evaluated in a separate task. Evaluating everything together was a
+// long task that blocked the main thread during load.
 void import(/* webpackChunkName: "react-dom" */ 'react-dom/client').then(({ createRoot }) => {
   const root = createRoot(document.getElementById('root') as HTMLElement);
-  // En transición: el primer render se trocea y cede el hilo principal entre trozos. La pantalla de
-  // carga ya está pintada, así que montar la app no debe bloquear su animación ni la entrada del usuario.
+  // In a transition: the first render is split into chunks and yields the main thread between them. The
+  // splash is already painted, so mounting the app must not block its animation or user input.
   startTransition(() => {
     root.render(
       <React.StrictMode>

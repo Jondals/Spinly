@@ -1,4 +1,4 @@
-/* Base visual compartida. Se importa antes que App (src/index.tsx) para que cada componente pueda sobrescribirla. */
+/* Shared visual base. It is imported before App (src/index.tsx) so every component can override it. */
 
 :root {
     --spinly-panel-pad-x: 1.35rem;
@@ -7,7 +7,7 @@
     --spinly-list-gap: 0.6rem;
     --spinly-card-radius: 0.75rem;
     --spinly-badge-radius: 0.5rem;
-    /* Etiquetas, autor y contadores: esquinas casi rectas */
+    /* Tags, author and counters: almost square corners */
     --spinly-chip-radius: 0.2rem;
 
     --radius-sm: 0.4rem;
@@ -29,7 +29,7 @@
     box-shadow: var(--card-shadow);
 }
 
-/* SegmentedToggle.tsx: el indicador se desliza con transform; --spinly-seg-count e --spinly-seg-index llegan inline. */
+/* SegmentedToggle.tsx: the indicator slides with transform; --spinly-seg-count and --spinly-seg-index come inline. */
 .spinly-segmented {
     --spinly-seg-pad: 4px;
     position: relative;
@@ -84,7 +84,7 @@
     font-weight: 600;
 }
 
-/* Selector de idioma del drawer: ocupa todo el ancho y cada opción lleva su bandera */
+/* Drawer language selector: full width, each option with its flag */
 .spinly-lang-choice {
     display: grid;
     margin: 0;
@@ -100,7 +100,7 @@
     font-size: 0.85rem;
 }
 
-/* Código del idioma junto a su bandera (ES, EN) */
+/* Language code next to its flag (ES, EN) */
 .spinly-lang-code {
     font-size: 0.72rem;
     font-weight: 700;
@@ -133,7 +133,7 @@
     padding: 0 var(--spinly-panel-pad-x);
 }
 
-/* CreateRow.tsx: se pliega con la misma técnica y duración que .spinly-collapse, a la inversa. */
+/* CreateRow.tsx: folds with the same technique and duration as .spinly-collapse, in reverse. */
 .spinly-create-row {
     display: grid;
     grid-template-rows: 1fr;
@@ -145,12 +145,12 @@
     grid-template-rows: 0fr;
     opacity: 0;
     pointer-events: none;
-    /* Anula el gap del contenedor flex para no dejar hueco */
+    /* Cancels the flex container's gap so no space is left */
     margin-top: calc(-1 * var(--spinly-card-gap));
     margin-bottom: 0;
 }
 
-/* El margen negativo compensado con padding deja sitio a la sombra del botón sin recortarla. */
+/* The negative margin offset by padding leaves room for the button's shadow without clipping it. */
 .spinly-create-row-inner {
     min-height: 0;
     overflow: hidden;
@@ -176,12 +176,12 @@
     height: 0.95rem;
 }
 
-/* CollapsePanel.tsx: la altura se anima con grid-template-rows 0fr → 1fr. */
+/* CollapsePanel.tsx: the height is animated with grid-template-rows 0fr → 1fr. */
 .spinly-collapse {
     display: grid;
     grid-template-rows: 0fr;
     opacity: 0;
-    /* Cerrado no deja hueco: anula el gap del contenedor flex */
+    /* Closed it leaves no space: it cancels the flex container's gap */
     margin: calc(-1 * var(--spinly-card-gap)) var(--spinly-panel-pad-x) 0;
     transition: grid-template-rows 0.26s ease, opacity 0.2s ease, margin 0.26s ease;
 }
@@ -282,7 +282,7 @@
     gap: 0.5rem;
 }
 
-/* Editar en el sitio de la tarjeta: ocupa su hueco en la lista (SwapItem anima el cambio) */
+/* Editing in place of the card: it takes its slot in the list (SwapItem animates the change) */
 .spinly-collapse--inline,
 .spinly-collapse--inline.spinly-collapse--open {
     margin: 0;
@@ -292,7 +292,7 @@
     border-color: var(--color-focus);
 }
 
-/* SwapItem.tsx: el contenido nuevo (formulario o tarjeta) entra con un fundido */
+/* SwapItem.tsx: the new content (form or card) fades in */
 .spinly-swap-fade > * {
     animation: spinly-swap-in 0.3s ease-out;
 }
@@ -348,7 +348,7 @@
     border-color: var(--color-focus);
 }
 
-/* Autor de un elemento de la comunidad: píldora con foto y nombre */
+/* Author of a community item: a pill with photo and name */
 .spinly-author {
     display: inline-flex;
     align-items: center;
@@ -514,7 +514,7 @@
     border: 1px solid var(--badge-border);
     border-radius: var(--radius-sm);
     background-color: var(--badge-bg);
-    /* Contraste AA sobre --bg-transparence en ambos temas */
+    /* AA contrast over --bg-transparence in both themes */
     color: var(--color-focus-text);
     font-family: var(--font-family);
     font-size: 0.78rem;
@@ -522,12 +522,12 @@
     white-space: nowrap;
 }
 
-/* El reset global `* { color }` de index.css pintaría de blanco los hijos del badge */
+/* index.css's global `* { color }` reset would paint the badge's children white */
 .spinly-badge * {
     color: inherit;
 }
 
-/* ItemActions.tsx: Compartir → Editar → Borrar, siempre visibles (también en táctil). */
+/* ItemActions.tsx: Share → Edit → Delete, always visible (on touch too). */
 .spinly-card-actions {
     position: absolute;
     top: 0.55rem;
@@ -570,7 +570,7 @@
     border-color: var(--color-remove, #f87171);
 }
 
-/* Borrado en la nube armado: el segundo clic confirma */
+/* Cloud delete armed: the second click confirms */
 .spinly-card-action--armed,
 .spinly-card-action--armed:hover:not(:disabled) {
     color: #ffffff;
@@ -588,7 +588,7 @@
     outline-offset: 1px;
 }
 
-/* Hueco para N acciones: 1.7rem cada una + 0.3rem de separación + margen */
+/* Room for N actions: 1.7rem each + 0.3rem spacing + margin */
 .spinly-card--actions-1 .presets-presets-card-top,
 .spinly-card--actions-1 .presets-themes-card-head {
     padding-right: 2.3rem;
@@ -650,11 +650,10 @@
     color: var(--color-remove, #f87171);
 }
 
-/* Base de todos los botones primarios. El selector lleva elemento para ganar
-   especificidad: este archivo se importa primero y las reglas de cada componente
-   lo sobrescribirían. */
+/* Base of every primary button. The selector includes the element to gain specificity: this file is
+   imported first and each component's rules would override it otherwise. */
 :root {
-    /* Sin degradado ni brillo de color: sólido y sombra neutra */
+    /* No gradient or colored glow: solid with a neutral shadow */
     --spinly-primary-gradient: var(--button-primary-bg);
     --spinly-primary-glow: rgba(0, 0, 0, 0.35);
     --spinly-primary-glow-soft: transparent;
@@ -676,7 +675,7 @@ button.spinly-btn-primary {
     transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
 }
 
-/* Los iconos dibujan con currentColor: la regla global `* { color }` los pintaría del color de texto */
+/* Icons draw with currentColor: the global `* { color }` rule would paint them in the text color */
 button.spinly-btn-primary svg,
 button.spinly-btn-primary svg *,
 button.spinly-btn-primary span {
@@ -704,7 +703,7 @@ button.spinly-btn-primary:focus-visible {
     outline-offset: 2px;
 }
 
-/* Acciones de lista (crear/guardar, cargar): discretas, oscuras con borde */
+/* List actions (create/save, load): discreet, dark with a border */
 button.spinly-new-btn.spinly-btn-primary,
 button.presets-presets-load-btn.spinly-btn-primary {
     background: var(--bg-card-color);
@@ -813,7 +812,7 @@ button.spinly-btn-primary:disabled {
     transform: translate(-50%, 0);
 }
 
-/* Hover solo con puntero real (en táctil el :hover se "pega" tras un toque) */
+/* Hover only with a real pointer (on touch :hover "sticks" after a tap) */
 @media (hover: hover) {
     .spinly-tooltip:hover .spinly-tooltip-bubble {
         opacity: 1;

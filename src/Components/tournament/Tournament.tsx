@@ -9,10 +9,8 @@ import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 
 import '../../css/Tournament.css';
 import TournamentSetup, { newEntry, type SetupEntry } from './TournamentSetup';
 import TournamentLive from './TournamentLive';
-import AudioControls from '../music/AudioControls';
 import type { WheelColorField } from '../wheel/Wheel';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
-import { MOBILE_QUERY } from '../../scripts/layout';
 import { readMusic } from '../../scripts/music-pulse';
 import { useMusic } from '../music/MusicProvider';
 import { TOURNAMENT_STORAGE_KEY } from '../../scripts/account-data';
@@ -188,7 +186,6 @@ function Tournament({ wheelNames, onColorChange }: TournamentProps) {
             ? [...tournament.participants].sort((x, y) => x.seed - y.seed).map((person, index) => ({ ...newEntry(person.name, index), color: person.color }))
             : wheelNames.slice(0, MAX_PARTICIPANTS).map((name, index) => newEntry(name, index)),
     }));
-    const isMobile = useMediaQuery(MOBILE_QUERY);
     const music = useMusic();
     const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
     const backdropRef = useRef<HTMLDivElement>(null);
@@ -242,8 +239,6 @@ function Tournament({ wheelNames, onColorChange }: TournamentProps) {
                     />
                 )}
             </div>
-            {/* Desktop: music and sound controls in their corner, as with the wheel. On mobile they live in the menu. */}
-            {!isMobile && <AudioControls variant="dock" />}
         </section>
     );
 }

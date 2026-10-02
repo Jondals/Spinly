@@ -27,6 +27,7 @@ Most online wheels are a picture that turns. Spinly treats the wheel as the cent
 - **Spin** it and watch the pointer tick across each sector until a dialog announces the winner.
 - **Save** the look as a *theme* or the whole wheel as a *preset*, and share both with the community.
 - **Play** your own playlist in the background, with separate volumes for music and sound effects.
+- **One settings menu** behind the gear in the header: sound and music volume, light mode, replaying the intro, and the music player with its playlist.
 - **Run a tournament**: a knockout bracket where every duel is decided on a two-sector wheel.
 - **Sign in** with just a username and password, and everything is there on your next device.
 

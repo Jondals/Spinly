@@ -70,8 +70,8 @@ interface MusicProviderProps {
     children: ReactNode;
 }
 
-// Audio controls: a gesture on them already turns music on or off by itself.
-const AUDIO_CONTROLS = '.spinly-audio';
+// The settings menu holds the music controls: a gesture on it already turns music on or off by itself.
+const AUDIO_CONTROLS = '.spinly-settings';
 
 /** Adds ids to (or removes them from) the list of songs waiting to be uploaded. */
 const markPending = (ids: readonly string[], pending: boolean) => {

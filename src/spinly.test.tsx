@@ -580,11 +580,11 @@ describe('wheel and editor', () => {
         expect(storedActiveTheme()).toMatchObject({ pointerColor: '#22d3ee', lightColor: '#f472b6' });
     });
 
-    test('the effects volume is set in the playlist: 0 mutes them and it is remembered', async () => {
+    test('the effects volume is set in the settings: 0 mutes them and it is remembered', async () => {
         renderApp();
-        // On desktop there is no mute button: the volume lives in the playlist mixer.
+        // There is no separate mute button: the volume lives in the settings menu.
         expect(screen.queryByRole('button', { name: 'Sounds' })).toBeNull();
-        fireEvent.click(screen.getByRole('button', { name: 'Open playlist' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Open settings' }));
         const slider = await screen.findByRole('slider', { name: 'Sound effects volume' });
         expect(slider).toHaveValue('1');
         fireEvent.change(slider, { target: { value: '0.4' } });
@@ -595,6 +595,25 @@ describe('wheel and editor', () => {
         expect(localStorage.getItem('spinly-sound-volume')).toBe('0.4');
         fireEvent.change(slider, { target: { value: '0.7' } });
         expect(localStorage.getItem('spinly-sound')).toBe('on');
+    });
+
+    test('the settings menu switches light mode, shows both volumes and closes with Escape', async () => {
+        renderApp();
+        fireEvent.click(screen.getByRole('button', { name: 'Open settings' }));
+        const panel = await screen.findByRole('dialog', { name: 'Settings' });
+        expect(within(panel).getByRole('slider', { name: 'Music volume' })).toBeInTheDocument();
+        const lightMode = within(panel).getByRole('switch', { name: 'Light mode' });
+        expect(lightMode).not.toBeChecked();
+        fireEvent.click(lightMode);
+        expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+        expect(localStorage.getItem('spinly-theme')).toBe('light');
+        // The sections fold away.
+        const options = within(panel).getByRole('button', { name: 'Options' });
+        fireEvent.click(options);
+        expect(options).toHaveAttribute('aria-expanded', 'false');
+        expect(within(panel).queryByRole('switch', { name: 'Light mode' })).toBeNull();
+        fireEvent.keyDown(document, { key: 'Escape' });
+        await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull());
     });
 
     test('buttons play a sound unless muted, even when their icon changes', async () => {
@@ -628,7 +647,7 @@ describe('wheel and editor', () => {
             expect(played.length).toBeGreaterThan(0);
             fireEvent.click(screen.getByRole('button', { name: /Switch to English/ }));
 
-            fireEvent.click(screen.getByRole('button', { name: 'Open playlist' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Open settings' }));
             fireEvent.change(await screen.findByRole('slider', { name: 'Sound effects volume' }), { target: { value: '0' } });
             played.length = 0;
             fireEvent.click(screen.getByRole('button', { name: 'Wheel Editor' }));
@@ -1000,10 +1019,10 @@ describe('music', () => {
     /** A fake audio file. */
     const song = (name: string, type = 'audio/mpeg') => new File(['audio'], name, { type });
 
-    /** Opens the playlist. The panel loads on demand: it waits for it to be painted, not just the dialog. */
+    /** Opens the settings menu, where the playlist lives. The player loads on demand: it waits for it to be painted, not just the dialog. */
     const openPlaylist = async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Open playlist' }));
-        const panel = await screen.findByRole('dialog', { name: 'Playlist' });
+        fireEvent.click(screen.getByRole('button', { name: 'Open settings' }));
+        const panel = await screen.findByRole('dialog', { name: 'Settings' });
         await within(panel).findByRole('button', { name: 'Upload songs' });
         return panel;
     };
@@ -1020,10 +1039,10 @@ describe('music', () => {
     });
     afterEach(() => canPlay.mockRestore());
 
-    test('no built-in songs: the playlist starts empty and the music button leads to uploading', async () => {
+    test('no built-in songs: the playlist in the settings starts empty and cannot play', async () => {
         renderApp();
-        fireEvent.click(screen.getByRole('button', { name: 'Open playlist' }));
-        const panel = await screen.findByRole('dialog', { name: 'Playlist' });
+        fireEvent.click(screen.getByRole('button', { name: 'Open settings' }));
+        const panel = await screen.findByRole('dialog', { name: 'Settings' });
         expect(await within(panel).findByText(/Your playlist is empty/)).toBeInTheDocument();
         expect(within(panel).getByRole('button', { name: 'Play' })).toBeDisabled();
         expect(mockMusic.played).toEqual([]);
@@ -1055,16 +1074,16 @@ describe('music', () => {
         const panel = await openPlaylist();
         await upload(panel, song('Uno.mp3'), song('Dos.ogg', 'audio/ogg'), song('Tres.wav', 'audio/wav'));
 
-        fireEvent.click(screen.getByRole('button', { name: 'Play music' }));
+        fireEvent.click(within(panel).getByRole('button', { name: 'Play' }));
         await waitFor(() => expect(mockMusic.played).toEqual(['file']));
         expect(within(panel).getByRole('button', { name: 'Play Uno' })).toHaveAttribute('aria-current', 'true');
         expect(localStorage.getItem('spinly-music-on')).toBe('on');
 
-        fireEvent.click(screen.getByRole('button', { name: 'Pause music' }));
+        fireEvent.click(within(panel).getByRole('button', { name: 'Pause' }));
         expect(mockMusic.played).toEqual(['file', 'pause']);
         expect(localStorage.getItem('spinly-music-on')).toBe('off');
         // Turning it back on resumes the same song instead of starting another one.
-        fireEvent.click(screen.getByRole('button', { name: 'Play music' }));
+        fireEvent.click(within(panel).getByRole('button', { name: 'Play' }));
         await waitFor(() => expect(mockMusic.played).toEqual(['file', 'pause', 'resume']));
 
         fireEvent.click(within(panel).getByRole('button', { name: 'Next track' }));

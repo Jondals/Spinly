@@ -7,9 +7,6 @@ import Icon, { type IconName } from '../common/Icon';
 import LanguageSwitch from '../i18n/LanguageSwitch';
 import { useTranslation } from '../i18n/LanguageProvider';
 import { useDismiss } from '../../hooks/useDismiss';
-import { useMediaQuery } from '../../hooks/useMediaQuery';
-import AudioControls from '../music/AudioControls';
-import { MOBILE_QUERY } from '../../scripts/layout';
 import '../../css/WheelManager.css';
 
 export type WheelSectionId = 'options' | 'presets' | 'themes' | 'tournament';
@@ -48,7 +45,6 @@ function WheelManager({ activeSection, onSectionChange, isOpen, isAnimated, onCl
     const { t } = useTranslation();
     // Clicks outside are handled by the backdrop; this only listens to Escape.
     useDismiss(isOpen, onClose);
-    const isMobile = useMediaQuery(MOBILE_QUERY);
     const [creditHidden, setCreditHidden] = useState(readCreditHidden);
     const [creditClosing, setCreditClosing] = useState(false);
     const closeTimer = useRef<number | undefined>(undefined);
@@ -102,13 +98,6 @@ function WheelManager({ activeSection, onSectionChange, isOpen, isAnimated, onCl
                         <p className="wheelmanager-lang-title">{t('header', 'language')}</p>
                         <LanguageSwitch variant="choice" />
                     </div>
-                    {/* On desktop, music and sounds live in the wheel's corner */}
-                    {isMobile && (
-                        <div className="wheelmanager-audio">
-                            <p className="wheelmanager-lang-title">{t('music', 'audio')}</p>
-                            <AudioControls variant="drawer" />
-                        </div>
-                    )}
                 </div>
                 {!creditHidden && (
                     <div className={`wheelmanager-credit${creditClosing ? ' wheelmanager-credit--closing' : ''}`}>

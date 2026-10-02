@@ -1,65 +1,30 @@
 /**
- * MusicPanel: the music player and playlist (now playing, controls, volumes, track list and uploads).
+ * MusicPanel: the music player and playlist (now playing, controls, track list and uploads). It lives in the
+ * Playlist section of the settings menu; the volumes live in its Options section.
  */
-import { useRef, type CSSProperties } from 'react';
-import Icon, { type IconName } from '../common/Icon';
+import { useRef } from 'react';
+import Icon from '../common/Icon';
 import StatusMessage from '../common/StatusMessage';
 import { useTranslation } from '../i18n/LanguageProvider';
 import { useSortable } from '../../hooks/useSortable';
-import { useSoundPreference } from '../../hooks/useSpinSound';
 import { useMusic } from './MusicProvider';
 import EqualizerBars from './EqualizerBars';
 import { AUDIO_ACCEPT, MAX_TRACK_BYTES, MAX_UPLOADS } from '../../scripts/music-library';
 
 const MB = Math.round(MAX_TRACK_BYTES / (1024 * 1024));
 
-interface VolumeRowProps {
-    icon: IconName;
-    label: string;
-    ariaLabel: string;
-    value: number;
-    onChange: (value: number) => void;
-}
-
-/** Mixer row: icon, name and a 0-1 slider with its filled part colored. */
-function VolumeRow({ icon, label, ariaLabel, value, onChange }: VolumeRowProps) {
-    return (
-        <label className="spinly-music-volume">
-            <Icon name={icon} size={15} />
-            <span className="spinly-music-volume-label">{label}</span>
-            <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={value}
-                onChange={(event) => onChange(Number(event.target.value))}
-                aria-label={ariaLabel}
-                style={{ '--fill': `${Math.round(value * 100)}%` } as CSSProperties}
-            />
-        </label>
-    );
-}
-
-interface MusicPanelProps {
-    /** Desktop: the effects volume goes here instead of a separate mute button. */
-    showSoundsVolume?: boolean;
-}
-
 /**
- * Player and playlist: what is playing with its controls, the mixer, the list (tapping a song plays it,
- * the handle reorders it, the X removes it) and uploading your own songs.
+ * Player and playlist: what is playing with its controls, the list (tapping a song plays it, the handle
+ * reorders it, the X removes it) and uploading your own songs.
  */
-function MusicPanel({ showSoundsVolume = false }: MusicPanelProps) {
+function MusicPanel() {
     const { t, tm } = useTranslation();
     const music = useMusic();
-    const sound = useSoundPreference();
     const fileInput = useRef<HTMLInputElement>(null);
     const sortable = useSortable(music.moveTrack, 'spinly-music-track');
     const current = music.playlist.find((track) => track.id === music.currentId) ?? null;
     const empty = music.playlist.length === 0;
     const status = music.playing ? t('music', 'nowPlaying') : current ? t('music', 'paused') : t('music', 'nothing');
-    const soundsValue = sound.enabled ? sound.volume : 0;
 
     return (
         <div className="spinly-music">
@@ -88,19 +53,6 @@ function MusicPanel({ showSoundsVolume = false }: MusicPanelProps) {
                 <button type="button" className="spinly-music-control" onClick={music.next} disabled={empty} aria-label={t('music', 'next')} title={t('music', 'next')}>
                     <Icon name="skipForward" size={15} />
                 </button>
-            </div>
-
-            <div className="spinly-music-mixer">
-                <VolumeRow icon="music" label={t('music', 'music')} ariaLabel={t('music', 'volume')} value={music.volume} onChange={music.setVolume} />
-                {showSoundsVolume && (
-                    <VolumeRow
-                        icon={soundsValue > 0 ? 'soundOn' : 'soundOff'}
-                        label={t('music', 'sounds')}
-                        ariaLabel={t('music', 'soundsVolume')}
-                        value={soundsValue}
-                        onChange={sound.setVolume}
-                    />
-                )}
             </div>
 
             <div className="spinly-music-list-head">

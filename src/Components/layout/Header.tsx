@@ -1,12 +1,11 @@
 /**
- * Header: the top bar with the logo, language switch, light/dark toggle, profile menu and, on
- * mobile, the hamburger button that opens the wheel manager drawer.
+ * Header: the top bar with the logo, language switch, settings (volumes, light mode and music), profile
+ * menu and, on mobile, the hamburger button that opens the wheel manager drawer.
  */
-import Icon from '../common/Icon';
 import LanguageSwitch from '../i18n/LanguageSwitch';
 import ProfileMenu from './ProfileMenu';
+import SettingsMenu from './SettingsMenu';
 import { useTranslation } from '../i18n/LanguageProvider';
-import { useColorScheme } from '../../hooks/useColorScheme';
 import '../../css/Header.css';
 
 interface HeaderProps {
@@ -17,7 +16,6 @@ interface HeaderProps {
 /** Renders the app header. */
 function Header({ isMenuOpen, onToggleMenu }: HeaderProps) {
     const { t } = useTranslation();
-    const { scheme, toggle: toggleScheme } = useColorScheme();
 
     return (
         <header className="Header">
@@ -36,9 +34,7 @@ function Header({ isMenuOpen, onToggleMenu }: HeaderProps) {
                 {/* On mobile the language is picked inside the drawer */}
                 <LanguageSwitch variant="button" className="spinly-lang--header" />
 
-                <button type="button" className="spinly-theme" onClick={toggleScheme} aria-label={t('header', 'toggleTheme')}>
-                    <Icon name={scheme === 'dark' ? 'sun' : 'moon'} size={32} />
-                </button>
+                <SettingsMenu />
 
                 <ProfileMenu />
 

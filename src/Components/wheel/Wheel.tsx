@@ -7,11 +7,9 @@ import '../../css/Wheel.css';
 import { SPIN_DURATION, describeSector, getImageBox, getWheelBackground, spinWheel, getLabelTransform, getOptionProbabilities, isLightColor, WHEEL_VIEWBOX } from '../../scripts/wheel';
 import Icon from '../common/Icon';
 import DotField from './DotField';
-import AudioControls from '../music/AudioControls';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useMusicPulse } from '../../hooks/useMusicPulse';
 import { useMusic } from '../music/MusicProvider';
-import { MOBILE_QUERY } from '../../scripts/layout';
 import Tooltip from '../common/Tooltip';
 import type { WheelTheme } from '../../types/theme-types';
 import type { WheelOption } from '../../scripts/option-wheel';
@@ -72,7 +70,6 @@ function Wheel({ options, activeTheme, onColorChange, active = true }: WheelProp
     const lightsRef = useRef<HTMLButtonElement>(null);
     const [picker, setPicker] = useState<{ field: WheelColorField; anchor: HTMLElement; color: string } | null>(null);
     const sound = useSoundPreference();
-    const isMobile = useMediaQuery(MOBILE_QUERY);
     // With music playing, the lights follow its rhythm and pattern, even while spinning; without music they
     // do their usual fast chase while spinning.
     const music = useMusic();
@@ -318,8 +315,6 @@ function Wheel({ options, activeTheme, onColorChange, active = true }: WheelProp
                     </Tooltip>
                 </div>
             </div>
-            {/* Desktop: music and sounds at the bottom right. On mobile they live in the menu. */}
-            {!isMobile && active && <AudioControls variant="dock" />}
         </div>
     );
 }

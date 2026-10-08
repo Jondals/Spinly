@@ -2,9 +2,9 @@
  * Talks to the Chatterly that opened or framed Spinly. It only does something when Spinly was opened from
  * Chatterly (a window or a frame opened with ?chatterly=<origin of Chatterly>): it says hello, telling whether the person
  * is signed in, reports results (a spin of the wheel or a tournament champion) so Chatterly can post them
- * in a chat, and, when opened with &link=1, hands over the names and colors of the person's themes and presets
- * so Chatterly can use them in its own wheels. Messages go only to that origin, never to "*", and nothing is
- * received from Chatterly.
+ * in a chat, and, when Chatterly asks for it, hands over the names and colors of the person's themes and presets
+ * so Chatterly can use them in its own wheels. Messages go only to that origin, never to "*", and the only thing
+ * accepted from Chatterly is that one request, from the window that framed this page.
  */
 import { readLocalData } from './account-data';
 import { hasStoredSession } from './supabaseClient';
@@ -88,20 +88,21 @@ function buildProfile() {
     };
 }
 
-/** Whether Chatterly opened this window to link the account. */
-function isLinking(): boolean {
-    return new URLSearchParams(window.location.search).get('link') === '1';
+/** Answers the request of Chatterly for the themes and presets (only from the window and origin that framed this page). */
+function listenToChatterly(): void {
+    window.addEventListener('message', (event: MessageEvent) => {
+        const origin = chatterlyOrigin();
+        if (!origin || event.origin !== origin || event.source !== chatterlyWindow()) return;
+        const data = event.data as { source?: string; type?: string } | null;
+        if (!data || data.source !== 'chatterly' || data.type !== 'send-profile') return;
+        send({ type: 'profile', signedIn: hasStoredSession(), profile: buildProfile() });
+    });
 }
 
 /** Says hello to Chatterly, with whether the person is signed in to Spinly. Call once at startup. */
 export function startChatterlyBridge(): void {
-    const signedIn = hasStoredSession();
-    send({ type: 'hello', signedIn });
-    if (isLinking() && window.opener) {
-        // The window was opened only to link the account: hand the themes and presets over and go away.
-        send({ type: 'profile', signedIn, profile: buildProfile() });
-        window.setTimeout(() => window.close(), 600);
-    }
+    listenToChatterly();
+    send({ type: 'hello', signedIn: hasStoredSession() });
 }
 
 /** Tells Chatterly the result of a spin or a tournament. */

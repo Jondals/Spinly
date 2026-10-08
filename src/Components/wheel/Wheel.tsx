@@ -14,6 +14,7 @@ import Tooltip from '../common/Tooltip';
 import type { WheelTheme } from '../../types/theme-types';
 import type { WheelOption } from '../../scripts/option-wheel';
 import { playWin } from '../../scripts/sound';
+import { reportResult, reportSpin, type RemoteSpin } from '../../scripts/chatterly-bridge';
 import { useTranslation } from '../i18n/LanguageProvider';
 import { useSoundPreference, useSpinTicks } from '../../hooks/useSpinSound';
 import { useWheelColors } from '../../hooks/useWheelColors';
@@ -55,7 +56,10 @@ const cssColor = (name: string): string =>
     getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#000000';
 
 /** Renders the wheel and handles spinning, the result dialog and the color pickers. */
-function Wheel({ options, activeTheme, onColorChange, active = true }: WheelProps) {
+function Wheel({ options: localOptions, activeTheme, onColorChange, active = true }: WheelProps) {
+    // A spin that somebody else started in a Chatterly call replaces the options shown, until the person edits their own.
+    const [remoteOptions, setRemoteOptions] = useState<WheelOption[] | null>(null);
+    const options = remoteOptions ?? localOptions;
     const { lang, t } = useTranslation();
     const [rotation, setRotation] = useState(0);
     const [spinning, setSpinning] = useState(false);
@@ -96,12 +100,37 @@ function Wheel({ options, activeTheme, onColorChange, active = true }: WheelProp
         setSpinning(true);
         const result = spinWheel(options, rotation);
         setRotation(result.rotation);
+        reportSpin({ options: options.map((option) => ({ name: option.name, color: option.color })), rotation: result.rotation, winner: result.winner });
         setTimeout(() => {
             setSpinning(false);
             setWinner(result.winner);
             playWin();
+            reportResult({ kind: 'wheel', title: '', names: options.map((option) => option.name), winner: result.winner });
         }, SPIN_DURATION);
     };
+
+    // Own edits of the options end a remote view.
+    useEffect(() => {
+        setRemoteOptions(null);
+    }, [localOptions]);
+
+    // A spin from somebody else in a Chatterly call: same options, same landing angle, same winner.
+    useEffect(() => {
+        const onRemoteSpin = (event: Event) => {
+            const spin = (event as CustomEvent<RemoteSpin>).detail;
+            setRemoteOptions(spin.options.map((option, index) => ({ id: `remote-${index}`, name: option.name, color: option.color })));
+            setWinner(null);
+            setSpinning(true);
+            setRotation((current) => current + ((((spin.rotation - current) % 360) + 360) % 360) + 5 * 360);
+            setTimeout(() => {
+                setSpinning(false);
+                setWinner(spin.winner);
+                playWin();
+            }, SPIN_DURATION);
+        };
+        window.addEventListener('chatterly-remote-spin', onRemoteSpin);
+        return () => window.removeEventListener('chatterly-remote-spin', onRemoteSpin);
+    }, []);
 
     // Focus goes back to the spin button so it is not lost when the result closes.
     const spinButtonRef = useRef<HTMLButtonElement>(null);

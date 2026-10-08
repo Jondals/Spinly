@@ -97,23 +97,42 @@ function tone(ctx: AudioContext, { frequency, to, start, duration, volume, type 
     oscillator.stop(start + duration + 0.02);
 }
 
-/** The flapper's click as it passes the border between two sectors. */
+/** A short burst of filtered noise, the "wood" of the flapper's click. */
+function noise(ctx: AudioContext, { start, duration, volume, filter }: { start: number; duration: number; volume: number; filter: number }) {
+    const buffer = ctx.createBuffer(1, Math.max(1, Math.floor(ctx.sampleRate * duration)), ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.frequency.value = filter;
+    const gain = ctx.createGain();
+    const level = Math.max(volume * getSoundVolume() ** 2, 0.0002);
+    gain.gain.setValueAtTime(level, start);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+    source.connect(band).connect(gain).connect(ctx.destination);
+    source.start(start);
+}
+
+/** The flapper's click as it passes the border between two sectors (same sound as in Chatterly). */
 export function playTick(): void {
     const ctx = audio();
     if (!ctx) return;
     const now = ctx.currentTime;
-    tone(ctx, { frequency: 1900, start: now, duration: 0.035, volume: 0.12, type: 'triangle' });
-    tone(ctx, { frequency: 520, start: now, duration: 0.05, volume: 0.08, type: 'square' });
+    tone(ctx, { frequency: 1500, to: 900, start: now, duration: 0.03, volume: 0.1, type: 'triangle' });
+    noise(ctx, { start: now, duration: 0.006, volume: 0.05, filter: 4500 });
 }
 
-/** Short arpeggio when the winner is announced. */
+/** Short rising arpeggio when the winner is announced (same sound as in Chatterly). */
 export function playWin(): void {
     const ctx = audio();
     if (!ctx) return;
     const now = ctx.currentTime;
-    [523.25, 659.25, 783.99, 1046.5].forEach((frequency, i) => {
-        tone(ctx, { frequency, start: now + i * 0.09, duration: 0.45, volume: 0.14, type: 'sine' });
-    });
+    const notes: Array<[number, number, number]> = [[523, 0, 0.18], [659, 0.12, 0.18], [784, 0.24, 0.2], [1047, 0.36, 0.45]];
+    for (const [frequency, at, duration] of notes) {
+        tone(ctx, { frequency, start: now + at, duration, volume: 0.11, type: 'sine' });
+    }
 }
 
 /** Tournament: a duel is decided. A rising arpeggio that lands on a bright chord. */

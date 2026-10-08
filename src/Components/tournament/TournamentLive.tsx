@@ -15,6 +15,7 @@ import type { WheelColorField } from '../wheel/Wheel';
 import TournamentBracket from './TournamentBracket';
 import { HistoryView, matchRoundName, StandingsView } from './TournamentViews';
 import { playDuelWin, playFanfare, playWin } from '../../scripts/sound';
+import { reportResult } from '../../scripts/chatterly-bridge';
 import {
     addEvent,
     allMatches,
@@ -135,7 +136,15 @@ function TournamentLive({ tournament, onChange, onNew, onColorChange }: Tourname
         else if (decided?.winner) playDuelWin();
         else playWin();
         if (decided?.winner) setLastWon(people.get(decided.winner)?.name ?? null);
-        if (after.champion) setShowChampion(true);
+        if (after.champion) {
+            setShowChampion(true);
+            // The podium (champion, runner-up and third place) goes to Chatterly when Spinly was opened from it.
+            const final = after.rounds[after.rounds.length - 1][0];
+            const podium = [after.champion, final.loser, after.third?.winner ?? null]
+                .map((id) => (id ? next.participants.find((person) => person.id === id)?.name : undefined))
+                .filter((name): name is string => Boolean(name));
+            reportResult({ kind: 'tournament', title: config.name, names: podium, winner: podium[0] ?? '' });
+        }
         onChange(next);
     };
 

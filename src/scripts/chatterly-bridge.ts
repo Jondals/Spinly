@@ -1,10 +1,14 @@
 /**
  * Talks to the Chatterly that opened or framed Spinly. It only does something when Spinly was opened from
  * Chatterly (a window or a frame opened with ?chatterly=<origin of Chatterly>): it says hello, telling whether the person
- * is signed in, and reports results (a spin of the wheel or a tournament champion) so Chatterly can post them
- * in a chat. Messages go only to that origin, never to "*", and nothing is received from Chatterly.
+ * is signed in, reports results (a spin of the wheel or a tournament champion) so Chatterly can post them
+ * in a chat, and, when opened with &link=1, hands over the names and colors of the person's themes and presets
+ * so Chatterly can use them in its own wheels. Messages go only to that origin, never to "*", and nothing is
+ * received from Chatterly.
  */
+import { readLocalData } from './account-data';
 import { hasStoredSession } from './supabaseClient';
+import { DEFAULT_PRESETS, DEFAULT_THEMES, HIDDEN_DEFAULTS_STORAGE_KEY, type WheelTheme } from '../types/theme-types';
 
 /** A result worth sharing: the winner of a wheel spin or the champion of a tournament. */
 export type BridgeResult = {
@@ -46,53 +50,58 @@ function send(message: Record<string, unknown>): void {
     }
 }
 
-/** A spin that somebody else started: the same options and the same landing angle, so everybody sees the same result. */
-export type RemoteSpin = {
-    options: { name: string; color: string }[];
-    /** Final angle of the disc in degrees. */
-    rotation: number;
-    winner: string;
-};
-
-/** Plain text of at most `max` characters ('' for anything that is not a string). */
-function text(value: unknown, max: number): string {
-    return typeof value === 'string' ? value.slice(0, max) : '';
+/** Ids of the sample themes and presets the person deleted. */
+function hiddenDefaults(): string[] {
+    try {
+        const raw: unknown = JSON.parse(localStorage.getItem(HIDDEN_DEFAULTS_STORAGE_KEY) ?? '[]');
+        return Array.isArray(raw) ? raw.filter((id): id is string => typeof id === 'string') : [];
+    } catch {
+        return [];
+    }
 }
 
-/** Checks a spin that arrived from Chatterly; returns null when it is not usable. */
-function readRemoteSpin(raw: unknown): RemoteSpin | null {
-    if (typeof raw !== 'object' || raw === null) return null;
-    const record = raw as Record<string, unknown>;
-    if (!Array.isArray(record.options) || typeof record.rotation !== 'number' || !Number.isFinite(record.rotation)) return null;
-    const options = (record.options as unknown[]).slice(0, 25).map((item) => {
-        const entry = (item ?? {}) as Record<string, unknown>;
-        return { name: text(entry.name, 20), color: text(entry.color, 16) };
-    });
-    const winner = text(record.winner, 20);
-    return options.length > 0 && winner ? { options, rotation: record.rotation, winner } : null;
+/** A theme reduced to what Chatterly draws: its colors (no images). */
+function slimTheme(theme: WheelTheme) {
+    return {
+        name: theme.name,
+        segments: theme.segments.map((segment) => segment.color),
+        border: theme.borderColor,
+        center: theme.centerColor,
+        pointer: theme.pointerColor,
+        light: theme.lightColor,
+    };
 }
 
-/** Listens to Chatterly (only to the window and origin that framed or opened this page) for spins to replay. */
-function listenToChatterly(): void {
-    window.addEventListener('message', (event: MessageEvent) => {
-        const origin = chatterlyOrigin();
-        if (!origin || event.origin !== origin || event.source !== chatterlyWindow()) return;
-        const data = event.data as { source?: string; type?: string; spin?: unknown } | null;
-        if (!data || data.source !== 'chatterly' || data.type !== 'remote-spin') return;
-        const spin = readRemoteSpin(data.spin);
-        if (spin) window.dispatchEvent(new CustomEvent('chatterly-remote-spin', { detail: spin }));
-    });
+/** The themes and presets of this browser (the sample ones that were not deleted and the person's own), reduced to names and colors. */
+function buildProfile() {
+    const hidden = hiddenDefaults();
+    const saved = readLocalData();
+    const themes = [...DEFAULT_THEMES.filter((theme) => !hidden.includes(theme.id)), ...saved.themes];
+    const presets = [...DEFAULT_PRESETS.filter((preset) => !hidden.includes(preset.id)), ...saved.presets];
+    return {
+        themes: themes.map(slimTheme),
+        presets: presets.map((preset) => ({
+            name: preset.name,
+            options: preset.options.map((option) => ({ name: option.name, color: option.color })),
+            theme: slimTheme(preset.theme),
+        })),
+    };
 }
 
-/** Tells Chatterly that a spin started here (so the others in a call can watch the same spin). */
-export function reportSpin(spin: RemoteSpin): void {
-    send({ type: 'spin', spin });
+/** Whether Chatterly opened this window to link the account. */
+function isLinking(): boolean {
+    return new URLSearchParams(window.location.search).get('link') === '1';
 }
 
 /** Says hello to Chatterly, with whether the person is signed in to Spinly. Call once at startup. */
 export function startChatterlyBridge(): void {
-    listenToChatterly();
-    send({ type: 'hello', signedIn: hasStoredSession() });
+    const signedIn = hasStoredSession();
+    send({ type: 'hello', signedIn });
+    if (isLinking() && window.opener) {
+        // The window was opened only to link the account: hand the themes and presets over and go away.
+        send({ type: 'profile', signedIn, profile: buildProfile() });
+        window.setTimeout(() => window.close(), 600);
+    }
 }
 
 /** Tells Chatterly the result of a spin or a tournament. */
